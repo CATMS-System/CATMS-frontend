@@ -18,12 +18,14 @@ npm install
 npm run dev
 ```
 
-The application will be running at `http://localhost:5173`.
+The application will run at `http://localhost:5173`.
+Vite dev server is pre-configured to proxy all `/api` requests to the FastAPI backend running at `http://localhost:8000`.
 
 ### 4. Build for Production
 ```bash
 npm run build
 ```
+
 
 ## Component Architecture
 - `src/App.jsx`: Application layout shell, header, and workspace role selector.
