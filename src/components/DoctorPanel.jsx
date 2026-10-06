@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText } from 'lucide-react';
+import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope } from 'lucide-react';
 import { useDoctorQueue } from '../hooks/useDoctorQueue';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
@@ -89,6 +89,15 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
     spo2: '',
     weight: '',
   });
+
+  // Clinical diagnosis and notes state
+  const [diagnosis, setDiagnosis] = useState('');
+  const [clinicalNotes, setClinicalNotes] = useState('');
+  const [doctorNotes, setDoctorNotes] = useState('');
+  const [followUpDate, setFollowUpDate] = useState('');
+
+  // Today's minimum date string for follow-up validation
+  const minDate = useMemo(() => new Date().toISOString().split('T')[0], []);
 
   // Navigate to consultation room route, passing appointment_id and patient_id
   const handleSelectPatient = (queueItem) => {
@@ -255,77 +264,151 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
             </div>
           </div>
 
-          {/* Vitals Input Fields */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
-            <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3 flex items-center">
-              <Activity className="h-4.5 w-4.5 text-blue-600 mr-1.5 animate-pulse" />
-              Patient Vitals
-            </h3>
+          {/* Consultation Form: Vitals + Diagnosis + Notes */}
+          <div className="space-y-6">
+            {/* Vitals Input Fields */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+              <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3 flex items-center">
+                <Activity className="h-4.5 w-4.5 text-blue-600 mr-1.5 animate-pulse" />
+                Patient Vitals
+              </h3>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-                  Blood Pressure (mmHg)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 120/80"
-                  className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
-                  value={vitals.bp}
-                  onChange={(e) => setVitals({ ...vitals, bp: e.target.value })}
-                />
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                    Blood Pressure (mmHg)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 120/80"
+                    className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                    value={vitals.bp}
+                    onChange={(e) => setVitals({ ...vitals, bp: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                    Heart Rate (bpm)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 72"
+                    className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                    value={vitals.hr}
+                    onChange={(e) => setVitals({ ...vitals, hr: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                    Temperature (°F)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 98.6"
+                    className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                    value={vitals.temp}
+                    onChange={(e) => setVitals({ ...vitals, temp: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                    SpO2 (%)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 98"
+                    className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                    value={vitals.spo2}
+                    onChange={(e) => setVitals({ ...vitals, spo2: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                    Weight (kg)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 70"
+                    className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                    value={vitals.weight}
+                    onChange={(e) => setVitals({ ...vitals, weight: e.target.value })}
+                  />
+                </div>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-                  Heart Rate (bpm)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 72"
-                  className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
-                  value={vitals.hr}
-                  onChange={(e) => setVitals({ ...vitals, hr: e.target.value })}
-                />
-              </div>
+            {/* Diagnosis & Notes Fields */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5 shadow-xs">
+              <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3 flex items-center">
+                <Stethoscope className="h-4.5 w-4.5 text-blue-600 mr-1.5" />
+                Clinical Diagnosis & Consultation Notes
+              </h3>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-                  Temperature (°F)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 98.6"
-                  className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
-                  value={vitals.temp}
-                  onChange={(e) => setVitals({ ...vitals, temp: e.target.value })}
-                />
-              </div>
+              <div className="space-y-4">
+                {/* Diagnosis (Required) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase">
+                      Clinical Diagnosis <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-red-500 font-semibold uppercase tracking-wider">Required</span>
+                  </div>
+                  <textarea
+                    required
+                    rows="3"
+                    placeholder="Enter formal clinical diagnosis (e.g. Acute bacterial bronchitis, Essential hypertension)..."
+                    className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm font-semibold text-slate-900"
+                    value={diagnosis}
+                    onChange={(e) => setDiagnosis(e.target.value)}
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-                  SpO2 (%)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 98"
-                  className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
-                  value={vitals.spo2}
-                  onChange={(e) => setVitals({ ...vitals, spo2: e.target.value })}
-                />
-              </div>
+                {/* Clinical Notes */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                    Clinical Notes
+                  </label>
+                  <textarea
+                    rows="3"
+                    placeholder="Chief complaints, symptoms presentation, physical findings, and medical observations..."
+                    className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm text-slate-800"
+                    value={clinicalNotes}
+                    onChange={(e) => setClinicalNotes(e.target.value)}
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-                  Weight (kg)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 70"
-                  className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
-                  value={vitals.weight}
-                  onChange={(e) => setVitals({ ...vitals, weight: e.target.value })}
-                />
+                {/* Doctor Notes */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                    Doctor Notes (Confidential Remarks)
+                  </label>
+                  <textarea
+                    rows="2"
+                    placeholder="Internal clinician remarks, differential diagnoses, or specialist follow-up observations..."
+                    className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50/50"
+                    value={doctorNotes}
+                    onChange={(e) => setDoctorNotes(e.target.value)}
+                  />
+                </div>
+
+                {/* Follow-Up Date */}
+                <div className="max-w-xs">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1 flex items-center space-x-1">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                    <span>Follow-Up Date</span>
+                  </label>
+                  <input
+                    type="date"
+                    min={minDate}
+                    className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm font-mono text-slate-800"
+                    value={followUpDate}
+                    onChange={(e) => setFollowUpDate(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           </div>
