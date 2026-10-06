@@ -30,7 +30,7 @@ const reports = [
     columns: [
       ['Doctor_ID', 'Doctor ID'], ['Doctor_Name', 'Doctor Name'],
       ['Branch_ID', 'Branch ID'], ['Branch_Name', 'Branch Location'],
-      ['Total_Invoices', 'Total Invoices'], ['Gross_Revenue', 'Gross Revenue', true],
+      ['Total_Consultations', 'Consultations'], ['Total_Invoices', 'Total Invoices'], ['Gross_Revenue', 'Gross Revenue', true],
       ['Collected_Revenue', 'Collected Revenue', true]
     ]
   },

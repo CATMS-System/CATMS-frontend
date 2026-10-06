@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 import ReportsPanel from './ReportsPanel';
+import InvoiceDetailsModal from './InvoiceDetailsModal';
 
 import {
   getInvoices,
@@ -262,6 +263,13 @@ export default function BillingPanel({ subView, db, handlers }) {
   // REAL INVOICE FILTERING
   // =========================================================
 
+  const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
+  const [invoiceBranchFilter, setInvoiceBranchFilter] = useState('');
+  const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
+  const invoiceBranches = useMemo(() => [...new Map(apiInvoices.map(inv =>
+    [String(inv.Branch_ID), { id: inv.Branch_ID, name: inv.Branch_Name }]
+  )).values()], [apiInvoices]);
+
   const filteredInvoices = useMemo(() => {
     return apiInvoices.filter(inv => {
       const search =
@@ -288,13 +296,17 @@ export default function BillingPanel({ subView, db, handlers }) {
 
       return (
         matchSearch &&
-        matchStatus
+        matchStatus &&
+        (!invoiceDateFilter || inv.Invoice_Date === invoiceDateFilter) &&
+        (!invoiceBranchFilter || String(inv.Branch_ID) === invoiceBranchFilter)
       );
     });
   }, [
     apiInvoices,
     invoiceSearchQuery,
-    invoiceStatusFilter
+    invoiceStatusFilter,
+    invoiceDateFilter,
+    invoiceBranchFilter
   ]);
 
   // =========================================================
@@ -302,6 +314,7 @@ export default function BillingPanel({ subView, db, handlers }) {
   // =========================================================
 
   const handleViewInvoice = async invoiceId => {
+    setShowInvoiceDetails(true);
     try {
       setInvoiceDetailsLoading(true);
       setInvoiceDetailsError('');
@@ -734,13 +747,28 @@ export default function BillingPanel({ subView, db, handlers }) {
 
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="flex flex-wrap items-end gap-4">
+            <label className="text-xs font-semibold text-slate-500">
+              <span className="block mb-1">Invoice date</span>
+              <input type="date" value={invoiceDateFilter} onChange={e => setInvoiceDateFilter(e.target.value)}
+                className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white" />
+            </label>
+            <label className="text-xs font-semibold text-slate-500">
+              <span className="block mb-1">Branch</span>
+              <select value={invoiceBranchFilter} onChange={e => setInvoiceBranchFilter(e.target.value)}
+                className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">All branches</option>
+                {invoiceBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name} (#{branch.id})</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="grid grid-cols-1 gap-6">
 
             {/* =================================================
                 REAL INVOICE TABLE
                 ================================================= */}
 
-            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
 
               <table className="w-full text-left border-collapse text-sm">
 
@@ -969,180 +997,6 @@ export default function BillingPanel({ subView, db, handlers }) {
 
             </div>
 
-            {/* =================================================
-                REAL INVOICE DETAILS
-                ================================================= */}
-
-            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-6 shadow-xs h-fit">
-
-              {invoiceDetailsLoading ? (
-
-                <div className="text-center text-slate-400 py-20 text-xs">
-
-                  Loading invoice
-                  details...
-
-                </div>
-
-              ) : invoiceDetailsError ? (
-
-                <div className="text-center text-red-600 py-20 text-xs">
-
-                  {
-                    invoiceDetailsError
-                  }
-
-                </div>
-
-              ) : selectedApiInvoice ? (
-
-                <div className="space-y-5 text-xs text-slate-650">
-
-                  <div className="border-b border-slate-150 pb-4">
-
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-
-                      Invoice Record
-
-                    </span>
-
-                    <h2 className="text-lg font-bold text-slate-950 font-mono mt-0.5">
-
-                      Invoice #
-                      {
-                        selectedApiInvoice
-                          .invoice
-                          .Invoice_ID
-                      }
-
-                    </h2>
-
-                    <span className="text-slate-500 font-mono">
-
-                      Date Issued:{' '}
-
-                      {
-                        selectedApiInvoice
-                          .invoice
-                          .Invoice_Date
-                      }
-
-                    </span>
-
-                  </div>
-
-                  <div className="space-y-2 font-mono text-[11px]">
-
-                    <div className="flex justify-between">
-
-                      <span>
-                        Consultation ID:
-                      </span>
-
-                      <strong className="text-slate-800">
-
-                        #
-                        {
-                          selectedApiInvoice
-                            .invoice
-                            .Consultation_ID
-                        }
-
-                      </strong>
-
-                    </div>
-
-                    <div className="flex justify-between">
-
-                      <span>
-                        Consultation Fee:
-                      </span>
-
-                      <strong className="text-slate-800">
-
-                        Rs.{' '}
-
-                        {Number(
-                          selectedApiInvoice
-                            .invoice
-                            .Billed_Consultation_Fee
-                        ).toFixed(2)}
-
-                      </strong>
-
-                    </div>
-
-                    <div className="flex justify-between">
-
-                      <span>
-                        Invoice Status:
-                      </span>
-
-                      <strong className="text-slate-800">
-
-                        {
-                          selectedApiInvoice
-                            .invoice
-                            .Invoice_Status
-                        }
-
-                      </strong>
-
-                    </div>
-
-                  </div>
-
-                  <div className="border-t border-slate-150 pt-3 font-mono">
-
-                    <div className="flex justify-between text-blue-600 font-bold text-sm">
-
-                      <span>
-                        Total Bill:
-                      </span>
-
-                      <span>
-
-                        Rs.{' '}
-
-                        {Number(
-                          selectedApiInvoice
-                            .total_bill
-                        ).toFixed(2)}
-
-                      </span>
-
-                    </div>
-
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] text-slate-500">
-
-                    The backend currently
-                    returns the consultation
-                    fee and calculated total
-                    bill for this invoice.
-                    Individual treatment rows
-                    and outstanding balance
-                    are not included in this
-                    GET response.
-
-                  </div>
-
-                </div>
-
-              ) : (
-
-                <div className="text-center text-slate-400 py-20 text-xs">
-
-                  Select an invoice record
-                  from the grid ledger to
-                  view its billing details.
-
-                </div>
-
-              )}
-
-            </div>
 
           </div>
 
@@ -1376,6 +1230,8 @@ export default function BillingPanel({ subView, db, handlers }) {
         />
 
       )}
+
+      {showInvoiceDetails && <InvoiceDetailsModal details={selectedApiInvoice} loading={invoiceDetailsLoading} error={invoiceDetailsError} onClose={() => setShowInvoiceDetails(false)} />}
 
       {/* =====================================================
           REAL INSURANCE CLAIM SUBMISSION MODAL
