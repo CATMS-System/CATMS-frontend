@@ -1,13 +1,60 @@
-import React from 'react';
-import { Activity, Clock, ArrowRight, CornerDownRight } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft } from 'lucide-react';
 import { useDoctorQueue } from '../hooks/useDoctorQueue';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
   const currentDoctorId = db?.currentUser?.id || 'STF-001';
   const currentDoctorName = db?.currentUser?.name || 'Dr. Alexander Bennett';
 
-  // Wire doctor's daily appointment queue through the isolated hook
+  // Wire doctor's daily appointment queue through isolated hook
   const { queue, loading, updateQueueStatus } = useDoctorQueue(currentDoctorId, db?.liveQueue);
+
+  // Parse appointment_id and patient_id from route / URL
+  const { activeAppointmentId, activePatientId } = useMemo(() => {
+    let apptId = null;
+    let patId = null;
+
+    if (paramId) {
+      // Handles both /doctor/consultation/:appointmentId?patient_id=:patientId and /doctor/consultation/:appointmentId/:patientId
+      const cleanParam = paramId.split('?')[0];
+      const parts = cleanParam.split('/');
+      apptId = parts[0] || null;
+      if (parts.length > 1) {
+        patId = parts[1];
+      }
+    }
+
+    if (typeof window !== 'undefined' && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('patient_id')) {
+        patId = params.get('patient_id');
+      }
+      if (params.get('appointment_id')) {
+        apptId = params.get('appointment_id');
+      }
+    }
+
+    return {
+      activeAppointmentId: apptId,
+      activePatientId: patId,
+    };
+  }, [paramId]);
+
+  // Navigate to consultation room route, passing appointment_id and patient_id
+  const handleSelectPatient = (queueItem) => {
+    const apptId = queueItem.appointmentId || queueItem.appointment_id || 'APP-1001';
+    const patientId = queueItem.patientId || queueItem.patient_id || 'PAT-0001';
+
+    updateQueueStatus(patientId, 'IN_PROGRESS');
+
+    const targetRoute = `/doctor/consultation/${apptId}?patient_id=${patientId}`;
+    if (handlers?.navigateTo) {
+      handlers.navigateTo(targetRoute);
+    } else {
+      window.history.pushState(null, '', targetRoute);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -49,7 +96,11 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                     </tr>
                   ) : queue.length > 0 ? (
                     queue.map((q, idx) => (
-                      <tr key={q.queueNo || q.appointmentId || idx} className="hover:bg-slate-50/50">
+                      <tr
+                        key={q.queueNo || q.appointmentId || idx}
+                        onClick={() => handleSelectPatient(q)}
+                        className="hover:bg-slate-50/70 cursor-pointer transition-colors"
+                      >
                         <td className="px-6 py-4 text-center font-mono font-bold text-slate-900">
                           #{idx + 1}
                         </td>
@@ -76,9 +127,13 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                         <td className="px-6 py-4 text-right">
                           <button
                             type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectPatient(q);
+                            }}
                             className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
                           >
-                            <span>Call Patient</span>
+                            <span>{q.status === 'IN_PROGRESS' ? 'Resume Console' : 'Call Patient'}</span>
                             <CornerDownRight className="h-3.5 w-3.5" />
                           </button>
                         </td>
@@ -98,12 +153,26 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         </div>
       )}
 
-      {/* Placeholder consultation room */}
+      {/* 2. CONSULTATION ROOM ROUTE (PLACEHOLDER) */}
       {subView === 'consultation' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
-          <Activity className="h-10 w-10 text-blue-500 mx-auto mb-3" />
-          <h2 className="text-lg font-bold text-slate-800">Consultation Room</h2>
-          <p className="text-sm mt-1">Select a patient from the queue to start consultation.</p>
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-xs text-center">
+            <Activity className="h-10 w-10 text-blue-600 mx-auto mb-3 animate-pulse" />
+            <h2 className="text-xl font-bold text-slate-800">Consultation Room</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Active session for Appointment: <span className="font-mono font-semibold text-slate-700">{activeAppointmentId || 'N/A'}</span> | Patient: <span className="font-mono font-semibold text-slate-700">{activePatientId || 'N/A'}</span>
+            </p>
+            <div className="mt-6 flex justify-center space-x-3">
+              <button
+                type="button"
+                onClick={() => handlers?.navigateTo ? handlers.navigateTo('/doctor/workbench') : window.history.back()}
+                className="inline-flex items-center space-x-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Back to Queue</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
