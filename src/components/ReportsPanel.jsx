@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Filter } from 'lucide-react';
+import { Download, FileText, Filter } from 'lucide-react';
+import { createReportCsv, createReportPdf, downloadCsv, reportFilename } from '../utils/reportExport';
 import {
   getBranchDailySummary,
   getDoctorRevenue,
@@ -115,7 +116,30 @@ export default function ReportsPanel({ db }) {
     return () => { active = false; };
   }, [reportId, branchFilter, dateStart, dateEnd, requestKey]);
 
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
   const loading = result.key !== requestKey || result.loading;
+  const canExport = Boolean(report && !loading && !result.error && result.rows.length > 0 && !exporting);
+  const handleExport = async format => {
+    if (!canExport) return;
+    setExportError('');
+    setExporting(true);
+    // Capture the visible response and its matching filters before lazy-loading PDF code.
+    const filters = { dateStart, dateEnd, branchId: branchFilter };
+    const rows = result.rows;
+    const filename = reportFilename(report, filters);
+    try {
+      if (format === 'csv') downloadCsv(createReportCsv(report, rows), filename);
+      else {
+        const doc = await createReportPdf(report, rows, filters);
+        doc.save(`${filename}.pdf`);
+      }
+    } catch (error) {
+      setExportError(error.message || 'Failed to export report. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
   const inputClass = 'border border-slate-200 rounded-lg px-3 py-2 bg-white text-xs font-semibold text-slate-700';
 
   return (
@@ -125,8 +149,20 @@ export default function ReportsPanel({ db }) {
           <h1 className="text-2xl font-bold text-slate-900">Operational & Management Reports Suite</h1>
           <p className="text-sm text-slate-500 mt-1">Cross-branch statistical analytics, financial audits, and treatment monitoring</p>
         </div>
-        <span className="text-xs text-slate-400">CSV and PDF exports unavailable</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <button disabled={!canExport} onClick={() => handleExport('csv')}
+            className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+            <Download className="h-3.5 w-3.5" />Export CSV
+          </button>
+          <button disabled={!canExport} onClick={() => handleExport('pdf')}
+            className="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+            <FileText className="h-3.5 w-3.5" />Export PDF
+          </button>
+          {exporting && <span role="status" className="text-xs text-slate-500">Preparing export…</span>}
+        </div>
       </div>
+
+      {exportError && <p role="alert" className="text-sm text-red-600">{exportError}</p>}
 
       <div className="border-b border-slate-200 overflow-x-auto">
         <nav className="flex space-x-6" aria-label="Management reports">
