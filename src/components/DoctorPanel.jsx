@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText } from 'lucide-react';
 import { useDoctorQueue } from '../hooks/useDoctorQueue';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
@@ -15,7 +15,6 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
     let patId = null;
 
     if (paramId) {
-      // Handles both /doctor/consultation/:appointmentId?patient_id=:patientId and /doctor/consultation/:appointmentId/:patientId
       const cleanParam = paramId.split('?')[0];
       const parts = cleanParam.split('/');
       apptId = parts[0] || null;
@@ -39,6 +38,57 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       activePatientId: patId,
     };
   }, [paramId]);
+
+  // Resolve active appointment and patient data from db
+  const activeAppt = useMemo(() => {
+    if (!activeAppointmentId) return null;
+    return (
+      db?.appointmentList?.find(
+        (a) => a.id === activeAppointmentId || String(a.appointment_id) === String(activeAppointmentId)
+      ) || {
+        id: activeAppointmentId,
+        date: new Date().toISOString().split('T')[0],
+        time: '10:00 AM',
+        reason: 'Clinical consultation',
+        status: 'In-Progress',
+      }
+    );
+  }, [db?.appointmentList, activeAppointmentId]);
+
+  const activePatient = useMemo(() => {
+    const pId = activePatientId || activeAppt?.patientId || activeAppt?.patient_id;
+    if (!pId) return null;
+    return (
+      db?.patientList?.find(
+        (p) => p.id === pId || String(p.patient_id) === String(pId)
+      ) || {
+        id: pId,
+        name: 'Patient ' + pId,
+        dob: '1990-01-01',
+        gender: 'Not specified',
+        nic: '900000000V',
+        insurance: { provider: 'Standard Health' },
+      }
+    );
+  }, [db?.patientList, activePatientId, activeAppt]);
+
+  // Calculate age from date of birth
+  const patientAge = useMemo(() => {
+    if (!activePatient?.dob) return 'N/A';
+    const birthYear = new Date(activePatient.dob).getFullYear();
+    const currentYear = new Date().getFullYear();
+    const calculated = currentYear - birthYear;
+    return calculated > 0 && !isNaN(calculated) ? `${calculated} yrs` : 'N/A';
+  }, [activePatient?.dob]);
+
+  // Vitals inputs state
+  const [vitals, setVitals] = useState({
+    bp: '',
+    hr: '',
+    temp: '',
+    spo2: '',
+    weight: '',
+  });
 
   // Navigate to consultation room route, passing appointment_id and patient_id
   const handleSelectPatient = (queueItem) => {
@@ -153,24 +203,130 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         </div>
       )}
 
-      {/* 2. CONSULTATION ROOM ROUTE (PLACEHOLDER) */}
+      {/* 2. CONSULTATION ROOM ROUTE */}
       {subView === 'consultation' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-xs text-center">
-            <Activity className="h-10 w-10 text-blue-600 mx-auto mb-3 animate-pulse" />
-            <h2 className="text-xl font-bold text-slate-800">Consultation Room</h2>
-            <p className="text-sm text-slate-500 mt-1">
-              Active session for Appointment: <span className="font-mono font-semibold text-slate-700">{activeAppointmentId || 'N/A'}</span> | Patient: <span className="font-mono font-semibold text-slate-700">{activePatientId || 'N/A'}</span>
-            </p>
-            <div className="mt-6 flex justify-center space-x-3">
+          {/* Patient Header (Name, Age, Appointment info) */}
+          <div className="bg-slate-900 rounded-xl p-6 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
+            <div className="flex items-center space-x-4">
+              <div className="h-14 w-14 bg-white/10 text-white rounded-full flex items-center justify-center font-bold text-xl border border-white/20">
+                {activePatient?.name?.charAt(0) || 'P'}
+              </div>
+              <div>
+                <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold font-mono">
+                  In Consultation
+                </span>
+                <h2 className="text-xl font-bold mt-0.5">{activePatient?.name || 'Selected Patient'}</h2>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/70 font-mono mt-1">
+                  <span>Patient ID: {activePatient?.id || activePatientId || 'N/A'}</span>
+                  <span>|</span>
+                  <span>Age: {patientAge}</span>
+                  <span>|</span>
+                  <span>DOB: {activePatient?.dob || 'N/A'}</span>
+                  <span>|</span>
+                  <span>Gender: {activePatient?.gender || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
+              <div className="bg-white/10 border border-white/20 rounded-xl p-3">
+                <span className="block text-white/50 text-[9px] uppercase tracking-wider mb-0.5 font-bold">
+                  Appointment Details
+                </span>
+                <strong className="text-white text-xs block">
+                  #{activeAppt?.id || activeAppointmentId || 'N/A'} ({activeAppt?.time || 'Scheduled'})
+                </strong>
+                <span className="text-[10px] text-white/70 truncate max-w-xs block">
+                  Reason: {activeAppt?.reason || 'General checkup'}
+                </span>
+              </div>
+
               <button
                 type="button"
-                onClick={() => handlers?.navigateTo ? handlers.navigateTo('/doctor/workbench') : window.history.back()}
-                className="inline-flex items-center space-x-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
+                onClick={() =>
+                  handlers?.navigateTo ? handlers.navigateTo('/doctor/workbench') : window.history.back()
+                }
+                className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl px-4 py-3 font-semibold transition-all flex items-center space-x-1.5 cursor-pointer"
               >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span>Back to Queue</span>
+                <ArrowLeft className="h-4 w-4" />
+                <span>Return to Queue</span>
               </button>
+            </div>
+          </div>
+
+          {/* Vitals Input Fields */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+            <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3 flex items-center">
+              <Activity className="h-4.5 w-4.5 text-blue-600 mr-1.5 animate-pulse" />
+              Patient Vitals
+            </h3>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                  Blood Pressure (mmHg)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 120/80"
+                  className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                  value={vitals.bp}
+                  onChange={(e) => setVitals({ ...vitals, bp: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                  Heart Rate (bpm)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 72"
+                  className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                  value={vitals.hr}
+                  onChange={(e) => setVitals({ ...vitals, hr: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                  Temperature (°F)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 98.6"
+                  className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                  value={vitals.temp}
+                  onChange={(e) => setVitals({ ...vitals, temp: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                  SpO2 (%)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 98"
+                  className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                  value={vitals.spo2}
+                  onChange={(e) => setVitals({ ...vitals, spo2: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                  Weight (kg)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 70"
+                  className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                  value={vitals.weight}
+                  onChange={(e) => setVitals({ ...vitals, weight: e.target.value })}
+                />
+              </div>
             </div>
           </div>
         </div>
