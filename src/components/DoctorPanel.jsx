@@ -1,8 +1,13 @@
 import React from 'react';
 import { Activity, Clock, ArrowRight, CornerDownRight } from 'lucide-react';
+import { useDoctorQueue } from '../hooks/useDoctorQueue';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
+  const currentDoctorId = db?.currentUser?.id || 'STF-001';
   const currentDoctorName = db?.currentUser?.name || 'Dr. Alexander Bennett';
+
+  // Wire doctor's daily appointment queue through the isolated hook
+  const { queue, loading, updateQueueStatus } = useDoctorQueue(currentDoctorId, db?.liveQueue);
 
   return (
     <div className="space-y-6">
@@ -36,11 +41,56 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-650">
-                  <tr>
-                    <td colSpan="5" className="px-6 py-10 text-center text-slate-400">
-                      No triage patients in your queue today. Refresh to monitor check-ins.
-                    </td>
-                  </tr>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
+                        Loading daily consultation queue...
+                      </td>
+                    </tr>
+                  ) : queue.length > 0 ? (
+                    queue.map((q, idx) => (
+                      <tr key={q.queueNo || q.appointmentId || idx} className="hover:bg-slate-50/50">
+                        <td className="px-6 py-4 text-center font-mono font-bold text-slate-900">
+                          #{idx + 1}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-900">{q.patientName || q.patient_name}</div>
+                          <span className="text-xs text-slate-400 font-mono">
+                            {q.patientId || q.patient_id}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-medium">{q.reason || 'Routine Checkup'}</td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
+                              q.status === 'IN_PROGRESS'
+                                ? 'bg-blue-50 text-blue-700 border-blue-150 animate-pulse'
+                                : q.status === 'WALK_IN'
+                                ? 'bg-amber-50 text-amber-700 border-amber-150'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-150'
+                            }`}
+                          >
+                            {q.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            type="button"
+                            className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
+                          >
+                            <span>Call Patient</span>
+                            <CornerDownRight className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-10 text-center text-slate-400">
+                        No triage patients in your queue today. Refresh to monitor check-ins.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -48,7 +98,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         </div>
       )}
 
-      {/* Placeholder consultation room for routes other than workbench */}
+      {/* Placeholder consultation room */}
       {subView === 'consultation' && (
         <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
           <Activity className="h-10 w-10 text-blue-500 mx-auto mb-3" />
