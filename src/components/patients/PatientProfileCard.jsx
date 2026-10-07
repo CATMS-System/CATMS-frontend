@@ -14,30 +14,30 @@ export default function PatientProfileCard({
   const [showAllPolicies, setShowAllPolicies] = useState(false);
   const [allPolicies, setAllPolicies] = useState([]);
   const [isLoadingPolicies, setIsLoadingPolicies] = useState(false);
+  const [policyError, setPolicyError] = useState('');
 
-  // reset all policies toggle when patient changes
+  // reset all policies toggle when patient is loaded again
   useEffect(() => {
     setShowAllPolicies(false);
     setAllPolicies([]);
-  }, [patient?.patient_id]);
+    setPolicyError('');
+  }, [patient]);
 
   // fetch full policy list when user toggles show all
   const handleToggleAllPolicies = () => {
-    if (!showAllPolicies && patient) {
-      setIsLoadingPolicies(true);
-      listPolicies(patient.patient_id)
-        .then(policies => {
-          setAllPolicies(policies);
-          setIsLoadingPolicies(false);
-          setShowAllPolicies(true);
-        })
-        .catch(() => {
-          setIsLoadingPolicies(false);
-          setShowAllPolicies(true);
-        });
-    } else {
+    if (showAllPolicies) {
       setShowAllPolicies(false);
+      return;
     }
+    setIsLoadingPolicies(true);
+    setPolicyError('');
+    listPolicies(patient.patient_id)
+      .then(policies => {
+        setAllPolicies(policies);
+        setShowAllPolicies(true);
+      })
+      .catch(err => setPolicyError(err.message))
+      .finally(() => setIsLoadingPolicies(false));
   };
 
   if (isLoading) {
@@ -150,6 +150,10 @@ export default function PatientProfileCard({
             </div>
           </div>
 
+          {policyError && (
+            <div className="text-red-600 text-xs">{policyError}</div>
+          )}
+
           {policiesToDisplay.length === 0 ? (
             <div className="text-slate-400 text-xs italic py-1">
               No insurance policies on record
@@ -166,11 +170,10 @@ export default function PatientProfileCard({
                       {policy.provider_name}
                     </span>
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex items-center ${
-                        policy.is_currently_valid
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-slate-150 text-slate-600'
-                      }`}
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex items-center ${policy.is_currently_valid
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-150 text-slate-600'
+                        }`}
                     >
                       {policy.is_currently_valid ? (
                         <>
