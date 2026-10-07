@@ -2,10 +2,10 @@
 
 import React, { useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import { createProvider } from '../../services/insuranceService';
+import { isValidPhone, isValidPostalCode, isValidEmail } from '../../utils/patientFormat';
 
-export default function ProviderModal({
-  isOpen,
-  onClose
+export default function ProviderModal({ isOpen, onClose, onSuccess
 }) {
   const [providerName, setProviderName] = useState('');
   const [contactNumber, setContactNumber] = useState('');
@@ -32,6 +32,73 @@ export default function ProviderModal({
     setGeneralError('');
   };
 
+  const validate = () => {
+    const newErrors = {};
+    if (!providerName.trim()) newErrors.providerName = 'Provider name is required';
+    if (!contactNumber.trim()) {
+      newErrors.contactNumber = 'Phone number is required';
+    } else if (!isValidPhone(contactNumber)) {
+      newErrors.contactNumber = 'Enter a valid phone number';
+    }
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!isValidEmail(email)) {
+      newErrors.email = 'Enter a valid email address';
+    }
+    if (!streetAddress.trim()) newErrors.streetAddress = 'Street address is required';
+    if (!city.trim()) newErrors.city = 'City is required';
+    if (!stateProvince.trim()) newErrors.stateProvince = 'Province is required';
+    if (!postalCode.trim()) {
+      newErrors.postalCode = 'Postal code is required';
+    } else if (!isValidPostalCode(postalCode)) {
+      newErrors.postalCode = 'Postal code must be exactly 5 digits';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setGeneralError('');
+    if (!validate()) return;
+
+    setIsSubmitting(true);
+    try {
+      const provider = await createProvider({
+        provider_name: providerName.trim(),
+        contact_number: contactNumber.trim(),
+        email: email.trim(),
+        street_address: streetAddress.trim(),
+        city: city.trim(),
+        state_province: stateProvince.trim(),
+        postal_code: postalCode.trim()
+      });
+      setIsSubmitting(false);
+      resetForm();
+      onSuccess(provider);
+      onClose();
+    } catch (err) {
+      setIsSubmitting(false);
+      const fieldMessages = {};
+
+      if (err.status === 409 && err.message.includes('name')) {
+        fieldMessages.providerName = err.message;
+      } else if (err.status === 409 && err.message.includes('email')) {
+        fieldMessages.email = err.message;
+      } else {
+        setGeneralError(err.message || 'Failed to create provider');
+      }
+
+      if (err.fieldErrors) {
+        if (err.fieldErrors.provider_name) fieldMessages.providerName = err.fieldErrors.provider_name;
+        if (err.fieldErrors.contact_number) fieldMessages.contactNumber = err.fieldErrors.contact_number;
+        if (err.fieldErrors.email) fieldMessages.email = err.fieldErrors.email;
+        if (err.fieldErrors.postal_code) fieldMessages.postalCode = err.fieldErrors.postal_code;
+      }
+      setErrors(prev => ({ ...prev, ...fieldMessages }));
+    }
+  };
+
   const handleClose = () => {
     resetForm();
     onClose();
@@ -44,6 +111,7 @@ export default function ProviderModal({
         onClick={handleClose}
       />
       <form
+        onSubmit={handleSubmit}
         className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-6 space-y-4"
       >
         <div className="flex justify-between items-center border-b border-slate-100 pb-3">
