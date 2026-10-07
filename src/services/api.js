@@ -22,7 +22,7 @@ export async function request(method, path, body = null) {
   let response;
   try {
     response = await fetch(`/api/v1${path}`, options);
-  } catch (err) {
+  } catch {
     throw {
       status: 0,
       message: 'Cannot reach the server',
@@ -35,7 +35,7 @@ export async function request(method, path, body = null) {
   if (text) {
     try {
       json = JSON.parse(text);
-    } catch (parseErr) {
+    } catch {
       json = null;
     }
   }
