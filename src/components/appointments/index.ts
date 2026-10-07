@@ -7,3 +7,5 @@ export { TriageUrgencySelector, type TriageUrgency } from './TriageUrgencySelect
 export { WalkInModal } from './WalkInModal';
 export { QueueStatusBadge } from './QueueStatusBadge';
 export { ClinicQueueTable } from './ClinicQueueTable';
+export { CancelAppointmentModal } from './CancelAppointmentModal';
+export { RescheduleModal } from './RescheduleModal';
