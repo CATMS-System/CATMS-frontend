@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope, AlertCircle, Search, Filter, Layers, Tag } from 'lucide-react';
+import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope, AlertCircle, Search, Filter, Layers, Tag, Plus, Minus, Trash2, ClipboardList } from 'lucide-react';
 import { useDoctorQueue } from '../hooks/useDoctorQueue';
 import { getCatalogue, getCategories } from '../api/treatmentApi';
 
@@ -205,6 +205,62 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       clearTimeout(debounceTimer);
     };
   }, [catalogueSearch, selectedCategory, DEFAULT_CATALOGUE]);
+
+  // Prescribed treatments state (Step F11)
+  const [prescribedItems, setPrescribedItems] = useState([]);
+
+  // Add treatment from catalogue browser
+  const handleAddTreatment = (item) => {
+    setPrescribedItems((prev) => {
+      const existingIndex = prev.findIndex(
+        (p) =>
+          (p.treatment_id && p.treatment_id === item.treatment_id) ||
+          p.service_code === item.service_code
+      );
+      if (existingIndex >= 0) {
+        return prev.map((p, idx) =>
+          idx === existingIndex ? { ...p, quantity: p.quantity + 1 } : p
+        );
+      }
+      return [
+        ...prev,
+        {
+          treatment_id: item.treatment_id,
+          service_code: item.service_code,
+          treatment_name: item.treatment_name,
+          standard_unit_price: Number(item.standard_unit_price || 0),
+          category_name: item.category_name,
+          quantity: 1,
+          instructions: '',
+        },
+      ];
+    });
+  };
+
+  // Remove treatment from prescribing table
+  const handleRemoveTreatment = (indexToRemove) => {
+    setPrescribedItems((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  // Update treatment quantity selector
+  const handleUpdateQuantity = (index, delta) => {
+    setPrescribedItems((prev) =>
+      prev.map((p, idx) => {
+        if (idx === index) {
+          const newQty = Math.max(1, p.quantity + delta);
+          return { ...p, quantity: newQty };
+        }
+        return p;
+      })
+    );
+  };
+
+  // Update treatment dosage instructions
+  const handleUpdateInstructions = (index, text) => {
+    setPrescribedItems((prev) =>
+      prev.map((p, idx) => (idx === index ? { ...p, instructions: text } : p))
+    );
+  };
 
   // Navigate to consultation room route, passing appointment_id and patient_id
   const handleSelectPatient = (queueItem) => {
@@ -557,6 +613,105 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
               </div>
             </div>
 
+            {/* Prescribing Table (Step F11) */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-md flex items-center">
+                    <ClipboardList className="h-4.5 w-4.5 text-blue-600 mr-1.5" />
+                    Prescribed Treatments & Items
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Itemized treatments, procedures, and medications prescribed for this consultation
+                  </p>
+                </div>
+                <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-full font-mono">
+                  {prescribedItems.length} {prescribedItems.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                      <th className="px-4 py-2.5 w-12 text-center">#</th>
+                      <th className="px-4 py-2.5">Treatment Item</th>
+                      <th className="px-4 py-2.5 w-36 text-center">Quantity</th>
+                      <th className="px-4 py-2.5">Instructions / Dosage</th>
+                      <th className="px-4 py-2.5 w-20 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {prescribedItems.length > 0 ? (
+                      prescribedItems.map((item, idx) => (
+                        <tr key={item.treatment_id || item.service_code || idx} className="hover:bg-slate-50/50">
+                          <td className="px-4 py-3 text-center font-mono font-bold text-slate-400">
+                            {idx + 1}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-900">{item.treatment_name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono flex items-center space-x-1.5">
+                              <span>{item.service_code}</span>
+                              <span>•</span>
+                              <span>{item.category_name || 'General'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <div className="inline-flex items-center space-x-1.5 bg-slate-50 border border-slate-250 rounded-lg p-1">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantity(idx, -1)}
+                                className="p-1 hover:bg-slate-200 rounded text-slate-600 transition-colors cursor-pointer"
+                                title="Decrease quantity"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="w-8 text-center font-mono font-bold text-slate-900 text-xs">
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantity(idx, 1)}
+                                className="p-1 hover:bg-slate-200 rounded text-slate-600 transition-colors cursor-pointer"
+                                title="Increase quantity"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <input
+                              type="text"
+                              placeholder="e.g. 1 tab TDS after meals for 5 days..."
+                              className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-2.5 py-1.5 text-xs text-slate-800"
+                              value={item.instructions}
+                              onChange={(e) => handleUpdateInstructions(idx, e.target.value)}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTreatment(idx)}
+                              className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Remove treatment"
+                            >
+                              <Trash2 className="h-4 w-4 mx-auto" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5" className="px-4 py-8 text-center text-slate-400">
+                          No treatments prescribed yet. Select treatments from the catalogue browser below to add them to this prescription.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {/* Treatment Catalogue Browser (Step F10) */}
             <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
@@ -604,7 +759,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                 </div>
               </div>
 
-              {/* Catalogue Results List (Step F10: no add-to-prescription yet) */}
+              {/* Catalogue Results List with Prescribe button */}
               <div className="border border-slate-150 rounded-lg divide-y divide-slate-100 max-h-72 overflow-y-auto">
                 {loadingCatalogue ? (
                   <div className="p-6 text-center text-xs text-slate-400">
@@ -636,13 +791,23 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                         </div>
                       </div>
 
-                      <div className="text-right shrink-0 ml-4">
-                        <span className="font-mono text-xs font-bold text-slate-900 block">
-                          ${Number(item.standard_unit_price || 0).toFixed(2)}
-                        </span>
-                        <span className="text-[10px] text-slate-400 uppercase font-mono">
-                          Standard Fee
-                        </span>
+                      <div className="flex items-center space-x-3 shrink-0 ml-4">
+                        <div className="text-right">
+                          <span className="font-mono text-xs font-bold text-slate-900 block">
+                            ${Number(item.standard_unit_price || 0).toFixed(2)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 uppercase font-mono">
+                            Standard Fee
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAddTreatment(item)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1 cursor-pointer transition-colors shadow-xs"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Prescribe</span>
+                        </button>
                       </div>
                     </div>
                   ))
