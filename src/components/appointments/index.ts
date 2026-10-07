@@ -5,3 +5,5 @@ export { ConflictAlertBanner } from './ConflictAlertBanner';
 export { AppointmentBookingModal } from './AppointmentBookingModal';
 export { TriageUrgencySelector, type TriageUrgency } from './TriageUrgencySelector';
 export { WalkInModal } from './WalkInModal';
+export { QueueStatusBadge } from './QueueStatusBadge';
+export { ClinicQueueTable } from './ClinicQueueTable';
