@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Users, Building, AlertCircle, Calendar, Plus, MapPin, Key, RefreshCw, Check, ArrowLeftRight, UserX, UserCheck, ShieldCheck } from 'lucide-react';
+import api from '../api/axios';
 import ReportsPanel from './ReportsPanel';
 
 export default function AdminPanel({ subView, db, handlers }) {
@@ -141,39 +142,59 @@ export default function AdminPanel({ subView, db, handlers }) {
     });
   };
 
-  const handleToggleStaffStatus = (staff) => {
+  const handleToggleStaffStatus = async (staff) => {
     const nextStatus = staff.status === 'Active' ? 'Inactive' : 'Active';
-    const updated = staffList.map(s => {
-      if (s.id === staff.id) return { ...s, status: nextStatus };
-      return s;
-    });
-    setStaffList(updated);
-    addAuditLog(
-      'UPDATE_STAFF',
-      `Toggled status of ${staff.name} to ${nextStatus}`,
-      JSON.stringify(staff),
-      JSON.stringify({ ...staff, status: nextStatus })
-    );
-    triggerToast(`${staff.name} is now ${nextStatus}`);
+    try {
+      const staffIdInt = parseInt(staff.id.split('-')[1]);
+      await api.put(`/staff/${staffIdInt}`, { Employment_Status: nextStatus });
+
+      const updated = staffList.map(s => {
+        if (s.id === staff.id) return { ...s, status: nextStatus };
+        return s;
+      });
+      setStaffList(updated);
+      addAuditLog(
+        'UPDATE_STAFF',
+        `Toggled status of ${staff.name} to ${nextStatus}`,
+        JSON.stringify(staff),
+        JSON.stringify({ ...staff, status: nextStatus })
+      );
+      triggerToast(`${staff.name} is now ${nextStatus}`);
+    } catch (err) {
+      console.error("API Error updating status", err);
+      triggerToast(`Failed to update status for ${staff.name}`);
+    }
   };
 
-  const handleTransferBranch = (e) => {
+  const handleTransferBranch = async (e) => {
     e.preventDefault();
     const newBranch = e.target.transferBranch.value;
     const oldBranch = selectedStaff.branch;
-    const updated = staffList.map(s => {
-      if (s.id === selectedStaff.id) return { ...s, branch: newBranch };
-      return s;
-    });
-    setStaffList(updated);
-    addAuditLog(
-      'UPDATE_STAFF',
-      `Transferred branch for ${selectedStaff.name} from ${oldBranch} to ${newBranch}`,
-      JSON.stringify(selectedStaff),
-      JSON.stringify({ ...selectedStaff, branch: newBranch })
-    );
-    triggerToast(`Transferred ${selectedStaff.name} to ${newBranch}`);
-    setShowTransferBranchModal(false);
+    
+    const branchObj = branches.find(b => b.Branch_Name === newBranch || b.name === newBranch);
+    const branchId = branchObj ? (branchObj.Branch_ID || 1) : 1;
+
+    try {
+      const staffIdInt = parseInt(selectedStaff.id.split('-')[1]);
+      await api.put(`/staff/${staffIdInt}`, { Branch_ID: branchId });
+
+      const updated = staffList.map(s => {
+        if (s.id === selectedStaff.id) return { ...s, branch: newBranch };
+        return s;
+      });
+      setStaffList(updated);
+      addAuditLog(
+        'UPDATE_STAFF',
+        `Transferred branch for ${selectedStaff.name} from ${oldBranch} to ${newBranch}`,
+        JSON.stringify(selectedStaff),
+        JSON.stringify({ ...selectedStaff, branch: newBranch })
+      );
+      triggerToast(`Transferred ${selectedStaff.name} to ${newBranch}`);
+      setShowTransferBranchModal(false);
+    } catch (err) {
+      console.error("API Error transferring branch", err);
+      triggerToast(`Failed to transfer ${selectedStaff.name}`);
+    }
   };
 
   const handleForcePasswordReset = (e) => {
