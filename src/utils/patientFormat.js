@@ -34,7 +34,7 @@ export function isValidPostalCode(code) {
 // check phone format with 7 to 20 digits
 export function isValidPhone(phone) {
   if (!phone) return false;
-  return /^\+?\d[\d\s\-]{6,19}$/.test(phone.trim());
+  return /^\+?\d[\d\s-]{6,19}$/.test(phone.trim());
 }
 
 // check date of birth is not in future
