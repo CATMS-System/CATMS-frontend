@@ -48,6 +48,19 @@ export function isValidDob(dob) {
   return true;
 }
 
+// check policy date year is in the range the backend accepts
+export function isValidPolicyYear(date) {
+  if (!date) return false;
+  const year = Number(date.slice(0, 4));
+  return year >= 2000 && year <= new Date().getFullYear() + 50;
+}
+
+// check coverage is 0 to 100 with at most 2 decimals
+export function isValidCoverage(value) {
+  if (!/^\d+(\.\d{1,2})?$/.test(String(value).trim())) return false;
+  return Number(value) <= 100;
+}
+
 // adapt api patient row for other panels expecting fake patient shape
 export function adaptPatientForPanels(patient) {
   if (!patient) return null;
