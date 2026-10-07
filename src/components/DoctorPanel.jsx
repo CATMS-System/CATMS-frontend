@@ -262,6 +262,15 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
     );
   };
 
+  // Running grand total for prescribed treatments (Step F12 - display only)
+  const prescribedGrandTotal = useMemo(() => {
+    return prescribedItems.reduce((acc, item) => {
+      const price = Number(item.standard_unit_price || 0);
+      const qty = Number(item.quantity || 1);
+      return acc + price * qty;
+    }, 0);
+  }, [prescribedItems]);
+
   // Navigate to consultation room route, passing appointment_id and patient_id
   const handleSelectPatient = (queueItem) => {
     const apptId = queueItem.appointmentId || queueItem.appointment_id || 'APP-1001';
@@ -613,9 +622,9 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
               </div>
             </div>
 
-            {/* Prescribing Table (Step F11) */}
+            {/* Prescribing Table (Step F11 & F12) */}
             <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-3">
                 <div>
                   <h3 className="font-bold text-slate-900 text-md flex items-center">
                     <ClipboardList className="h-4.5 w-4.5 text-blue-600 mr-1.5" />
@@ -625,9 +634,14 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                     Itemized treatments, procedures, and medications prescribed for this consultation
                   </p>
                 </div>
-                <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-full font-mono">
-                  {prescribedItems.length} {prescribedItems.length === 1 ? 'item' : 'items'}
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-full font-mono">
+                    {prescribedItems.length} {prescribedItems.length === 1 ? 'item' : 'items'}
+                  </span>
+                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold px-3 py-1 rounded-full font-mono">
+                    Estimated Total: ${prescribedGrandTotal.toFixed(2)}
+                  </span>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -636,9 +650,11 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
                       <th className="px-4 py-2.5 w-12 text-center">#</th>
                       <th className="px-4 py-2.5">Treatment Item</th>
+                      <th className="px-4 py-2.5 w-24 text-right">Unit Price</th>
                       <th className="px-4 py-2.5 w-36 text-center">Quantity</th>
                       <th className="px-4 py-2.5">Instructions / Dosage</th>
-                      <th className="px-4 py-2.5 w-20 text-center">Action</th>
+                      <th className="px-4 py-2.5 w-28 text-right">Line Total</th>
+                      <th className="px-4 py-2.5 w-16 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -655,6 +671,9 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                               <span>•</span>
                               <span>{item.category_name || 'General'}</span>
                             </div>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-slate-600 font-medium">
+                            ${Number(item.standard_unit_price || 0).toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <div className="inline-flex items-center space-x-1.5 bg-slate-50 border border-slate-250 rounded-lg p-1">
@@ -688,6 +707,9 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                               onChange={(e) => handleUpdateInstructions(idx, e.target.value)}
                             />
                           </td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                            ${(Number(item.standard_unit_price || 0) * Number(item.quantity || 1)).toFixed(2)}
+                          </td>
                           <td className="px-4 py-3 text-center">
                             <button
                               type="button"
@@ -702,13 +724,36 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="5" className="px-4 py-8 text-center text-slate-400">
+                        <td colSpan="7" className="px-4 py-8 text-center text-slate-400">
                           No treatments prescribed yet. Select treatments from the catalogue browser below to add them to this prescription.
                         </td>
                       </tr>
                     )}
                   </tbody>
+                  {prescribedItems.length > 0 && (
+                    <tfoot className="bg-slate-50/80 border-t-2 border-slate-200">
+                      <tr>
+                        <td colSpan="5" className="px-4 py-3 text-right font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                          Prescription Grand Total (Est.):
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-slate-950 text-sm">
+                          ${prescribedGrandTotal.toFixed(2)}
+                        </td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
+              </div>
+
+              {/* Display pricing note (backend determines actual price) */}
+              <div className="bg-amber-50/70 border border-amber-200/70 rounded-lg px-3.5 py-2 text-[11px] text-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <span>
+                  <strong className="font-semibold">Note:</strong> Pricing and totals shown here are for display and clinical estimation only; the backend sets the actual price upon consultation completion.
+                </span>
+                <span className="font-mono text-xs font-bold text-amber-900 shrink-0">
+                  Grand Total: ${prescribedGrandTotal.toFixed(2)}
+                </span>
               </div>
             </div>
 
