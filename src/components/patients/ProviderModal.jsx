@@ -107,6 +107,53 @@ export default function ProviderModal({
               {errors.email && <span className="text-[11px] text-red-600">{errors.email}</span>}
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+              Street Address *
+            </label>
+            <input
+              type="text"
+              className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
+              value={streetAddress}
+              onChange={e => setStreetAddress(e.target.value)}
+            />
+            {errors.streetAddress && <span className="text-[11px] text-red-600">{errors.streetAddress}</span>}
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">City *</label>
+              <input
+                type="text"
+                className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
+                value={city}
+                onChange={e => setCity(e.target.value)}
+              />
+              {errors.city && <span className="text-[11px] text-red-600">{errors.city}</span>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Province *</label>
+              <input
+                type="text"
+                className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
+                value={stateProvince}
+                onChange={e => setStateProvince(e.target.value)}
+              />
+              {errors.stateProvince && <span className="text-[11px] text-red-600">{errors.stateProvince}</span>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Postal *</label>
+              <input
+                type="text"
+                maxLength={5}
+                className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm font-mono"
+                value={postalCode}
+                onChange={e => setPostalCode(e.target.value)}
+              />
+              {errors.postalCode && <span className="text-[11px] text-red-600">{errors.postalCode}</span>}
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end space-x-3 pt-3 border-t border-slate-100">
