@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope } from 'lucide-react';
+import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope, AlertCircle } from 'lucide-react';
 import { useDoctorQueue } from '../hooks/useDoctorQueue';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
@@ -95,6 +95,33 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
+
+  // Inline field validation state
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
+  // Field validator helper
+  const validateField = (field, value) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (field === 'diagnosis') {
+        if (!value || !value.trim()) {
+          next.diagnosis = 'Clinical diagnosis is required and cannot be empty.';
+        } else {
+          delete next.diagnosis;
+        }
+      }
+      if (field === 'followUpDate') {
+        if (value && value < todayStr) {
+          next.followUpDate = 'Follow-up date cannot be in the past.';
+        } else {
+          delete next.followUpDate;
+        }
+      }
+      return next;
+    });
+  };
 
   // Today's minimum date string for follow-up validation
   const minDate = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -361,10 +388,30 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                     required
                     rows="3"
                     placeholder="Enter formal clinical diagnosis (e.g. Acute bacterial bronchitis, Essential hypertension)..."
-                    className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm font-semibold text-slate-900"
+                    className={`w-full border rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                      errors.diagnosis
+                        ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/20 text-slate-900'
+                        : 'border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-900'
+                    }`}
                     value={diagnosis}
-                    onChange={(e) => setDiagnosis(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDiagnosis(val);
+                      if (touched.diagnosis) {
+                        validateField('diagnosis', val);
+                      }
+                    }}
+                    onBlur={() => {
+                      setTouched((prev) => ({ ...prev, diagnosis: true }));
+                      validateField('diagnosis', diagnosis);
+                    }}
                   />
+                  {errors.diagnosis && (
+                    <p className="text-xs text-red-600 mt-1.5 flex items-center space-x-1 font-medium animate-fade-in">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{errors.diagnosis}</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Clinical Notes */}
@@ -404,10 +451,28 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                   <input
                     type="date"
                     min={minDate}
-                    className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm font-mono text-slate-800"
+                    className={`w-full border rounded-lg px-3 py-2 text-sm font-mono transition-colors ${
+                      errors.followUpDate
+                        ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/20 text-slate-900'
+                        : 'border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-800'
+                    }`}
                     value={followUpDate}
-                    onChange={(e) => setFollowUpDate(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFollowUpDate(val);
+                      validateField('followUpDate', val);
+                    }}
+                    onBlur={() => {
+                      setTouched((prev) => ({ ...prev, followUpDate: true }));
+                      validateField('followUpDate', followUpDate);
+                    }}
                   />
+                  {errors.followUpDate && (
+                    <p className="text-xs text-red-600 mt-1.5 flex items-center space-x-1 font-medium animate-fade-in">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{errors.followUpDate}</span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
