@@ -37,6 +37,11 @@ export function isValidPhone(phone) {
   return /^\+?\d[\d\s-]{6,19}$/.test(phone.trim());
 }
 
+// check basic email format
+export function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 // check date of birth is not in future
 export function isValidDob(dob) {
   if (!dob) return false;
