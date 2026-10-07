@@ -51,8 +51,9 @@ export async function request(method, path, body = null) {
       } else if (Array.isArray(json.detail)) {
         message = 'Please check the entered values';
         for (const item of json.detail) {
-          if (Array.isArray(item.loc) && item.loc.length > 0) {
-            const field = item.loc[item.loc.length - 1];
+          if (Array.isArray(item.loc) && item.loc.length > 1) {
+            // keep the path after body so emergency_contact.first_name stays separate from first_name
+            const field = item.loc.slice(1).join('.');
             // remove pydantic prefix if present
             const cleanMsg = (item.msg || '').replace(/^Value error,\s*/i, '');
             fieldErrors[field] = cleanMsg;
