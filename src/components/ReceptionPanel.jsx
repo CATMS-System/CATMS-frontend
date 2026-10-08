@@ -3,32 +3,10 @@ import { Search, Plus, Calendar, Clock, Check, X, ShieldAlert, Phone, Shield, Ar
 import PatientsSection from './patients/PatientsSection';
 
 export default function ReceptionPanel({ subView, db, handlers }) {
-  const { patientList, staffList, appointmentList, liveQueue, branches } = db;
-  const { setPatientList, setAppointmentList, setLiveQueue, triggerToast, addAuditLog } = handlers;
+  const { patientList, staffList, appointmentList, liveQueue } = db;
+  const { setAppointmentList, setLiveQueue, triggerToast, addAuditLog, navigateTo } = handlers;
 
   const currentBranch = db.currentUser.branch || 'Colombo Main';
-
-  // Search patients
-  const [patientSearch, setPatientSearch] = useState('');
-  const [showAddPatientModal, setShowAddPatientModal] = useState(false);
-  const [showUpdatePatientModal, setShowUpdatePatientModal] = useState(false);
-  const [selectedPatientForUpdate, setSelectedPatientForUpdate] = useState(null);
-
-  // New Patient Form
-  const [patientForm, setPatientForm] = useState({
-    firstName: '',
-    lastName: '',
-    nic: '',
-    contact: '',
-    email: '',
-    dob: '',
-    gender: 'Male',
-    address: '',
-    insuranceProvider: 'None / Cash',
-    insurancePolicy: '',
-    insuranceExpiry: '',
-    emergencyContacts: [{ name: '', relation: '', phone: '' }]
-  });
 
   // Calendar States
   const [selectedDocId, setSelectedDocId] = useState(
@@ -59,24 +37,6 @@ export default function ReceptionPanel({ subView, db, handlers }) {
   const branchDoctors = useMemo(() => {
     return staffList.filter(s => s.branch === currentBranch && (s.role.includes('Doc') || s.role === 'Cardiologist' || s.role === 'Dermatologist' || s.role === 'General Practitioner') && s.status === 'Active');
   }, [staffList, currentBranch]);
-
-  // Patients cross-branch search
-  const filteredPatients = useMemo(() => {
-    if (!patientSearch) return patientList;
-    const query = patientSearch.toLowerCase();
-    return patientList.filter(p =>
-      p.name.toLowerCase().includes(query) ||
-      p.id.toLowerCase().includes(query) ||
-      p.contact.toLowerCase().includes(query) ||
-      p.nic.toLowerCase().includes(query)
-    );
-  }, [patientList, patientSearch]);
-
-  // Patient profile card context
-  const [activeProfilePatientId, setActiveProfilePatientId] = useState(patientList[0]?.id || '');
-  const activeProfilePatient = useMemo(() => {
-    return patientList.find(p => p.id === activeProfilePatientId);
-  }, [patientList, activeProfilePatientId]);
 
   // Appointment calendar config
   const calendarHours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'];
@@ -138,91 +98,6 @@ export default function ReceptionPanel({ subView, db, handlers }) {
     triggerToast(`Emergency check-in completed! Added to queue.`);
     setWalkinPatientId('');
     setWalkinReason('');
-  };
-
-  // Add Patient Contact fields
-  const handleAddEmergencyContactField = () => {
-    setPatientForm(prev => ({
-      ...prev,
-      emergencyContacts: [...prev.emergencyContacts, { name: '', relation: '', phone: '' }]
-    }));
-  };
-
-  const handleRegisterPatient = (e) => {
-    e.preventDefault();
-    const newPatId = `PAT-${(patientList.length + 1).toString().padStart(4, '0')}`;
-    const newPatient = {
-      id: newPatId,
-      name: `${patientForm.firstName} ${patientForm.lastName}`,
-      dob: patientForm.dob,
-      nic: patientForm.nic,
-      contact: patientForm.contact,
-      address: patientForm.address,
-      branch: currentBranch,
-      insurance: {
-        provider: patientForm.insuranceProvider,
-        policyNumber: patientForm.insurancePolicy,
-        expDate: patientForm.insuranceExpiry
-      },
-      emergencyContacts: patientForm.emergencyContacts.filter(c => c.name && c.phone)
-    };
-
-    setPatientList([newPatient, ...patientList]);
-    addAuditLog(
-      'CREATE_PATIENT',
-      `Onboarded new patient ${newPatient.name} (${newPatId})`,
-      'null',
-      JSON.stringify(newPatient)
-    );
-
-    triggerToast(`Patient onboarded successfully! Code: ${newPatId}`);
-    setShowAddPatientModal(false);
-
-    // Reset
-    setPatientForm({
-      firstName: '',
-      lastName: '',
-      nic: '',
-      contact: '',
-      email: '',
-      dob: '',
-      gender: 'Male',
-      address: '',
-      insuranceProvider: 'None / Cash',
-      insurancePolicy: '',
-      insuranceExpiry: '',
-      emergencyContacts: [{ name: '', relation: '', phone: '' }]
-    });
-  };
-
-  const handleUpdatePatientProfile = (e) => {
-    e.preventDefault();
-    const updated = patientList.map(p => {
-      if (p.id === selectedPatientForUpdate.id) {
-        return {
-          ...p,
-          contact: e.target.contactPhone.value,
-          insurance: {
-            ...p.insurance,
-            provider: e.target.insProvider.value,
-            policyNumber: e.target.insPolicy.value,
-            expDate: e.target.insExpiry.value
-          },
-          emergencyContacts: selectedPatientForUpdate.emergencyContacts
-        };
-      }
-      return p;
-    });
-
-    setPatientList(updated);
-    addAuditLog(
-      'UPDATE_PATIENT',
-      `Updated contact/insurance details for ${selectedPatientForUpdate.name}`,
-      JSON.stringify(selectedPatientForUpdate),
-      JSON.stringify(updated.find(p => p.id === selectedPatientForUpdate.id))
-    );
-    triggerToast('Patient profile updated successfully!');
-    setShowUpdatePatientModal(false);
   };
 
   // Appointment scheduling grid slot actions
