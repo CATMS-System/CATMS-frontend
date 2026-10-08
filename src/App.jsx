@@ -841,7 +841,7 @@ export default function App() {
             <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 p-4 space-y-2">
               {searchResults.map(p => (
                 <div
-                  key={p.id}
+                  key={p.patient_id}
                   onClick={() => {
                     // Navigate depending on user role
                     if (currentUser.roleCode === 'ROLE_RECEPTIONIST') {
@@ -850,18 +850,18 @@ export default function App() {
                       navigateTo('/doctor/workbench');
                     }
                     setGlobalSearchOpen(false);
-                    triggerToast(`Selected patient ${p.name}`);
+                    triggerToast(`Selected patient ${formatPatientName(p.first_name, p.last_name)}`);
                   }}
                   className="p-3 border border-slate-200 hover:border-blue-500 rounded-xl bg-slate-50/50 hover:bg-white transition-all cursor-pointer text-left"
                 >
                   <div className="flex justify-between items-center font-sans text-xs">
-                    <span className="font-bold text-slate-900 text-sm">{p.name}</span>
-                    <span className="font-mono text-slate-450">{p.id}</span>
+                    <span className="font-bold text-slate-900 text-sm">{formatPatientName(p.first_name, p.last_name)}</span>
+                    <span className="font-mono text-slate-450">{formatPatientId(p.patient_id)}</span>
                   </div>
                   <div className="flex justify-between items-center text-[10px] text-slate-450 mt-2 font-mono">
                     <span>NIC: {p.nic}</span>
-                    <span>Contact: {p.contact}</span>
-                    <span>Branch: {p.branch}</span>
+                    <span>Contact: {p.contact_number}</span>
+                    <span>Registered: {p.registration_date}</span>
                   </div>
                 </div>
               ))}
