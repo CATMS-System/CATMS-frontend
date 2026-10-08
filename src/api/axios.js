@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api/v1',
+  baseURL: '/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -26,7 +26,10 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       // Clear token and redirect to login if unauthorized
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem('catms_user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

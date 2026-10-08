@@ -115,12 +115,12 @@ const INITIAL_AUDITS = [
 
 // Available demo users and their profiles (JWT payload simulations)
 const DEMO_LOGINS = [
-  { role: 'Admin', roleCode: 'ROLE_ADMIN', email: 'admin@careflow.com', password: 'admin123', name: 'Alana Smith [Admin]', branch: 'All Branches' },
-  { role: 'Branch Manager', roleCode: 'ROLE_BRANCH_MANAGER', email: 'manager@careflow.com', password: 'manager123', name: 'Marcus Vance [Manager]', branch: 'Colombo Main' },
-  { role: 'Receptionist', roleCode: 'ROLE_RECEPTIONIST', email: 'receptionist@careflow.com', password: 'recept123', name: 'Shenaya Perera [Recept]', branch: 'Colombo Main' },
-  { role: 'Doctor', roleCode: 'ROLE_DOCTOR', email: 'doctor@careflow.com', password: 'doc123', name: 'Dr. Alexander Bennett [Doc]', branch: 'Colombo Main', id: 'STF-001' },
-  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing@careflow.com', password: 'bill123', name: 'Dilhani Fernando [Billing]', branch: 'Colombo Main' },
-  { role: 'Patient', roleCode: 'ROLE_PATIENT', email: 'patient@careflow.com', password: 'pat123', name: 'John Doe [Patient]', patientId: 'PAT-0001' }
+  { role: 'Admin', roleCode: 'ROLE_ADMIN', email: 'admin_alana', password: 'admin123', name: 'Alana Smith [Admin]', branch: 'All Branches' },
+  { role: 'Branch Manager', roleCode: 'ROLE_BRANCH_MANAGER', email: 'mgr_vance', password: 'manager123', name: 'Marcus Vance [Manager]', branch: 'Colombo Main' },
+  { role: 'Receptionist', roleCode: 'ROLE_RECEPTIONIST', email: 'recept_shenaya', password: 'recept123', name: 'Shenaya Perera [Recept]', branch: 'Colombo Main' },
+  { role: 'Doctor', roleCode: 'ROLE_DOCTOR', email: 'dr_bennett', password: 'doc123', name: 'Dr. Alexander Bennett [Doc]', branch: 'Colombo Main', id: 'STF-001' },
+  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_patel', password: 'bill123', name: 'Dilhani Fernando [Billing]', branch: 'Colombo Main' },
+  { role: 'Patient', roleCode: 'ROLE_PATIENT', email: 'pat_johndoe', password: 'pat123', name: 'John Doe [Patient]', patientId: 'PAT-0001' }
 ];
 
 export default function App() {
@@ -357,19 +357,37 @@ export default function App() {
   // ==========================================
   // AUTHENTICATION HANDLERS
   // ==========================================
-  const handleSignIn = (e) => {
+  const handleSignIn = async (e) => {
     e.preventDefault();
-    const user = DEMO_LOGINS.find(u => u.email.toLowerCase() === emailInput.toLowerCase() && u.password === passwordInput);
-    if (user) {
-      localStorage.setItem('catms_user', JSON.stringify(user));
-      setCurrentUser(user);
-      setAuthError('');
-      setEmailInput('');
-      setPasswordInput('');
-      triggerToast(`Authenticated successfully as ${user.role}!`);
-      navigateTo(getRoleDefaultPath(user.roleCode));
-    } else {
-      setAuthError('Invalid credentials. Check email or password.');
+    try {
+      const response = await api.post('/auth/login', {
+        username: emailInput,
+        password: passwordInput
+      }, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+      
+      const { access_token } = response.data;
+      if (access_token) {
+        localStorage.setItem('token', access_token);
+        
+        // Fetch user or fallback to DEMO_LOGINS to keep UI state simple for now
+        const user = DEMO_LOGINS.find(u => u.email.toLowerCase() === emailInput.toLowerCase());
+        const finalUser = user || { role: 'Staff', roleCode: 'ROLE_RECEPTIONIST', email: emailInput, name: emailInput, branch: 'All Branches' };
+        
+        localStorage.setItem('catms_user', JSON.stringify(finalUser));
+        setCurrentUser(finalUser);
+        setAuthError('');
+        setEmailInput('');
+        setPasswordInput('');
+        triggerToast(`Authenticated successfully!`);
+        navigateTo(getRoleDefaultPath(finalUser.roleCode));
+      }
+    } catch (error) {
+      console.error("Login failed:", error);
+      setAuthError('Invalid credentials. Check username or password.');
     }
   };
 
