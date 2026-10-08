@@ -1,4 +1,4 @@
-const API_BASE = '/api/v1';
+const API_BASE = '/api/v1/billing';
 
 async function handleResponse(response) {
   if (!response.ok) {
