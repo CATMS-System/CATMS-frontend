@@ -75,3 +75,40 @@ for (const [name, call] of [['billing', () => billing.getInvoices()], ['reports'
     await assert.rejects(call, /Controlled error/);
   });
 }
+
+for (const [name, call] of [['billing', () => billing.getInvoices()], ['reports', () => reports.getOutstandingBalances()]]) {
+  const cases = [
+    {
+      label: 'validation array', status: 422,
+      payload: { detail: [
+        { loc: ['body', 'amount'], msg: 'Input should be greater than 0', input: 'SECRET', ctx: { debug: 'SECRET' } },
+        { loc: ['query', 'branch_id'], msg: 'Input should be a valid integer' },
+        { loc: ['body', 'items', 0, 'id'], msg: 'Field required' }
+      ] },
+      expected: 'body.amount: Input should be greater than 0; query.branch_id: Input should be a valid integer; body.items.0.id: Field required'
+    },
+    { label: 'string detail', status: 400, payload: { detail: '  Invoice not found.  ' }, expected: 'Invoice not found.' },
+    { label: 'missing detail', status: 400, payload: { debug: 'SECRET' }, expected: 'Request failed.' },
+    { label: 'null response', status: 400, payload: null, expected: 'Request failed.' },
+    { label: 'unexpected detail object', status: 400, payload: { detail: { trace: 'SECRET' } }, expected: 'Request failed.' },
+    { label: 'empty validation array', status: 422, payload: { detail: [] }, expected: 'Request failed.' },
+    { label: 'malformed validation entries', status: 422, payload: { detail: [null, 'SECRET', {}, { msg: 42 }] }, expected: 'Request failed.' },
+    { label: 'missing location', status: 422, payload: { detail: [{ msg: 'Invalid value' }] }, expected: 'Invalid value' },
+    { label: 'blank detail', status: 400, payload: { detail: '  ' }, expected: 'Request failed.' },
+    { label: 'internal server diagnostics', status: 500, payload: { detail: 'SQL traceback SECRET' }, expected: 'Request failed.' },
+    { label: 'non-JSON response', status: 502, nonJson: true, expected: 'Request failed.' }
+  ];
+  for (const scenario of cases) {
+    test(`${name} normalizes ${scenario.label} safely`, async t => {
+      t.mock.method(globalThis, 'fetch', async () => ({
+        ok: false, status: scenario.status,
+        json: async () => { if (scenario.nonJson) throw new SyntaxError('SECRET'); return scenario.payload; }
+      }));
+      await assert.rejects(call, error => {
+        assert.equal(error.message, scenario.expected);
+        assert.ok(!error.message.includes('SECRET'));
+        return true;
+      });
+    });
+  }
+}

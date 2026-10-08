@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   DollarSign,
   AlertCircle,
@@ -8,6 +8,7 @@ import {
 
 import ReportsPanel from './ReportsPanel';
 import InvoiceDetailsModal from './InvoiceDetailsModal';
+import { createInvoiceDetailsRequest } from '../utils/invoiceDetailsRequest';
 
 import {
   getInvoices,
@@ -313,29 +314,25 @@ export default function BillingPanel({ subView, db, handlers }) {
   // LOAD ONE REAL INVOICE
   // =========================================================
 
-  const handleViewInvoice = async invoiceId => {
+  const invoiceDetailsRequest = useRef(null);
+  if (!invoiceDetailsRequest.current) {
+    invoiceDetailsRequest.current = createInvoiceDetailsRequest(getInvoice, {
+      setDetails: setSelectedApiInvoice,
+      setLoading: setInvoiceDetailsLoading,
+      setError: setInvoiceDetailsError
+    });
+  }
+
+  useEffect(() => () => invoiceDetailsRequest.current.invalidate(), []);
+
+  const handleViewInvoice = invoiceId => {
     setShowInvoiceDetails(true);
-    try {
-      setInvoiceDetailsLoading(true);
-      setInvoiceDetailsError('');
-      setSelectedApiInvoice(null);
+    return invoiceDetailsRequest.current.load(invoiceId);
+  };
 
-      const data =
-        await getInvoice(invoiceId);
-
-      setSelectedApiInvoice(data);
-    } catch (error) {
-      console.error(
-        'Failed to load invoice details:',
-        error
-      );
-
-      setInvoiceDetailsError(
-        error.message
-      );
-    } finally {
-      setInvoiceDetailsLoading(false);
-    }
+  const handleCloseInvoiceDetails = () => {
+    invoiceDetailsRequest.current.invalidate();
+    setShowInvoiceDetails(false);
   };
 
   // =========================================================
@@ -404,15 +401,8 @@ export default function BillingPanel({ subView, db, handlers }) {
 
       setApiInvoices(refreshedInvoices);
 
-      // Reload invoice details.
-      const refreshedDetails =
-        await getInvoice(
-          selectedInvoice.Invoice_ID
-        );
-
-      setSelectedApiInvoice(
-        refreshedDetails
-      );
+      // Refresh only if this invoice is still open in the details modal.
+      await invoiceDetailsRequest.current.refresh(selectedInvoice.Invoice_ID);
 
       triggerToast(
         `Payment recorded successfully for Invoice #${selectedInvoice.Invoice_ID}`
@@ -1231,7 +1221,7 @@ export default function BillingPanel({ subView, db, handlers }) {
 
       )}
 
-      {showInvoiceDetails && <InvoiceDetailsModal details={selectedApiInvoice} loading={invoiceDetailsLoading} error={invoiceDetailsError} onClose={() => setShowInvoiceDetails(false)} />}
+      {showInvoiceDetails && <InvoiceDetailsModal details={selectedApiInvoice} loading={invoiceDetailsLoading} error={invoiceDetailsError} onClose={handleCloseInvoiceDetails} />}
 
       {/* =====================================================
           REAL INSURANCE CLAIM SUBMISSION MODAL

@@ -1,3 +1,5 @@
+import { apiErrorMessage } from './apiError.js';
+
 const API_BASE = '/api/v1/billing';
 
 async function handleResponse(response) {
@@ -6,7 +8,7 @@ async function handleResponse(response) {
 
     try {
       const error = await response.json();
-      message = error.detail || message;
+      message = apiErrorMessage(error, response.status);
     } catch {
       // Response did not contain JSON.
     }
