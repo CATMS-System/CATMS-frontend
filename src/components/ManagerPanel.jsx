@@ -11,11 +11,15 @@ export default function ManagerPanel({ subView, db, handlers }) {
     return db.currentUser.branch || 'Colombo Main';
   }, [db.currentUser]);
 
+  const managerBranchId = useMemo(() => {
+    const b = db.branches?.find(br => br.name === managerBranch || br.Branch_Name === managerBranch);
+    return b ? (b.Branch_ID || 1) : 1;
+  }, [managerBranch, db.branches]);
+
   // Real-time doctor availability states
-  // Add an availability field if not exist or simulate toggling
   const doctorsInBranch = useMemo(() => {
-    return staffList.filter(s => s.branch === managerBranch && (s.role.includes('Doc') || s.role === 'Cardiologist' || s.role === 'Dermatologist' || s.role === 'General Practitioner'));
-  }, [staffList, managerBranch]);
+    return staffList.filter(s => s.Branch_ID === managerBranchId && (s.role.includes('Doc') || s.role === 'Cardiologist' || s.role === 'Dermatologist' || s.role === 'General Practitioner'));
+  }, [staffList, managerBranchId]);
 
   const handleToggleDocStatus = (docId, newStatus) => {
     // update staff state or details
@@ -85,7 +89,11 @@ export default function ManagerPanel({ subView, db, handlers }) {
     setShowRosterModal(false);
   };
 
-  // Local calculations
+  // Read-only staff list local
+  const localStaff = useMemo(() => {
+    return staffList.filter(s => s.Branch_ID === managerBranchId);
+  }, [staffList, managerBranchId]);
+
   const localMetrics = useMemo(() => {
     const todayAppts = appointmentList.filter(a => a.branch === managerBranch && a.date === '2026-08-23');
     const completed = todayAppts.filter(a => a.status === 'Completed').length;
@@ -104,18 +112,20 @@ export default function ManagerPanel({ subView, db, handlers }) {
       return sum;
     }, 0);
 
+    const totalDoctors = doctorsInBranch.length;
+    const activeStaff = localStaff.filter(s => s.status === 'Active').length;
+    const roomCount = 12; // Static for demo
+
     return {
       appointmentsCount: todayAppts.length,
       completedCount: completed,
       walkinsCount: walkins,
-      revenueCollected: collected
+      revenueCollected: collected,
+      totalDoctors,
+      activeStaff,
+      roomCount
     };
-  }, [appointmentList, invoiceList, managerBranch]);
-
-  // Read-only staff list local
-  const localStaff = useMemo(() => {
-    return staffList.filter(s => s.branch === managerBranch);
-  }, [staffList, managerBranch]);
+  }, [appointmentList, invoiceList, managerBranch, doctorsInBranch, localStaff]);
 
   return (
     <div className="space-y-6">
@@ -171,6 +181,39 @@ export default function ManagerPanel({ subView, db, handlers }) {
               </div>
               <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
                 <DollarSign className="h-6 w-6" />
+              </div>
+            </div>
+          </div>
+
+          {/* Branch Overview Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+              <div>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Total Doctors</span>
+                <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">{localMetrics.totalDoctors}</span>
+              </div>
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                <Users className="h-6 w-6" />
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+              <div>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Active Staff</span>
+                <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">{localMetrics.activeStaff}</span>
+              </div>
+              <div className="p-3 bg-teal-50 text-teal-600 rounded-xl">
+                <Activity className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+              <div>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Consultation Rooms</span>
+                <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">{localMetrics.roomCount}</span>
+              </div>
+              <div className="p-3 bg-orange-50 text-orange-600 rounded-xl">
+                <HelpCircle className="h-6 w-6" />
               </div>
             </div>
           </div>

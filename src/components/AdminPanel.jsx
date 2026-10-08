@@ -30,6 +30,7 @@ export default function AdminPanel({ subView, db, handlers }) {
   const [showEditStaffModal, setShowEditStaffModal] = useState(false);
   const [showTransferBranchModal, setShowTransferBranchModal] = useState(false);
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+  const [showAddBranchModal, setShowAddBranchModal] = useState(false);
   const [tempPassInput, setTempPassInput] = useState('');
   
   // Search and Filter states
@@ -40,6 +41,7 @@ export default function AdminPanel({ subView, db, handlers }) {
 
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [auditActionFilter, setAuditActionFilter] = useState('All');
+  const [auditDateFilter, setAuditDateFilter] = useState('');
   const [expandedAuditId, setExpandedAuditId] = useState(null);
 
   // Specialties list for Step 3
@@ -79,56 +81,77 @@ export default function AdminPanel({ subView, db, handlers }) {
     }
   };
 
-  const handleOnboardingSubmit = (e) => {
+  const handleOnboardingSubmit = async (e) => {
     e.preventDefault();
-    const newStaffId = `STF-${(staffList.length + 1).toString().padStart(3, '0')}`;
-    const newStaffMember = {
-      id: newStaffId,
-      name: `Dr. ${onboardingData.firstName} ${onboardingData.lastName}`,
-      role: onboardingData.role === 'DOCTOR' ? `${onboardingData.specialties[0] || 'Medical Specialist'}` : onboardingData.role.replace('_', ' '),
-      branch: onboardingData.branch,
-      status: 'Active',
-      details: {
-        firstName: onboardingData.firstName,
-        lastName: onboardingData.lastName,
-        nic: onboardingData.nic,
-        contact: onboardingData.contact,
-        email: onboardingData.email,
-        license: onboardingData.license,
-        consultFee: parseFloat(onboardingData.consultFee),
-        specialties: onboardingData.specialties,
-        username: onboardingData.username
-      }
-    };
+    try {
+      const branchObj = branches.find(b => b.Branch_Name === onboardingData.branch || b.name === onboardingData.branch);
+      const branchId = branchObj ? (branchObj.Branch_ID || 1) : 1;
+      const jobTitle = onboardingData.role === 'DOCTOR' ? (onboardingData.specialties[0] || 'Medical Specialist') : onboardingData.role.replace('_', ' ');
 
-    const updatedStaff = [...staffList, newStaffMember];
-    setStaffList(updatedStaff);
-    addAuditLog(
-      'CREATE_STAFF',
-      `Onboarded staff member ${newStaffMember.name} (${newStaffId})`,
-      'null',
-      JSON.stringify(newStaffMember)
-    );
+      const response = await api.post('/staff', {
+        First_Name: onboardingData.firstName,
+        Last_Name: onboardingData.lastName,
+        Job_Title: jobTitle,
+        Contact_Number: onboardingData.contact,
+        Email: onboardingData.email,
+        Employment_Status: 'Active',
+        Branch_ID: branchId,
+        Account_ID: Math.floor(Math.random() * 1000) + 100
+      });
+      const s = response.data;
+      
+      const newStaffId = `STF-${s.Account_ID}`;
+      const newStaffMember = {
+        id: newStaffId,
+        name: `Dr. ${s.First_Name} ${s.Last_Name}`,
+        role: s.Job_Title,
+        branch: onboardingData.branch,
+        status: s.Employment_Status,
+        details: {
+          firstName: s.First_Name,
+          lastName: s.Last_Name,
+          nic: onboardingData.nic,
+          contact: s.Contact_Number,
+          email: s.Email,
+          license: onboardingData.license,
+          consultFee: parseFloat(onboardingData.consultFee),
+          specialties: onboardingData.specialties,
+          username: onboardingData.username
+        }
+      };
 
-    triggerToast(`Staff member ${newStaffMember.name} successfully created!`);
-    setShowAddStaffDrawer(false);
-    
-    // Reset state
-    setOnboardingStep(1);
-    setOnboardingData({
-      firstName: '',
-      lastName: '',
-      nic: '',
-      contact: '',
-      email: '',
-      role: 'RECEPTIONIST',
-      branch: 'Colombo Main',
-      license: '',
-      consultFee: '1500',
-      specialties: [],
-      username: '',
-      tempPassword: ''
-    });
+      const updatedStaff = [...staffList, newStaffMember];
+      setStaffList(updatedStaff);
+      addAuditLog(
+        'CREATE_STAFF',
+        `Onboarded staff member ${newStaffMember.name} (${newStaffId})`,
+        'null',
+        JSON.stringify(newStaffMember)
+      );
+
+      triggerToast(`Staff member ${newStaffMember.name} successfully created!`);
+      setShowAddStaffDrawer(false);
+      
+      // Reset state
+      setOnboardingStep(1);
+      setOnboardingData({
+        firstName: '',
+        lastName: '',
+        nic: '',
+        contact: '',
+        email: '',
+        role: 'RECEPTIONIST',
+        branch: 'Colombo Main',
+        license: '',
+        consultFee: '1500',
+        specialties: [],
+        username: '',
+        tempPassword: ''
+      });
+    } catch (err) {
+      console.error("API Error creating staff", err);
+      triggerToast(`Failed to create staff member.`);
+    }
   };
 
   const handleToggleSpecialty = (spec) => {
@@ -232,6 +255,42 @@ export default function AdminPanel({ subView, db, handlers }) {
     triggerToast(`Assigned manager for ${branchName}`);
   };
 
+  const handleAddBranch = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        Branch_Name: e.target.branchName.value,
+        Street_Address: e.target.address.value,
+        City: 'Colombo',
+        State_Province: 'Western',
+        Postal_Code: '00100',
+        Contact_Number: e.target.phone.value,
+        Email: `${e.target.branchName.value.toLowerCase().replace(/\s+/g, '')}@careflow.com`,
+        Manager_Staff_ID: null
+      };
+      
+      const response = await api.post('/branches', payload);
+      const b = response.data;
+      
+      const newBranch = {
+        name: b.Branch_Name,
+        address: b.Street_Address,
+        phone: b.Contact_Number,
+        Branch_ID: b.Branch_ID,
+        managerId: null,
+        managerName: 'Unassigned'
+      };
+      
+      setBranches([...branches, newBranch]);
+      addAuditLog('CONFIG_BRANCH', `Created new branch ${newBranch.name}`, 'null', JSON.stringify(newBranch));
+      triggerToast(`Branch ${newBranch.name} successfully created!`);
+      setShowAddBranchModal(false);
+    } catch (err) {
+      console.error("API Error creating branch", err);
+      triggerToast('Failed to create branch.');
+    }
+  };
+
   // Filtered lists
   const filteredStaff = useMemo(() => {
     return staffList.filter(s => {
@@ -247,9 +306,10 @@ export default function AdminPanel({ subView, db, handlers }) {
     return auditLogs.filter(log => {
       const matchSearch = log.details.toLowerCase().includes(auditSearchQuery.toLowerCase()) || log.userId.toLowerCase().includes(auditSearchQuery.toLowerCase());
       const matchAction = auditActionFilter === 'All' || log.action === auditActionFilter;
-      return matchSearch && matchAction;
+      const matchDate = !auditDateFilter || log.timestamp.startsWith(auditDateFilter);
+      return matchSearch && matchAction && matchDate;
     });
-  }, [auditLogs, auditSearchQuery, auditActionFilter]);
+  }, [auditLogs, auditSearchQuery, auditActionFilter, auditDateFilter]);
 
   return (
     <div className="space-y-6">
@@ -510,9 +570,18 @@ export default function AdminPanel({ subView, db, handlers }) {
       {/* 3. CLINIC BRANCH CONFIGURATION */}
       {subView === 'branches' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Clinic Branch Settings & Governance</h1>
-            <p className="text-sm text-slate-500 mt-1">Configure facilities, direct phone lines, and assign operational Branch Managers</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Clinic Branch Settings & Governance</h1>
+              <p className="text-sm text-slate-500 mt-1">Configure facilities, direct phone lines, and assign operational Branch Managers</p>
+            </div>
+            <button
+              onClick={() => setShowAddBranchModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold flex items-center space-x-1.5 transition-colors shadow-sm cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Branch</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -576,6 +645,12 @@ export default function AdminPanel({ subView, db, handlers }) {
                 onChange={e => setAuditSearchQuery(e.target.value)}
               />
             </div>
+            <input
+              type="date"
+              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white"
+              value={auditDateFilter}
+              onChange={e => setAuditDateFilter(e.target.value)}
+            />
             <select
               className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white"
               value={auditActionFilter}
@@ -968,6 +1043,33 @@ export default function AdminPanel({ subView, db, handlers }) {
               >
                 Force Security Reset
               </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {/* ADD BRANCH MODAL */}
+      {showAddBranchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setShowAddBranchModal(false)} />
+          <form onSubmit={handleAddBranch} className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h3 className="font-bold text-slate-900 text-lg border-b border-slate-100 pb-3">Register New Clinic Branch</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Branch Name</label>
+                <input type="text" name="branchName" required className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm" placeholder="e.g. Kandy South" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Street Address</label>
+                <input type="text" name="address" required className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm" placeholder="e.g. 45 Peradeniya Road" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Contact Phone</label>
+                <input type="text" name="phone" required className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm" placeholder="e.g. +94 81 234 5678" />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+              <button type="button" onClick={() => setShowAddBranchModal(false)} className="bg-white border border-slate-350 text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer">Cancel</button>
+              <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer">Create Branch</button>
             </div>
           </form>
         </div>

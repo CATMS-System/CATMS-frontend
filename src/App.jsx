@@ -195,6 +195,7 @@ export default function App() {
             name: `${s.First_Name} ${s.Last_Name}`,
             role: s.Job_Title,
             branch: branches.find(b => b.Branch_ID === s.Branch_ID)?.Branch_Name || 'Colombo Main',
+            Branch_ID: s.Branch_ID,
             status: s.Employment_Status,
             details: { email: s.Email, contact: s.Contact_Number }
           }));
