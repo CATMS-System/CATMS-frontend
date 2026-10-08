@@ -274,17 +274,25 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // Global search filtering
-  const searchResults = useMemo(() => {
-    if (!globalSearchQuery) return [];
-    const query = globalSearchQuery.toLowerCase();
-    return patientList.filter(p =>
-      p.name.toLowerCase().includes(query) ||
-      p.id.toLowerCase().includes(query) ||
-      p.contact.toLowerCase().includes(query) ||
-      p.nic.toLowerCase().includes(query)
-    );
-  }, [patientList, globalSearchQuery]);
+  // global search asks the backend after a short pause
+  const [searchResults, setSearchResults] = useState([]);
+
+  useEffect(() => {
+    if (!globalSearchQuery) {
+      setSearchResults([]);
+      return;
+    }
+    let isCurrent = true;
+    const timer = setTimeout(() => {
+      searchPatients(globalSearchQuery, 1, 8)
+        .then(res => isCurrent && setSearchResults(res.items || []))
+        .catch(() => isCurrent && setSearchResults([]));
+    }, 300);
+    return () => {
+      isCurrent = false;
+      clearTimeout(timer);
+    };
+  }, [globalSearchQuery]);
 
   // ==========================================
   // AUTHENTICATION HANDLERS
