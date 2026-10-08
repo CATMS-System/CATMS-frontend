@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Users, Building, Calendar, Clock, Search, Plus, Activity, FileText, 
-  DollarSign, TrendingUp, Download, LogOut, ClipboardList, AlertCircle, 
+import {
+  Users, Building, Calendar, Clock, Search, Plus, Activity, FileText,
+  DollarSign, TrendingUp, Download, LogOut, ClipboardList, AlertCircle,
   CheckCircle2, Lock, User, ShieldCheck, UserCheck, Menu, X, Keyboard
 } from 'lucide-react';
 
@@ -13,6 +13,8 @@ import DoctorPanel from './components/DoctorPanel';
 import BillingPanel from './components/BillingPanel';
 import PatientPanel from './components/PatientPanel';
 import ReportsPanel from './components/ReportsPanel';
+import { searchPatients, getPatient } from './services/patientService';
+import { adaptPatientForPanels } from './utils/patientAdapter';
 
 // ==========================================
 // INITIAL MOCK DATA CONFIGURATIONS
@@ -32,42 +34,6 @@ const INITIAL_STAFF = [
   { id: 'STF-006', name: 'Samantha Silva', role: 'Branch Manager', branch: 'Kandy', status: 'Active', details: { email: 'silva@careflow.com', contact: '+94 81 222 3333' } },
   { id: 'STF-007', name: 'Rohan De Silva', role: 'Branch Manager', branch: 'Galle', status: 'Active', details: { email: 'rohan@careflow.com', contact: '+94 91 333 4444' } },
   { id: 'STF-008', name: 'Dr. Nimal Perera', role: 'Dermatologist', branch: 'Galle', status: 'Active', details: { email: 'nimal@careflow.com', contact: '+94 71 456 7890', license: 'SLMC-66321', consultFee: 2000, specialties: ['Dermatology'] } }
-];
-
-const INITIAL_PATIENTS = [
-  {
-    id: 'PAT-0001',
-    name: 'John Doe',
-    dob: '1985-05-12',
-    nic: '852140938V',
-    contact: '+94 77 123 4567',
-    address: '12 Flat, Galle Road, Colombo',
-    branch: 'Colombo Main',
-    insurance: { provider: 'Union Assurance', policyNumber: 'UA-88321-A', expDate: '2027-12-31' },
-    emergencyContacts: [{ name: 'Jane Doe', relation: 'Spouse', phone: '+94 77 123 4568' }]
-  },
-  {
-    id: 'PAT-0002',
-    name: 'Clara Oswald',
-    dob: '1992-11-23',
-    nic: '923281029V',
-    contact: '+94 77 987 6543',
-    address: '45 Lake Round, Kandy',
-    branch: 'Kandy',
-    insurance: { provider: 'Softlogic Life', policyNumber: 'SL-99321-B', expDate: '2026-06-30' },
-    emergencyContacts: [{ name: 'Danny Pink', relation: 'Friend', phone: '+94 77 987 6544' }]
-  },
-  {
-    id: 'PAT-0003',
-    name: 'David Miller',
-    dob: '1970-02-08',
-    nic: '700392109V',
-    contact: '+94 71 456 7890',
-    address: '78 Fort View, Galle',
-    branch: 'Galle',
-    insurance: { provider: 'Sri Lanka Insurance', policyNumber: 'SLIC-3341', expDate: '2025-08-23' },
-    emergencyContacts: [{ name: 'Susan Miller', relation: 'Wife', phone: '+94 71 456 7891' }]
-  }
 ];
 
 const INITIAL_APPOINTMENTS = [
@@ -133,7 +99,7 @@ export default function App() {
       if (parsed && parsed.name && parsed.roleCode) {
         return parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   });
 
@@ -149,10 +115,8 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_STAFF;
   });
 
-  const [patientList, setPatientList] = useState(() => {
-    const saved = localStorage.getItem('catms_patients');
-    return saved ? JSON.parse(saved) : INITIAL_PATIENTS;
-  });
+  const [patientList, setPatientList] = useState([]);
+  const [patientsVersion, setPatientsVersion] = useState(0);
 
   const [appointmentList, setAppointmentList] = useState(() => {
     const saved = localStorage.getItem('catms_appointments');
@@ -196,9 +160,6 @@ export default function App() {
     localStorage.setItem('catms_staff', JSON.stringify(staffList));
   }, [staffList]);
   useEffect(() => {
-    localStorage.setItem('catms_patients', JSON.stringify(patientList));
-  }, [patientList]);
-  useEffect(() => {
     localStorage.setItem('catms_appointments', JSON.stringify(appointmentList));
   }, [appointmentList]);
   useEffect(() => {
@@ -213,6 +174,21 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('catms_audits', JSON.stringify(auditLogs));
   }, [auditLogs]);
+
+  // load patients from the backend for the panels that still read patientList
+  useEffect(() => {
+    if (!currentUser) return;
+    let isCurrent = true;
+    searchPatients('', 1, 50)
+      .then(res => Promise.all((res.items || []).map(p => getPatient(p.patient_id))))
+      .then(full => isCurrent && setPatientList(full.map(adaptPatientForPanels)))
+      .catch(() => isCurrent && setPatientList([]));
+    return () => {
+      isCurrent = false;
+    };
+  }, [currentUser, patientsVersion]);
+
+  const reloadPatients = () => setPatientsVersion(v => v + 1);
 
   // ==========================================
   // SPA ROUTING MANAGEMENT
@@ -349,12 +325,12 @@ export default function App() {
 
   // State bundle pack
   const db = { staffList, patientList, appointmentList, liveQueue, invoiceList, auditLogs, branches, currentUser, selectedBranch, medicalHistories };
-  const handlers = { setStaffList, setPatientList, setAppointmentList, setLiveQueue, setInvoiceList, setMedicalHistories, setAuditLogs, setBranches, addAuditLog, triggerToast, navigateTo };
+  const handlers = { setStaffList, setAppointmentList, setLiveQueue, setInvoiceList, setMedicalHistories, setAuditLogs, setBranches, addAuditLog, triggerToast, navigateTo, reloadPatients };
 
   // ==========================================
   // RENDER COORDINATOR
   // ==========================================
-  
+
   // 1. AUTH PORTAL (Logged out view)
   if (!currentUser) {
     return (
@@ -462,7 +438,7 @@ export default function App() {
   // 2. MAIN APP SHELL (Logged in views)
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex text-slate-900">
-      
+
       {/* Toast Alert Banner */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4.5 py-3.5 rounded-xl shadow-2xl border border-slate-800 flex items-center space-x-2.5 text-xs animate-bounce font-medium">
@@ -488,45 +464,40 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/admin/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/admin/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Building className="h-4.5 w-4.5" />
                   <span>Executive Dashboard</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/staff')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/admin/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Users className="h-4.5 w-4.5" />
                   <span>Staff Directory</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/branches')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/admin/branches' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/branches' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Building className="h-4.5 w-4.5" />
                   <span>Clinic Branches</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/audit-logs')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/admin/audit-logs' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/audit-logs' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <ClipboardList className="h-4.5 w-4.5" />
                   <span>Security Audit Logs</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/reports')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/admin/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <TrendingUp className="h-4.5 w-4.5" />
                   <span>Reports Suite</span>
@@ -538,36 +509,32 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/manager/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/manager/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Building className="h-4.5 w-4.5" />
                   <span>Branch Operations</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/manager/roster')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/manager/roster' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/roster' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Calendar className="h-4.5 w-4.5" />
                   <span>Doctor Roster Planner</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/manager/staff')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/manager/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Users className="h-4.5 w-4.5" />
                   <span>Local Staff Directory</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/manager/reports')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/manager/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <TrendingUp className="h-4.5 w-4.5" />
                   <span>Branch Reports</span>
@@ -579,36 +546,32 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/reception/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/reception/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <ClipboardList className="h-4.5 w-4.5" />
                   <span>Triage Workbench</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/reception/patients')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/reception/patients' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/patients' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Users className="h-4.5 w-4.5" />
                   <span>Patient Registry</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/reception/appointments')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/reception/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Calendar className="h-4.5 w-4.5" />
                   <span>Schedules Calendar</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/reception/walkin')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/reception/walkin' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/walkin' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Clock className="h-4.5 w-4.5" />
                   <span>Walk-in Intake</span>
@@ -620,9 +583,8 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/doctor/workbench')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath.startsWith('/doctor/') ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath.startsWith('/doctor/') ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Activity className="h-4.5 w-4.5" />
                   <span>Consult Workbench</span>
@@ -634,36 +596,32 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/billing/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/billing/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <DollarSign className="h-4.5 w-4.5" />
                   <span>Billing Desk</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/billing/invoices')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/billing/invoices' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/invoices' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <FileText className="h-4.5 w-4.5" />
                   <span>Invoice Ledger</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/billing/claims')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/billing/claims' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/claims' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <ShieldCheck className="h-4.5 w-4.5" />
                   <span>Insurance Claims</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/billing/reports')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/billing/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <TrendingUp className="h-4.5 w-4.5" />
                   <span>Finance Reports</span>
@@ -675,36 +633,32 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/portal/home')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/portal/home' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/home' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Building className="h-4.5 w-4.5" />
                   <span>Home Dashboard</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/portal/book')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/portal/book' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/book' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Calendar className="h-4.5 w-4.5" />
                   <span>Self Booking Wizard</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/portal/medical-history')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/portal/medical-history' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/medical-history' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <FileText className="h-4.5 w-4.5" />
                   <span>My Consultations</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/portal/billing')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/portal/billing' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/billing' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <DollarSign className="h-4.5 w-4.5" />
                   <span>My Receipts</span>
@@ -724,9 +678,8 @@ export default function App() {
               <button
                 key={demo.role}
                 onClick={() => handleQuickSwitchRole(demo.roleCode)}
-                className={`py-1 border rounded text-center transition-all cursor-pointer ${
-                  currentUser.roleCode === demo.roleCode ? 'bg-blue-600 border-blue-600 text-white shadow-xs' : 'bg-transparent border-slate-800 text-slate-450 hover:bg-slate-900 hover:text-white'
-                }`}
+                className={`py-1 border rounded text-center transition-all cursor-pointer ${currentUser.roleCode === demo.roleCode ? 'bg-blue-600 border-blue-600 text-white shadow-xs' : 'bg-transparent border-slate-800 text-slate-450 hover:bg-slate-900 hover:text-white'
+                  }`}
               >
                 {demo.role.split(' ')[0]}
               </button>
@@ -737,7 +690,7 @@ export default function App() {
 
       {/* Main Workspace Frame */}
       <div className="pl-64 flex-1 flex flex-col min-w-0">
-        
+
         {/* Global Top Header Bar */}
         <header className="bg-white border-b border-slate-200 h-16 px-8 flex justify-between items-center shrink-0 z-20 shadow-xs">
           <div className="flex items-center space-x-4">
@@ -814,7 +767,7 @@ export default function App() {
           {(() => {
             // Simple path routing mapping
             const path = currentPath;
-            
+
             if (path.startsWith('/admin/')) {
               const subView = path.replace('/admin/', '');
               return <AdminPanel subView={subView} db={db} handlers={handlers} />;
@@ -858,13 +811,13 @@ export default function App() {
       {/* ==========================================
           GLOBAL OVERLAY MODALS
           ========================================== */}
-      
+
       {/* GLOBAL PATIENT SEARCH MODAL (Ctrl+K) */}
       {globalSearchOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setGlobalSearchOpen(false)} />
           <div className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-            
+
             {/* Search Input bar */}
             <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 relative flex items-center">
               <Search className="h-5 w-5 text-slate-400 mr-3" />
