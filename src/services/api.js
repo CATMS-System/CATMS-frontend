@@ -1,9 +1,7 @@
 // base fetch client for the catms backend api
 
-// placeholder for the future auth token from member 1
-const authToken = null;
-
 export async function request(method, path, body = null) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const options = {
     method,
     headers: {
@@ -11,8 +9,8 @@ export async function request(method, path, body = null) {
     }
   };
 
-  if (authToken) {
-    options.headers['Authorization'] = `Bearer ${authToken}`;
+  if (token) {
+    options.headers['Authorization'] = `Bearer ${token}`;
   }
 
   if (body !== null && body !== undefined) {

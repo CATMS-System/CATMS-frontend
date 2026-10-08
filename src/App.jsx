@@ -156,7 +156,10 @@ export default function App() {
         if (res.data && res.data.length > 0) {
           // Map backend staff schema to frontend format
           const mapped = res.data.map(s => ({
-            id: `STF-${s.Account_ID}`,
+            id: `STF-${s.Staff_ID}`,
+            Staff_ID: s.Staff_ID,
+            staffId: s.Staff_ID,
+            Account_ID: s.Account_ID,
             name: `${s.First_Name} ${s.Last_Name}`,
             role: s.Job_Title,
             branch: branches.find(b => b.Branch_ID === s.Branch_ID)?.Branch_Name || 'Colombo Main',
@@ -226,8 +229,14 @@ export default function App() {
     if (!currentUser) return;
     let isCurrent = true;
     searchPatients('', 1, 50)
-      .then(res => Promise.all((res.items || []).map(p => getPatient(p.patient_id))))
-      .then(full => isCurrent && setPatientList(full.map(adaptPatientForPanels)))
+      .then(res => Promise.allSettled((res.items || []).map(p => getPatient(p.patient_id))))
+      .then(results => {
+        if (!isCurrent) return;
+        const full = results
+          .filter(r => r.status === 'fulfilled' && r.value)
+          .map(r => r.value);
+        setPatientList(full.map(adaptPatientForPanels));
+      })
       .catch(() => isCurrent && setPatientList([]));
     return () => {
       isCurrent = false;
@@ -359,9 +368,33 @@ export default function App() {
       if (access_token) {
         localStorage.setItem('token', access_token);
         
-        // Fetch user or fallback to DEMO_LOGINS to keep UI state simple for now
-        const user = DEMO_LOGINS.find(u => u.email.toLowerCase() === emailInput.toLowerCase());
-        const finalUser = user || { role: 'Staff', roleCode: 'ROLE_RECEPTIONIST', email: emailInput, name: emailInput, branch: 'All Branches' };
+        let finalUser = null;
+        try {
+          const meRes = await api.get('/auth/me');
+          if (meRes.data) {
+            const me = meRes.data;
+            const roleCode = me.System_Role === 'Admin' ? 'ROLE_ADMIN'
+              : me.System_Role === 'Doctor' ? 'ROLE_DOCTOR'
+              : me.System_Role === 'Receptionist' ? 'ROLE_RECEPTIONIST'
+              : me.System_Role === 'Nurse' ? 'ROLE_NURSE'
+              : 'ROLE_RECEPTIONIST';
+            finalUser = {
+              Account_ID: me.Account_ID,
+              name: me.Username,
+              email: me.Email || emailInput,
+              role: me.System_Role,
+              roleCode,
+              branch: 'Colombo Main'
+            };
+          }
+        } catch (meErr) {
+          console.warn("Could not fetch /auth/me profile, using fallback:", meErr);
+        }
+
+        if (!finalUser) {
+          const user = DEMO_LOGINS.find(u => u.email.toLowerCase() === emailInput.toLowerCase());
+          finalUser = user || { role: 'Staff', roleCode: 'ROLE_RECEPTIONIST', email: emailInput, name: emailInput, branch: 'All Branches' };
+        }
         
         localStorage.setItem('catms_user', JSON.stringify(finalUser));
         setCurrentUser(finalUser);
@@ -378,6 +411,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
     localStorage.removeItem('catms_user');
     setCurrentUser(null);
     triggerToast('Session invalidated. Redirecting...');

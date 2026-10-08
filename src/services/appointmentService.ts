@@ -22,6 +22,15 @@ import type {
 
 const API_BASE = '/api/v1';
 
+function getHeaders(customHeaders: Record<string, string> = {}): HeadersInit {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const headers: Record<string, string> = { ...customHeaders };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({ detail: response.statusText }));
@@ -42,12 +51,12 @@ export async function getDoctors(branchId?: number, specialtyId?: number, search
   if (search) params.append('search', search);
 
   const url = `${API_BASE}/doctors${params.toString() ? `?${params.toString()}` : ''}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: getHeaders() });
   return handleResponse<DoctorProfile[]>(res);
 }
 
 export async function getDoctorById(doctorId: number): Promise<DoctorProfile> {
-  const res = await fetch(`${API_BASE}/doctors/${doctorId}`);
+  const res = await fetch(`${API_BASE}/doctors/${doctorId}`, { headers: getHeaders() });
   return handleResponse<DoctorProfile>(res);
 }
 
@@ -56,7 +65,7 @@ export async function getDoctorSchedules(doctorId: number, branchId?: number): P
   if (branchId) params.append('branch_id', branchId.toString());
 
   const url = `${API_BASE}/doctors/${doctorId}/schedules${params.toString() ? `?${params.toString()}` : ''}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: getHeaders() });
   return handleResponse<DoctorWeeklySchedule[]>(res);
 }
 
@@ -69,12 +78,12 @@ export async function getDoctorAvailableSlots(
   const params = new URLSearchParams({ date, duration_minutes: durationMinutes.toString() });
   if (branchId) params.append('branch_id', branchId.toString());
 
-  const res = await fetch(`${API_BASE}/doctors/${doctorId}/available-slots?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/doctors/${doctorId}/available-slots?${params.toString()}`, { headers: getHeaders() });
   return handleResponse<AvailableSlot[]>(res);
 }
 
 export async function getSpecialties(): Promise<SpecialtyItem[]> {
-  const res = await fetch(`${API_BASE}/specialties`);
+  const res = await fetch(`${API_BASE}/specialties`, { headers: getHeaders() });
   return handleResponse<SpecialtyItem[]>(res);
 }
 
@@ -85,7 +94,7 @@ export async function getSpecialties(): Promise<SpecialtyItem[]> {
 export async function bookAppointment(payload: AppointmentCreatePayload): Promise<AppointmentResponse> {
   const res = await fetch(`${API_BASE}/appointments`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   return handleResponse<AppointmentResponse>(res);
@@ -94,7 +103,7 @@ export async function bookAppointment(payload: AppointmentCreatePayload): Promis
 export async function bookWalkIn(payload: WalkInAppointmentPayload): Promise<AppointmentResponse> {
   const res = await fetch(`${API_BASE}/appointments/walk-in`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   return handleResponse<AppointmentResponse>(res);
@@ -113,12 +122,12 @@ export async function getAppointments(filters?: {
   if (filters?.status) params.append('status', filters.status);
 
   const url = `${API_BASE}/appointments${params.toString() ? `?${params.toString()}` : ''}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: getHeaders() });
   return handleResponse<AppointmentResponse[]>(res);
 }
 
 export async function getAppointmentById(appointmentId: number): Promise<AppointmentResponse> {
-  const res = await fetch(`${API_BASE}/appointments/${appointmentId}`);
+  const res = await fetch(`${API_BASE}/appointments/${appointmentId}`, { headers: getHeaders() });
   return handleResponse<AppointmentResponse>(res);
 }
 
@@ -133,7 +142,7 @@ export async function getAppointmentStatusCounts(params?: {
   if (params?.doctor_id) query.append('doctor_id', params.doctor_id.toString());
 
   const url = `${API_BASE}/appointments/metrics/status-counts${query.toString() ? `?${query.toString()}` : ''}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: getHeaders() });
   return handleResponse<AppointmentStatusCounts>(res);
 }
 
@@ -141,7 +150,7 @@ export async function getDailyQueue(branchId: number, date?: string): Promise<Qu
   const params = new URLSearchParams({ branch_id: branchId.toString() });
   if (date) params.append('date', date);
 
-  const res = await fetch(`${API_BASE}/appointments/queue?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/appointments/queue?${params.toString()}`, { headers: getHeaders() });
   return handleResponse<QueueItem[]>(res);
 }
 
@@ -151,7 +160,7 @@ export async function rescheduleAppointment(
 ): Promise<AppointmentResponse> {
   const res = await fetch(`${API_BASE}/appointments/${appointmentId}/reschedule`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   return handleResponse<AppointmentResponse>(res);
@@ -163,7 +172,7 @@ export async function cancelAppointment(
 ): Promise<AppointmentResponse> {
   const res = await fetch(`${API_BASE}/appointments/${appointmentId}/cancel`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   return handleResponse<AppointmentResponse>(res);
