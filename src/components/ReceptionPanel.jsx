@@ -4,7 +4,7 @@ import PatientsSection from './patients/PatientsSection';
 
 export default function ReceptionPanel({ subView, db, handlers }) {
   const { patientList, staffList, appointmentList, liveQueue } = db;
-  const { setAppointmentList, setLiveQueue, triggerToast, addAuditLog, navigateTo } = handlers;
+  const { setAppointmentList, setLiveQueue, triggerToast, addAuditLog, navigateTo, reloadPatients } = handlers;
 
   const currentBranch = db.currentUser.branch || 'Colombo Main';
 
@@ -334,7 +334,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
 
       {/* 2. PATIENT REGISTRATION & LOOKUP MODULE */}
       {subView === 'patients' && (
-        <PatientsSection triggerToast={triggerToast} addAuditLog={addAuditLog} />
+        <PatientsSection triggerToast={triggerToast} addAuditLog={addAuditLog} onPatientsChanged={reloadPatients} />
       )}
 
       {/* 3. APPOINTMENT SCHEDULING CALENDAR */}
