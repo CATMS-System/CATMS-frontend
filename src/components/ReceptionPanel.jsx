@@ -1,6 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Calendar, Clock, Check, X, ShieldAlert, Phone, Shield, ArrowRight, UserCheck, AlertTriangle } from 'lucide-react';
 import PatientsSection from './patients/PatientsSection';
+import {
+  AppointmentBookingModal,
+  WalkInModal,
+  RescheduleModal,
+  CancelAppointmentModal,
+  ClinicQueueTable,
+} from './appointments';
+import { getDoctors, getSpecialties } from '../services/appointmentService';
 
 export default function ReceptionPanel({ subView, db, handlers }) {
   const { patientList, staffList, appointmentList, liveQueue } = db;
@@ -16,9 +24,86 @@ export default function ReceptionPanel({ subView, db, handlers }) {
   const [showBookModal, setShowBookModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showWalkInModal, setShowWalkInModal] = useState(false);
   const [selectedSlotHour, setSelectedSlotHour] = useState(null);
   const [selectedAppointmentForAction, setSelectedAppointmentForAction] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
+
+  // API Data
+  const [apiDoctors, setApiDoctors] = useState([]);
+  const [specialties, setSpecialties] = useState([]);
+
+  useEffect(() => {
+    getDoctors().then(setApiDoctors).catch(err => console.error("API Error (Doctors):", err));
+    getSpecialties().then(setSpecialties).catch(err => console.error("API Error (Specialties):", err));
+  }, []);
+
+  const currentBranchObj = db.branches?.find(b => b.Branch_Name === currentBranch || b.name === currentBranch);
+  const currentBranchId = currentBranchObj?.Branch_ID || 1;
+
+  const allDoctors = useMemo(() => {
+    if (apiDoctors && apiDoctors.length > 0) return apiDoctors;
+    return staffList
+      .filter(s => (s.role && (s.role.includes('Doc') || s.role === 'Cardiologist' || s.role === 'Dermatologist' || s.role === 'General Practitioner')))
+      .map((s, idx) => ({
+        Doctor_ID: s.Staff_ID || s.staffId || (idx + 1),
+        Staff_ID: s.Staff_ID || s.staffId || (idx + 1),
+        First_Name: s.name ? s.name.split(' ')[0] : 'Dr.',
+        Last_Name: s.name ? s.name.split(' ').slice(1).join(' ') : 'Specialist',
+        Full_Name: s.name,
+        Email: s.details?.email || null,
+        Contact_Number: s.details?.contact || null,
+        Branch_ID: s.Branch_ID || 1,
+        Branch_Name: s.branch || 'Colombo Main',
+        License_Number: s.details?.license || 'SLMC-12345',
+        Standard_Consultation_Fee: s.details?.consultFee || 2000,
+        Specialties: [s.role]
+      }));
+  }, [apiDoctors, staffList]);
+
+  const patientOptions = useMemo(() => {
+    return patientList.map(p => {
+      const pid = typeof p.id === 'string' && p.id.startsWith('PAT-')
+        ? parseInt(p.id.replace('PAT-', ''), 10)
+        : (p.Patient_ID || parseInt(p.id, 10) || 1);
+      return {
+        Patient_ID: isNaN(pid) ? 1 : pid,
+        Full_Name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Patient',
+        NIC: p.nic || p.NIC || null,
+        Contact_Number: p.contact || p.phone || null,
+      };
+    });
+  }, [patientList]);
+
+  const selectedApptResponse = useMemo(() => {
+    if (!selectedAppointmentForAction) return null;
+    const a = selectedAppointmentForAction;
+    if (a.Appointment_ID && a.Patient_Name) return a;
+    const apptIdNum = parseInt(String(a.id || '').replace('APP-', ''), 10) || 1;
+    const patIdNum = parseInt(String(a.patientId || '').replace('PAT-', ''), 10) || 1;
+    const docIdNum = parseInt(String(a.doctorId || '').replace('STF-', ''), 10) || 1;
+    return {
+      Appointment_ID: apptIdNum,
+      Patient_ID: patIdNum,
+      Patient_Name: a.patientName || 'Patient',
+      Doctor_ID: docIdNum,
+      Doctor_Name: a.doctorName || 'Physician',
+      Branch_ID: currentBranchId,
+      Branch_Name: a.branch || currentBranch,
+      Appointment_Date: a.date || selectedDate,
+      Start_Time: a.time ? (a.time.length === 5 ? `${a.time}:00` : a.time) : '09:00:00',
+      Duration_Minutes: 30,
+      Appointment_Type: a.isWalkIn ? 'Walk_In' : 'Standard',
+      Status: a.status || 'Scheduled',
+      Reason_For_Visit: a.reason || 'Consultation'
+    };
+  }, [selectedAppointmentForAction, currentBranchId, currentBranch, selectedDate]);
+
+  const initialDocIdNum = useMemo(() => {
+    if (!selectedDocId) return null;
+    const num = parseInt(String(selectedDocId).replace('STF-', ''), 10);
+    return isNaN(num) ? null : num;
+  }, [selectedDocId]);
 
   // Emergency Walk-in State
   const [walkinPatientId, setWalkinPatientId] = useState('');
@@ -256,14 +341,14 @@ export default function ReceptionPanel({ subView, db, handlers }) {
                 <span>Register Patient</span>
               </button>
               <button
-                onClick={() => navigateTo('/reception/appointments')}
+                onClick={() => setShowBookModal(true)}
                 className="px-3.5 py-2 bg-white border border-slate-250 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-50 transition-all flex items-center space-x-1 cursor-pointer"
               >
                 <Calendar className="h-3.5 w-3.5" />
                 <span>Book Appointment</span>
               </button>
               <button
-                onClick={() => navigateTo('/reception/walkin')}
+                onClick={() => setShowWalkInModal(true)}
                 className="px-3.5 py-2 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition-all flex items-center space-x-1 cursor-pointer"
               >
                 <Clock className="h-3.5 w-3.5" />
@@ -272,63 +357,27 @@ export default function ReceptionPanel({ subView, db, handlers }) {
             </div>
           </div>
 
-          {/* Active Triage Queue Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
-              <h2 className="font-bold text-slate-900 text-md">Live Active Branch Queue Tracker</h2>
-              <span className="bg-sky-50 text-sky-850 px-2.5 py-0.5 rounded-full text-xs font-semibold border border-sky-100 font-mono">
-                {currentBranch} Room Allocations
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    <th className="px-6 py-3">Queue No.</th>
-                    <th className="px-6 py-3">Patient Code & Name</th>
-                    <th className="px-6 py-3">Triage Reason</th>
-                    <th className="px-6 py-3">Assigned Physician</th>
-                    <th className="px-6 py-3">Target Room</th>
-                    <th className="px-6 py-3">Status Tag</th>
-                    <th className="px-6 py-3 text-right">Est. Wait</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-650">
-                  {localQueue.map(q => (
-                    <tr key={q.queueNo} className="hover:bg-slate-50/50">
-                      <td className="px-6 py-4 font-mono font-bold text-slate-900">#{q.queueNo}</td>
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900">{q.patientName}</div>
-                        <span className="text-xs text-slate-400 font-mono">{q.patientId}</span>
-                      </td>
-                      <td className="px-6 py-4">{q.reason}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-800">{q.assignedDoctor}</td>
-                      <td className="px-6 py-4 font-mono font-bold text-blue-600">
-                        <span className="px-2 py-1 bg-blue-50 border border-blue-100 rounded-lg">
-                          {q.room}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${q.status === 'WALK_IN' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                          }`}>
-                          {q.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right font-mono font-bold text-slate-700">~{q.estWaitTime} mins</td>
-                    </tr>
-                  ))}
-                  {localQueue.length === 0 && (
-                    <tr>
-                      <td colSpan="7" className="px-6 py-10 text-center text-slate-400">
-                        No patient triage records checked in for this branch queue today.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* Active Triage Queue Table powered by Member 3 ClinicQueueTable */}
+          <ClinicQueueTable
+            branchId={currentBranchId}
+            initialDate={selectedDate}
+            onSelectAppointment={(item) => {
+              setSelectedAppointmentForAction({
+                Appointment_ID: item.Appointment_ID,
+                id: `APP-${item.Appointment_ID}`,
+                patientId: `PAT-${item.Patient_ID}`,
+                patientName: item.Patient_Name,
+                doctorId: `STF-${item.Doctor_ID}`,
+                doctorName: item.Doctor_Name,
+                branch: item.Branch_Name,
+                date: item.Appointment_Date,
+                time: item.Start_Time?.slice(0, 5),
+                status: item.Status,
+                reason: item.Reason_For_Visit,
+                isWalkIn: item.Appointment_Type === 'Walk_In'
+              });
+            }}
+          />
         </div>
       )}
 
@@ -511,166 +560,159 @@ export default function ReceptionPanel({ subView, db, handlers }) {
             >
               Dispatch Priority Emergency Check-in
             </button>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowWalkInModal(true)}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-lg py-2.5 text-sm font-semibold transition-colors cursor-pointer shadow-xs flex items-center justify-center space-x-2"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Launch Interactive Walk-In & Triage Dialog</span>
+              </button>
+            </div>
           </form>
         </div>
       )}
 
       {/* ==================================
-          MODALS & DRAWERS (INTERACTIVE POPUPS)
+          MEMBER 3 APPOINTMENT MODALS
           ================================== */}
 
-      {/* BOOK APPOINTMENT MODAL */}
-      {showBookModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setShowBookModal(false)} />
-          <form onSubmit={submitBooking} className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-6 space-y-4">
-            <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3">Book Roster Appointment Slot</h3>
-            <div className="space-y-3 font-mono text-xs">
-              <div className="flex justify-between items-center text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-150 font-sans">
-                <span>Practitioner: <strong>{staffList.find(s => s.id === selectedDocId)?.name}</strong></span>
-                <span>Time: <strong>{selectedSlotHour}</strong></span>
-              </div>
+      {/* REAL APPOINTMENT BOOKING MODAL */}
+      <AppointmentBookingModal
+        isOpen={showBookModal}
+        onClose={() => setShowBookModal(false)}
+        onSuccess={(newAppt) => {
+          setShowBookModal(false);
+          triggerToast(`Appointment #${newAppt.Appointment_ID} booked for ${newAppt.Patient_Name}!`);
+          addAuditLog(
+            'CREATE_APPOINTMENT',
+            `Booked appointment #${newAppt.Appointment_ID} for ${newAppt.Patient_Name} with ${newAppt.Doctor_Name} on ${newAppt.Appointment_Date} at ${newAppt.Start_Time}`,
+            'null',
+            JSON.stringify(newAppt)
+          );
+          setAppointmentList(prev => [
+            ...prev,
+            {
+              id: `APP-${newAppt.Appointment_ID}`,
+              Appointment_ID: newAppt.Appointment_ID,
+              date: newAppt.Appointment_Date,
+              time: newAppt.Start_Time?.slice(0, 5) || '09:00',
+              doctorId: `STF-${newAppt.Doctor_ID}`,
+              doctorName: newAppt.Doctor_Name,
+              patientId: `PAT-${newAppt.Patient_ID}`,
+              patientName: newAppt.Patient_Name,
+              branch: newAppt.Branch_Name || currentBranch,
+              status: newAppt.Status,
+              reason: newAppt.Reason_For_Visit,
+              isWalkIn: newAppt.Appointment_Type === 'Walk_In'
+            }
+          ]);
+        }}
+        doctors={allDoctors}
+        specialties={specialties}
+        patients={patientOptions}
+        initialDoctorId={initialDocIdNum}
+        initialDate={selectedDate}
+      />
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5 font-sans">Select Patient</label>
-                <select
-                  name="bookPatient"
-                  required
-                  className="w-full border border-slate-350 rounded-lg px-3 py-2 bg-white text-sm font-sans"
-                >
-                  <option value="">-- Choose Registered Patient --</option>
-                  {patientList.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.id})</option>
-                  ))}
-                </select>
-              </div>
+      {/* REAL RESCHEDULE APPOINTMENT MODAL */}
+      <RescheduleModal
+        isOpen={showRescheduleModal}
+        onClose={() => setShowRescheduleModal(false)}
+        onSuccess={(updated) => {
+          setShowRescheduleModal(false);
+          triggerToast(`Appointment #${updated.Appointment_ID} rescheduled successfully.`);
+          addAuditLog(
+            'UPDATE_APPOINTMENT',
+            `Rescheduled appointment #${updated.Appointment_ID} to ${updated.Appointment_Date} at ${updated.Start_Time}`,
+            JSON.stringify(selectedAppointmentForAction),
+            JSON.stringify(updated)
+          );
+          setAppointmentList(prev => prev.map(a => {
+            const matchId = a.Appointment_ID === updated.Appointment_ID || a.id === `APP-${updated.Appointment_ID}`;
+            if (matchId) {
+              return {
+                ...a,
+                date: updated.Appointment_Date,
+                time: updated.Start_Time?.slice(0, 5) || a.time,
+                status: updated.Status
+              };
+            }
+            return a;
+          }));
+        }}
+        appointment={selectedApptResponse}
+        doctors={allDoctors}
+      />
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1 font-sans">Visit Reason / Consultation Target</label>
-                <input
-                  type="text"
-                  required
-                  name="visitReason"
-                  className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm font-sans"
-                  placeholder="e.g. Regular medical follow up"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowBookModal(false)}
-                className="bg-white border border-slate-350 text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer"
-              >
-                Confirm Appointment
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* REAL CANCEL APPOINTMENT MODAL */}
+      <CancelAppointmentModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onSuccess={(updated) => {
+          setShowCancelModal(false);
+          triggerToast(`Appointment #${updated.Appointment_ID} cancelled.`);
+          addAuditLog(
+            'UPDATE_APPOINTMENT',
+            `Cancelled appointment #${updated.Appointment_ID}. Reason: ${updated.Cancellation_Reason || 'Cancelled by reception staff'}`,
+            JSON.stringify(selectedAppointmentForAction),
+            JSON.stringify(updated)
+          );
+          setAppointmentList(prev => prev.map(a => {
+            const matchId = a.Appointment_ID === updated.Appointment_ID || a.id === `APP-${updated.Appointment_ID}`;
+            if (matchId) {
+              return {
+                ...a,
+                status: 'Cancelled',
+                cancellationReason: updated.Cancellation_Reason
+              };
+            }
+            return a;
+          }));
+          if (selectedAppointmentForAction?.patientId) {
+            setLiveQueue(prev => prev.filter(q => q.patientId !== selectedAppointmentForAction.patientId));
+          }
+        }}
+        appointment={selectedApptResponse}
+      />
 
-      {/* RESCHEDULE APPOINTMENT MODAL */}
-      {showRescheduleModal && selectedAppointmentForAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setShowRescheduleModal(false)} />
-          <form onSubmit={submitReschedule} className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-6 space-y-4">
-            <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3">Reschedule Consultation</h3>
-            <p className="text-xs text-slate-500">
-              Reschedule appointment <strong>{selectedAppointmentForAction.id}</strong> for {selectedAppointmentForAction.patientName}.
-            </p>
-            <div className="space-y-3 font-mono text-xs">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1 font-sans">Target Date</label>
-                <input
-                  type="date"
-                  required
-                  name="newDate"
-                  defaultValue={selectedAppointmentForAction.date}
-                  className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5 font-sans">Target Time Hour Slot</label>
-                <select
-                  name="newTime"
-                  defaultValue={selectedAppointmentForAction.time}
-                  className="w-full border border-slate-350 rounded-lg px-3 py-2 bg-white text-sm font-sans"
-                >
-                  {calendarHours.map(hour => (
-                    <option key={hour} value={hour}>{hour}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowRescheduleModal(false)}
-                className="bg-white border border-slate-350 text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer"
-              >
-                Check & Reschedule
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* CANCEL APPOINTMENT MODAL */}
-      {showCancelModal && selectedAppointmentForAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setShowCancelModal(false)} />
-          <form onSubmit={submitCancel} className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-6 space-y-4">
-            <h3 className="font-bold text-red-650 text-md border-b border-slate-100 pb-3 flex items-center">
-              <AlertTriangle className="h-5 w-5 mr-1.5" />
-              Cancel Appointment Allocation
-            </h3>
-            <p className="text-xs text-slate-500">
-              Are you sure you want to cancel the appointment for <strong>{selectedAppointmentForAction.patientName}</strong>?
-            </p>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
-                Mandatory Cancellation Reason
-              </label>
-              <textarea
-                required
-                className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
-                placeholder="State reason for cancellation (e.g. Patient requested, doctor emergency leave)..."
-                rows="3"
-                value={cancelReason}
-                onChange={e => setCancelReason(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowCancelModal(false)}
-                className="bg-white border border-slate-350 text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer"
-              >
-                Confirm Cancellation
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* REAL WALK-IN MODAL */}
+      <WalkInModal
+        isOpen={showWalkInModal}
+        onClose={() => setShowWalkInModal(false)}
+        onSuccess={(newWalkIn) => {
+          setShowWalkInModal(false);
+          triggerToast(`Walk-in appointment #${newWalkIn.Appointment_ID} registered!`);
+          addAuditLog(
+            'CREATE_APPOINTMENT',
+            `Registered walk-in appointment #${newWalkIn.Appointment_ID} for ${newWalkIn.Patient_Name}`,
+            'null',
+            JSON.stringify(newWalkIn)
+          );
+          setAppointmentList(prev => [
+            ...prev,
+            {
+              id: `APP-${newWalkIn.Appointment_ID}`,
+              Appointment_ID: newWalkIn.Appointment_ID,
+              date: newWalkIn.Appointment_Date,
+              time: newWalkIn.Start_Time?.slice(0, 5) || '09:00',
+              doctorId: `STF-${newWalkIn.Doctor_ID}`,
+              doctorName: newWalkIn.Doctor_Name,
+              patientId: `PAT-${newWalkIn.Patient_ID}`,
+              patientName: newWalkIn.Patient_Name,
+              branch: newWalkIn.Branch_Name || currentBranch,
+              status: newWalkIn.Status,
+              reason: newWalkIn.Reason_For_Visit,
+              isWalkIn: true
+            }
+          ]);
+        }}
+        doctors={allDoctors}
+        patients={patientOptions}
+        currentBranchId={currentBranchId}
+      />
     </div>
   );
 }
