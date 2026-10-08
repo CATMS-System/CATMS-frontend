@@ -88,24 +88,35 @@ export default function AdminPanel({ subView, db, handlers }) {
       const branchId = branchObj ? (branchObj.Branch_ID || 1) : 1;
       const jobTitle = onboardingData.role === 'DOCTOR' ? (onboardingData.specialties[0] || 'Medical Specialist') : onboardingData.role.replace('_', ' ');
 
-      const response = await api.post('/staff', {
+      const payload = {
         First_Name: onboardingData.firstName,
         Last_Name: onboardingData.lastName,
         Job_Title: jobTitle,
         Contact_Number: onboardingData.contact,
         Email: onboardingData.email,
         Employment_Status: 'Active',
-        Branch_ID: branchId,
-        Account_ID: Math.floor(Math.random() * 1000) + 100
-      });
+        Branch_ID: branchId
+      };
+      if (onboardingData.username) {
+        payload.Username = onboardingData.username;
+      }
+      if (onboardingData.tempPassword) {
+        payload.Password = onboardingData.tempPassword;
+      }
+
+      const response = await api.post('/staff', payload);
       const s = response.data;
       
-      const newStaffId = `STF-${s.Account_ID}`;
+      const newStaffId = `STF-${s.Staff_ID}`;
       const newStaffMember = {
         id: newStaffId,
-        name: `Dr. ${s.First_Name} ${s.Last_Name}`,
+        Staff_ID: s.Staff_ID,
+        staffId: s.Staff_ID,
+        Account_ID: s.Account_ID,
+        name: `${s.First_Name} ${s.Last_Name}`,
         role: s.Job_Title,
         branch: onboardingData.branch,
+        Branch_ID: s.Branch_ID,
         status: s.Employment_Status,
         details: {
           firstName: s.First_Name,
@@ -166,9 +177,9 @@ export default function AdminPanel({ subView, db, handlers }) {
   };
 
   const handleToggleStaffStatus = async (staff) => {
-    const nextStatus = staff.status === 'Active' ? 'Inactive' : 'Active';
+    const nextStatus = staff.status === 'Active' ? 'On_Leave' : 'Active';
     try {
-      const staffIdInt = parseInt(staff.id.split('-')[1]);
+      const staffIdInt = staff.Staff_ID || staff.staffId || parseInt(staff.id.split('-')[1]);
       await api.put(`/staff/${staffIdInt}`, { Employment_Status: nextStatus });
 
       const updated = staffList.map(s => {
@@ -198,7 +209,7 @@ export default function AdminPanel({ subView, db, handlers }) {
     const branchId = branchObj ? (branchObj.Branch_ID || 1) : 1;
 
     try {
-      const staffIdInt = parseInt(selectedStaff.id.split('-')[1]);
+      const staffIdInt = selectedStaff.Staff_ID || selectedStaff.staffId || parseInt(selectedStaff.id.split('-')[1]);
       await api.put(`/staff/${staffIdInt}`, { Branch_ID: branchId });
 
       const updated = staffList.map(s => {
