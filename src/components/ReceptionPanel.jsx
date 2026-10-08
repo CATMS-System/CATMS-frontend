@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Plus, Calendar, Clock, Check, X, ShieldAlert, Phone, Shield, ArrowRight, UserCheck, AlertTriangle } from 'lucide-react';
+import PatientsSection from './patients/PatientsSection';
 
 export default function ReceptionPanel({ subView, db, handlers }) {
   const { patientList, staffList, appointmentList, liveQueue, branches } = db;
@@ -176,7 +177,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
 
     triggerToast(`Patient onboarded successfully! Code: ${newPatId}`);
     setShowAddPatientModal(false);
-    
+
     // Reset
     setPatientForm({
       firstName: '',
@@ -434,9 +435,8 @@ export default function ReceptionPanel({ subView, db, handlers }) {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          q.status === 'WALK_IN' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${q.status === 'WALK_IN' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
                           {q.status}
                         </span>
                       </td>
@@ -459,135 +459,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
 
       {/* 2. PATIENT REGISTRATION & LOOKUP MODULE */}
       {subView === 'patients' && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Patient Directory & Registry</h1>
-              <p className="text-sm text-slate-500 mt-1">Cross-branch patient lookups, new member onboarding, and profile configurations</p>
-            </div>
-            <button
-              onClick={() => setShowAddPatientModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold flex items-center space-x-2 shadow-xs cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Onboard New Patient</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Search and Table */}
-            <div className="lg:col-span-2 space-y-4">
-              <div className="bg-white rounded-xl border border-slate-200 p-4">
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                    <Search className="h-5 w-5" />
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Search by Patient Code (PAT-XXXX), Name, Contact, or NIC..."
-                    className="w-full pl-10 pr-3 py-2.5 border border-slate-350 rounded-lg text-sm"
-                    value={patientSearch}
-                    onChange={e => setPatientSearch(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-                <table className="w-full text-left border-collapse text-xs md:text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                      <th className="px-4 py-3">Patient Code & Name</th>
-                      <th className="px-4 py-3">NIC Number</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-650">
-                    {filteredPatients.map(p => (
-                      <tr key={p.id} className={`hover:bg-slate-50/50 ${activeProfilePatientId === p.id ? 'bg-blue-50/20' : ''}`}>
-                        <td className="px-4 py-3">
-                          <div className="font-bold text-slate-900">{p.name}</div>
-                          <span className="text-xs text-slate-400 font-mono">{p.id}</span>
-                        </td>
-                        <td className="px-4 py-3 font-mono">{p.nic}</td>
-                        <td className="px-4 py-3 text-right space-x-2">
-                          <button
-                            onClick={() => setActiveProfilePatientId(p.id)}
-                            className="text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
-                          >
-                            Inspect Profile
-                          </button>
-                          <span className="text-slate-300">|</span>
-                          <button
-                            onClick={() => {
-                              setSelectedPatientForUpdate(p);
-                              setShowUpdatePatientModal(true);
-                            }}
-                            className="text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
-                          >
-                            Update
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Profile Overview Card */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5 shadow-xs">
-              {activeProfilePatient ? (
-                <div className="space-y-6">
-                  <div className="border-b border-slate-150 pb-4">
-                    <span className="text-xs text-slate-400 font-mono uppercase tracking-wider">Patient Card File</span>
-                    <h2 className="text-xl font-bold text-slate-950 mt-0.5">{activeProfilePatient.name}</h2>
-                    <span className="text-xs text-slate-500 font-mono mt-1 block">Code: {activeProfilePatient.id} | DOB: {activeProfilePatient.dob}</span>
-                  </div>
-
-                  <div className="space-y-4 text-xs">
-                    <div>
-                      <span className="block text-[10px] text-slate-450 font-bold uppercase tracking-wider">Primary Contact Phone</span>
-                      <strong className="text-slate-800 text-sm font-mono block mt-0.5">{activeProfilePatient.contact}</strong>
-                    </div>
-
-                    <div>
-                      <span className="block text-[10px] text-slate-450 font-bold uppercase tracking-wider">Residential Address</span>
-                      <span className="text-slate-700 block mt-0.5">{activeProfilePatient.address || 'Not Recorded'}</span>
-                    </div>
-
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-                      <span className="block text-[10px] text-slate-450 font-bold uppercase tracking-wider flex items-center">
-                        <Shield className="h-3.5 w-3.5 text-blue-600 mr-1" />
-                        Insurance Policy Details
-                      </span>
-                      <div className="font-mono">
-                        <div>Provider: <strong>{activeProfilePatient.insurance?.provider || 'None'}</strong></div>
-                        <div>Policy No: <strong>{activeProfilePatient.insurance?.policyNumber || 'N/A'}</strong></div>
-                        <div>Expiry Date: <strong>{activeProfilePatient.insurance?.expDate || 'N/A'}</strong></div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="block text-[10px] text-slate-450 font-bold uppercase tracking-wider mb-2">Emergency Contact Contacts</span>
-                      <div className="space-y-2">
-                        {activeProfilePatient.emergencyContacts?.map((c, i) => (
-                          <div key={i} className="border border-slate-150 rounded-lg p-2.5 font-mono">
-                            <div className="font-bold text-slate-800 font-sans text-xs">{c.name} ({c.relation})</div>
-                            <div className="text-slate-500 mt-0.5">{c.phone}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center text-slate-400 py-20 text-xs">
-                  Select a patient record to view full medical demographics.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <PatientsSection triggerToast={triggerToast} addAuditLog={addAuditLog} />
       )}
 
       {/* 3. APPOINTMENT SCHEDULING CALENDAR */}
