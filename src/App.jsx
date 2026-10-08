@@ -1,3 +1,4 @@
+import { getFrontendRoleCode } from './utils/authRole.js';
 import React, { useState, useEffect } from 'react';
 import {
   Users, Building, Calendar, Clock, Search, Plus, Activity, FileText,
@@ -373,11 +374,7 @@ export default function App() {
           const meRes = await api.get('/auth/me');
           if (meRes.data) {
             const me = meRes.data;
-            const roleCode = me.System_Role === 'Admin' ? 'ROLE_ADMIN'
-              : me.System_Role === 'Doctor' ? 'ROLE_DOCTOR'
-              : me.System_Role === 'Receptionist' ? 'ROLE_RECEPTIONIST'
-              : me.System_Role === 'Nurse' ? 'ROLE_NURSE'
-              : 'ROLE_RECEPTIONIST';
+            const roleCode = getFrontendRoleCode(me.System_Role);
             finalUser = {
               Account_ID: me.Account_ID,
               name: me.Username,

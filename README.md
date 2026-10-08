@@ -5,7 +5,7 @@ Web client for the Clinic Appointment and Treatment Management System (CATMS), b
 ## Getting Started
 
 ### 1. Prerequisites
-- Node.js 18+
+- Node.js 24 LTS recommended (Vite and its React plugin require Node.js `^20.19.0 || >=22.12.0`).
 - npm or pnpm
 
 ### 2. Install Dependencies
