@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users, Building, Calendar, Clock, Search, Plus, Activity, FileText,
   DollarSign, TrendingUp, Download, LogOut, ClipboardList, AlertCircle,
@@ -15,6 +15,7 @@ import PatientPanel from './components/PatientPanel';
 import ReportsPanel from './components/ReportsPanel';
 import { searchPatients, getPatient } from './services/patientService';
 import { adaptPatientForPanels } from './utils/patientAdapter';
+import { formatPatientId, formatPatientName } from './utils/patientFormat';
 
 // ==========================================
 // INITIAL MOCK DATA CONFIGURATIONS
