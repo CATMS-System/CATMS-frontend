@@ -1,32 +1,30 @@
+import api from './axios';
 import { apiErrorMessage } from './apiError.js';
 
-const API_BASE = '/api/v1/billing';
-
-async function handleResponse(response) {
-  if (!response.ok) {
-    let message = 'Request failed.';
-
-    try {
-      const error = await response.json();
-      message = apiErrorMessage(error, response.status);
-    } catch {
-      // Response did not contain JSON.
-    }
-
+function handleAxiosError(error) {
+  if (error.response) {
+    const message = apiErrorMessage(error.response.data, error.response.status);
     throw new Error(message);
   }
-
-  return response.json();
+  throw error;
 }
 
 export async function getInvoices() {
-  const response = await fetch(`${API_BASE}/invoices`);
-  return handleResponse(response);
+  try {
+    const response = await api.get('/billing/invoices');
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
 }
 
 export async function getInvoice(invoiceId) {
-  const response = await fetch(`${API_BASE}/invoices/${invoiceId}`);
-  return handleResponse(response);
+  try {
+    const response = await api.get(`/billing/invoices/${invoiceId}`);
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
 }
 
 export async function recordPayment(
@@ -35,22 +33,16 @@ export async function recordPayment(
   paymentMethod,
   transactionReference
 ) {
-  const response = await fetch(
-    `${API_BASE}/invoices/${invoiceId}/payments`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount,
-        payment_method: paymentMethod,
-        transaction_reference: transactionReference,
-      }),
-    }
-  );
-
-  return handleResponse(response);
+  try {
+    const response = await api.post(`/billing/invoices/${invoiceId}/payments`, {
+      amount,
+      payment_method: paymentMethod,
+      transaction_reference: transactionReference,
+    });
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
 }
 
 export async function submitInsuranceClaim(
@@ -58,21 +50,15 @@ export async function submitInsuranceClaim(
   policyId,
   claimedAmount
 ) {
-  const response = await fetch(
-    `${API_BASE}/invoices/${invoiceId}/claims`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        policy_id: policyId,
-        claimed_amount: claimedAmount,
-      }),
-    }
-  );
-
-  return handleResponse(response);
+  try {
+    const response = await api.post(`/billing/invoices/${invoiceId}/claims`, {
+      policy_id: policyId,
+      claimed_amount: claimedAmount,
+    });
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
 }
 
 export async function updateClaimStatus(
@@ -88,16 +74,10 @@ export async function updateClaimStatus(
     body.approved_amount = approvedAmount;
   }
 
-  const response = await fetch(
-    `${API_BASE}/claims/${claimId}/status`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    }
-  );
-
-  return handleResponse(response);
+  try {
+    const response = await api.patch(`/billing/claims/${claimId}/status`, body);
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
 }
