@@ -5,7 +5,7 @@ import { getCatalogue, getCategories } from '../api/treatmentApi';
 import { createConsultation, getPatientHistory, getConsultation } from '../api/consultationApi';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
-  const currentDoctorId = db?.currentUser?.id || 'STF-001';
+  const currentDoctorId = db?.currentUser?.doctor_id ?? db?.currentUser?.doctorId ?? db?.currentUser?.id ?? 'STF-001';
   const currentDoctorName = db?.currentUser?.name || 'Dr. Alexander Bennett';
   // TODO: branch_id should come from auth context once Member 1's auth work lands
   const currentBranchId = db?.currentUser?.branch_id || db?.currentUser?.branchId || 1;
