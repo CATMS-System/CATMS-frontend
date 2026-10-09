@@ -1,4 +1,4 @@
-import api from './axios';
+import api from './axios.js';
 
 /**
  * Record a new consultation and generate invoice
