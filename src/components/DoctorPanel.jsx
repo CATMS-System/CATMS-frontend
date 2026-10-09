@@ -461,7 +461,6 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         type: 'error',
         message: errorMsg,
       });
-      console.error('Error completing consultation:', err);
     } finally {
       setIsSubmitting(false);
     }
