@@ -37,22 +37,22 @@ export default function PatientPanel({ subView, db, handlers }) {
       .then(appts => {
         if (!isCurrent) return;
         if (Array.isArray(appts)) {
-          const filtered = appts.filter(a => Number(a.Patient_ID) === numericPatientId || a.patient_id === numericPatientId);
+          const filtered = appts.filter(a => Number(a.Patient_ID || a.patient_id) === numericPatientId);
           if (filtered.length > 0) {
             const mapped = filtered.map(appt => ({
-              id: `APP-${appt.Appointment_ID}`,
-              Appointment_ID: appt.Appointment_ID,
-              date: String(appt.Appointment_Date || '').split('T')[0],
-              time: String(appt.Start_Time || '').slice(0, 5),
-              doctorId: `STF-${appt.Doctor_ID}`,
-              doctor_id: appt.Doctor_ID,
-              doctorName: appt.Doctor_Name || 'Dr. Physician',
+              id: `APP-${appt.Appointment_ID || appt.appointment_id}`,
+              Appointment_ID: appt.Appointment_ID || appt.appointment_id,
+              date: String(appt.Appointment_Date || appt.appointment_date || '').split('T')[0],
+              time: String(appt.Start_Time || appt.start_time || '').slice(0, 5),
+              doctorId: `STF-${appt.Doctor_ID || appt.doctor_id}`,
+              doctor_id: appt.Doctor_ID || appt.doctor_id,
+              doctorName: appt.Doctor_Name || appt.doctor_name || 'Dr. Physician',
               patientId: currentPatientId,
               patient_id: numericPatientId,
-              branch: appt.Branch_Name || 'Colombo Main',
-              branch_id: appt.Branch_ID,
-              status: appt.Status === 'COMPLETED' ? 'Completed' : (['BOOKED', 'CONFIRMED', 'CHECKED_IN'].includes(appt.Status) ? 'Booked' : appt.Status),
-              reason: appt.Reason || 'Consultation'
+              branch: appt.Branch_Name || appt.branch_name || 'Colombo Main',
+              branch_id: appt.Branch_ID || appt.branch_id,
+              status: (appt.Status || appt.status || '').toUpperCase() === 'COMPLETED' ? 'Completed' : (['BOOKED', 'CONFIRMED', 'CHECKED_IN', 'SCHEDULED'].includes((appt.Status || appt.status || '').toUpperCase()) ? 'Booked' : (appt.Status || appt.status || 'Booked')),
+              reason: appt.Reason || appt.reason_for_visit || 'Consultation'
             }));
             setApiAppointments(mapped);
           }
@@ -65,17 +65,17 @@ export default function PatientPanel({ subView, db, handlers }) {
       .then(invs => {
         if (!isCurrent) return;
         if (Array.isArray(invs)) {
-          const filtered = invs.filter(i => Number(i.Patient_ID) === numericPatientId);
+          const filtered = invs.filter(i => Number(i.Patient_ID || i.patient_id) === numericPatientId);
           if (filtered.length > 0) {
             const mapped = filtered.map(inv => ({
-              invoiceId: `INV-${inv.Invoice_ID}`,
-              Invoice_ID: inv.Invoice_ID,
+              invoiceId: `INV-${inv.Invoice_ID || inv.invoice_id}`,
+              Invoice_ID: inv.Invoice_ID || inv.invoice_id,
               patientId: currentPatientId,
-              date: String(inv.Invoice_Date || inv.Created_At || '').split('T')[0],
-              insuranceCoverage: Number(inv.Approved_Amount || 0),
-              patientBalance: Number(inv.Patient_Due_Amount ?? inv.Total_Amount ?? 0),
-              status: inv.Payment_Status === 'PAID' ? 'Paid' : (inv.Payment_Status === 'PARTIALLY_PAID' ? 'Partially Paid' : 'Unpaid'),
-              totalAmount: Number(inv.Total_Amount || 0)
+              date: String(inv.Invoice_Date || inv.invoice_date || inv.Created_At || '').split('T')[0],
+              insuranceCoverage: Number(inv.Approved_Amount || inv.approved_amount || inv.Insurance_Covered || inv.insurance_covered || 0),
+              patientBalance: Number(inv.Patient_Due_Amount ?? inv.Outstanding_Balance ?? inv.outstanding_balance ?? inv.Total_Amount ?? inv.Invoice_Total ?? 0),
+              status: ((inv.Payment_Status || inv.payment_status || inv.Invoice_Status || inv.invoice_status || '')).toUpperCase().includes('PAID') ? 'Paid' : 'Unpaid',
+              totalAmount: Number(inv.Total_Amount || inv.Invoice_Total || inv.invoice_total || inv.Billed_Consultation_Fee || 0)
             }));
             setApiInvoices(mapped);
           }
@@ -89,14 +89,14 @@ export default function PatientPanel({ subView, db, handlers }) {
         if (!isCurrent) return;
         if (Array.isArray(history) && history.length > 0) {
           const mappedVisits = history.map(item => ({
-            date: String(item.Consultation_Date || '').split('T')[0],
-            doctor: item.Doctor_Name || 'Attending Physician',
-            diagnosis: item.Diagnosis || item.Clinical_Notes || 'Clinical consultation recorded',
-            vitals: item.Vitals ? (typeof item.Vitals === 'string' ? item.Vitals : Object.entries(item.Vitals).map(([k, v]) => `${k}: ${v}`).join(', ')) : 'Vitals logged on intake',
-            treatments: Array.isArray(item.Treatments) ? item.Treatments.map(t => ({
-              name: t.Treatment_Name,
-              qty: t.Quantity,
-              price: Number(t.Unit_Price_Charged || t.Total_Price || 0)
+            date: String(item.Consultation_Date || item.consultation_date || '').split('T')[0],
+            doctor: item.Doctor_Name || item.doctor_name || 'Attending Physician',
+            diagnosis: item.Diagnosis || item.diagnosis || item.Clinical_Notes || item.clinical_notes || 'Clinical consultation recorded',
+            vitals: item.Vitals || item.vitals ? (typeof (item.Vitals || item.vitals) === 'string' ? (item.Vitals || item.vitals) : Object.entries(item.Vitals || item.vitals).map(([k, v]) => `${k}: ${v}`).join(', ')) : 'Vitals logged on intake',
+            treatments: Array.isArray(item.Treatments || item.items) ? (item.Treatments || item.items).map(t => ({
+              name: t.Treatment_Name || t.treatment_name,
+              qty: t.Quantity || t.quantity,
+              price: Number(t.Unit_Price_Charged || t.billed_unit_price || t.Total_Price || 0)
             })) : []
           }));
           setApiConsultations(mappedVisits);
