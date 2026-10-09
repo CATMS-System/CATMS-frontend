@@ -275,6 +275,9 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
   // Loading state for consultation submission (Step F13)
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Success and error feedback toast state (Step F14)
+  const [toastState, setToastState] = useState(null);
+
   // Complete consultation and send to billing via createConsultation API
   const handleCompleteVisit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -328,8 +331,43 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         items: itemsPayload,
       };
 
-      await createConsultation(payload);
+      const result = await createConsultation(payload);
+      const invoiceId = result?.invoice_id || result?.invoiceId || 'INV-Generated';
+      const successMsg = `Consultation completed successfully! Invoice #${invoiceId} generated and routed to billing.`;
+
+      // Success feedback (Step F14)
+      handlers?.triggerToast?.(successMsg);
+      setToastState({
+        type: 'success',
+        message: successMsg,
+        invoiceId,
+      });
+
+      if (activePatientId) {
+        updateQueueStatus(activePatientId, 'COMPLETED');
+      }
+
+      // Navigate back to workbench queue on success
+      setTimeout(() => {
+        if (handlers?.navigateTo) {
+          handlers.navigateTo('/doctor/workbench');
+        } else {
+          window.history.pushState(null, '', '/doctor/workbench');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+      }, 1200);
     } catch (err) {
+      // Error feedback (Step F14)
+      const errorMsg =
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Failed to complete consultation. Please check required fields and try again.';
+
+      handlers?.triggerToast?.(`Error: ${errorMsg}`);
+      setToastState({
+        type: 'error',
+        message: errorMsg,
+      });
       console.error('Error completing consultation:', err);
     } finally {
       setIsSubmitting(false);
@@ -962,6 +1000,42 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Feedback Notification (Step F14) */}
+      {toastState && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 max-w-md p-4 rounded-xl shadow-2xl border flex items-start space-x-3 animate-fade-in ${
+            toastState.type === 'success'
+              ? 'bg-slate-900 text-white border-emerald-500 shadow-emerald-950/20'
+              : 'bg-slate-900 text-white border-red-500 shadow-red-950/20'
+          }`}
+        >
+          {toastState.type === 'success' ? (
+            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1 text-xs">
+            <div className="font-bold text-sm text-white">
+              {toastState.type === 'success' ? 'Consultation Completed' : 'Consultation Error'}
+            </div>
+            <div className="mt-0.5 text-slate-300">{toastState.message}</div>
+            {toastState.invoiceId && (
+              <div className="mt-2 inline-flex items-center space-x-1.5 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 font-mono text-[11px] px-2 py-0.5 rounded">
+                <span>Invoice Issued:</span>
+                <span className="font-bold">#{toastState.invoiceId}</span>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setToastState(null)}
+            className="text-slate-400 hover:text-white text-xs font-bold ml-2 cursor-pointer"
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>
