@@ -83,12 +83,12 @@ const INITIAL_AUDITS = [
 
 // Available demo users and their profiles (JWT payload simulations)
 const DEMO_LOGINS = [
-  { role: 'Admin', roleCode: 'ROLE_ADMIN', email: 'admin_alana', password: 'admin123', name: 'Alana Smith [Admin]', branch: 'All Branches' },
-  { role: 'Branch Manager', roleCode: 'ROLE_BRANCH_MANAGER', email: 'mgr_vance', password: 'manager123', name: 'Marcus Vance [Manager]', branch: 'Colombo Main' },
-  { role: 'Receptionist', roleCode: 'ROLE_RECEPTIONIST', email: 'recept_shenaya', password: 'recept123', name: 'Shenaya Perera [Recept]', branch: 'Colombo Main' },
-  { role: 'Doctor', roleCode: 'ROLE_DOCTOR', email: 'dr_bennett', password: 'doc123', name: 'Dr. Alexander Bennett [Doc]', branch: 'Colombo Main', id: 'STF-001' },
-  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_patel', password: 'bill123', name: 'Dilhani Fernando [Billing]', branch: 'Colombo Main' },
-  { role: 'Patient', roleCode: 'ROLE_PATIENT', email: 'pat_johndoe', password: 'pat123', name: 'John Doe [Patient]', patientId: 'PAT-0001' }
+  { role: 'Admin', roleCode: 'ROLE_ADMIN', email: 'admin_alana', password: 'admin123', name: 'Alana Smith [Admin]', branch: 'All Branches', branch_id: 1, Branch_ID: 1 },
+  { role: 'Branch Manager', roleCode: 'ROLE_BRANCH_MANAGER', email: 'mgr_vance', password: 'manager123', name: 'Marcus Vance [Manager]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 4, Staff_ID: 4 },
+  { role: 'Receptionist', roleCode: 'ROLE_RECEPTIONIST', email: 'recept_shenaya', password: 'recept123', name: 'Shenaya Perera [Recept]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 9, Staff_ID: 9 },
+  { role: 'Doctor', roleCode: 'ROLE_DOCTOR', email: 'dr_bennett', password: 'doc123', name: 'Dr. Alexander Bennett [Doc]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, id: 'STF-001', doctor_id: 1, doctorId: 1, Doctor_ID: 1, staff_id: 1, Staff_ID: 1 },
+  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_patel', password: 'bill123', name: 'Dilhani Fernando [Billing]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 5, Staff_ID: 5 },
+  { role: 'Patient', roleCode: 'ROLE_PATIENT', email: 'pat_johndoe', password: 'pat123', name: 'John Doe [Patient]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, patientId: 'PAT-0001', patient_id: 1, Patient_ID: 1 }
 ];
 
 export default function App() {
@@ -381,7 +381,10 @@ export default function App() {
               email: me.Email || emailInput,
               role: me.System_Role,
               roleCode,
-              branch: 'Colombo Main'
+              branch: 'Colombo Main',
+              branch_id: 1,
+              Branch_ID: 1,
+              doctor_id: roleCode === 'ROLE_DOCTOR' ? (me.Doctor_ID || me.Staff_ID || 1) : undefined
             };
           }
         } catch (meErr) {
@@ -390,7 +393,7 @@ export default function App() {
 
         if (!finalUser) {
           const user = DEMO_LOGINS.find(u => u.email.toLowerCase() === emailInput.toLowerCase());
-          finalUser = user || { role: 'Staff', roleCode: 'ROLE_RECEPTIONIST', email: emailInput, name: emailInput, branch: 'All Branches' };
+          finalUser = user || { role: 'Staff', roleCode: 'ROLE_RECEPTIONIST', email: emailInput, name: emailInput, branch: 'All Branches', branch_id: 1, Branch_ID: 1 };
         }
         
         localStorage.setItem('catms_user', JSON.stringify(finalUser));
