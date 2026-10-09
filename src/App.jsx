@@ -1,4 +1,3 @@
-import { getFrontendRoleCode } from './utils/authRole.js';
 import React, { useState, useEffect } from 'react';
 import {
   Users, Building, Calendar, Clock, Search, Plus, Activity, FileText,
@@ -6,6 +5,8 @@ import {
   CheckCircle2, Lock, User, ShieldCheck, UserCheck, Menu, X, Keyboard
 } from 'lucide-react';
 import api from './api/axios';
+import { useAuth, DEMO_LOGINS } from './contexts/AuthContext.jsx';
+import { getFrontendRoleCode } from './utils/authRole.js';
 
 // Import Workspace Panels
 import AdminPanel from './components/AdminPanel';
@@ -81,30 +82,11 @@ const INITIAL_AUDITS = [
   { id: 'AUD-002', timestamp: '2026-08-23 10:20:00', userId: 'doctor@careflow.com', username: 'Dr. Alexander Bennett', branch: 'Colombo Main', action: 'UPDATE_APPOINTMENT', details: 'Completed consultation John Doe (PAT-0001)', before: '{"status":"Booked"}', after: '{"status":"Completed"}' }
 ];
 
-// Available demo users and their profiles (JWT payload simulations)
-const DEMO_LOGINS = [
-  { role: 'Admin', roleCode: 'ROLE_ADMIN', email: 'admin_alana', password: 'admin123', name: 'Alana Smith [Admin]', branch: 'All Branches', branch_id: 1, Branch_ID: 1 },
-  { role: 'Branch Manager', roleCode: 'ROLE_BRANCH_MANAGER', email: 'mgr_vance', password: 'manager123', name: 'Marcus Vance [Manager]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 4, Staff_ID: 4 },
-  { role: 'Receptionist', roleCode: 'ROLE_RECEPTIONIST', email: 'recept_shenaya', password: 'recept123', name: 'Shenaya Perera [Recept]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 9, Staff_ID: 9 },
-  { role: 'Doctor', roleCode: 'ROLE_DOCTOR', email: 'dr_bennett', password: 'doc123', name: 'Dr. Alexander Bennett [Doc]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, id: 'STF-001', doctor_id: 1, doctorId: 1, Doctor_ID: 1, staff_id: 1, Staff_ID: 1 },
-  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_patel', password: 'bill123', name: 'Dilhani Fernando [Billing]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 5, Staff_ID: 5 },
-  { role: 'Patient', roleCode: 'ROLE_PATIENT', email: 'pat_johndoe', password: 'pat123', name: 'John Doe [Patient]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, patientId: 'PAT-0001', patient_id: 1, Patient_ID: 1 }
-];
-
 export default function App() {
   // ==========================================
-  // PERSISTED STATES
+  // AUTH CONTEXT
   // ==========================================
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('catms_user');
-    try {
-      const parsed = saved ? JSON.parse(saved) : null;
-      if (parsed && parsed.name && parsed.roleCode) {
-        return parsed;
-      }
-    } catch (e) { }
-    return null;
-  });
+  const { currentUser, isHydrated, login, logout, quickSwitchRole } = useAuth();
 
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
@@ -276,6 +258,9 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Wait for hydration before running route checks to prevent redirect loops
+    if (!isHydrated) return;
+
     // If not logged in, enforce /login
     if (!currentUser) {
       if (currentPath !== '/login') {
@@ -287,7 +272,7 @@ export default function App() {
         navigateTo(getRoleDefaultPath(currentUser.roleCode));
       }
     }
-  }, [currentUser, currentPath]);
+  }, [currentUser, currentPath, isHydrated]);
 
   // ==========================================
   // GLOBAL HOTKEYS & UTILITIES
@@ -356,87 +341,30 @@ export default function App() {
   const handleSignIn = async (e) => {
     e.preventDefault();
     try {
-      const response = await api.post('/auth/login', {
-        username: emailInput,
-        password: passwordInput
-      }, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-      
-      const { access_token } = response.data;
-      if (access_token) {
-        localStorage.setItem('token', access_token);
-        
-        let finalUser = null;
-        try {
-          const meRes = await api.get('/auth/me');
-          if (meRes.data) {
-            const me = meRes.data;
-            const roleCode = getFrontendRoleCode(me.System_Role);
-            finalUser = {
-              Account_ID: me.Account_ID,
-              name: me.Username,
-              email: me.Email || emailInput,
-              role: me.System_Role,
-              roleCode,
-              branch: 'Colombo Main',
-              branch_id: 1,
-              Branch_ID: 1,
-              doctor_id: roleCode === 'ROLE_DOCTOR' ? (me.Doctor_ID || me.Staff_ID || 1) : undefined
-            };
-          }
-        } catch (meErr) {
-          console.warn("Could not fetch /auth/me profile, using fallback:", meErr);
-        }
-
-        if (!finalUser) {
-          const user = DEMO_LOGINS.find(u => u.email.toLowerCase() === emailInput.toLowerCase());
-          finalUser = user || { role: 'Staff', roleCode: 'ROLE_RECEPTIONIST', email: emailInput, name: emailInput, branch: 'All Branches', branch_id: 1, Branch_ID: 1 };
-        }
-        
-        localStorage.setItem('catms_user', JSON.stringify(finalUser));
-        setCurrentUser(finalUser);
+      const result = await login(emailInput, passwordInput);
+      if (result?.success) {
         setAuthError('');
         setEmailInput('');
         setPasswordInput('');
-        triggerToast(`Authenticated successfully!`);
-        navigateTo(getRoleDefaultPath(finalUser.roleCode));
+        triggerToast(result.isDemo ? `Authenticated as ${result.user.role} (Demo mode)!` : 'Authenticated successfully!');
+        navigateTo(getRoleDefaultPath(result.user.roleCode));
       }
     } catch (error) {
       console.error("Login failed:", error);
-      const demoUser = DEMO_LOGINS.find(
-        u => u.email.toLowerCase() === emailInput.toLowerCase() && u.password === passwordInput
-      );
-      if (demoUser) {
-        localStorage.setItem('catms_user', JSON.stringify(demoUser));
-        setCurrentUser(demoUser);
-        setAuthError('');
-        setEmailInput('');
-        setPasswordInput('');
-        triggerToast(`Authenticated as ${demoUser.role} (Demo mode)!`);
-        navigateTo(getRoleDefaultPath(demoUser.roleCode));
-        return;
-      }
       setAuthError('Invalid credentials. Check username or password.');
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('catms_user');
-    setCurrentUser(null);
+    logout();
     triggerToast('Session invalidated. Redirecting...');
     navigateTo('/login');
   };
 
   // Developer rapid role swapper (claim bypass switcher)
   const handleQuickSwitchRole = (roleCode) => {
-    const targetUser = DEMO_LOGINS.find(u => u.roleCode === roleCode);
+    const targetUser = quickSwitchRole(roleCode);
     if (targetUser) {
-      localStorage.setItem('catms_user', JSON.stringify(targetUser));
-      setCurrentUser(targetUser);
       triggerToast(`Bypassed to role: ${targetUser.role}`);
       navigateTo(getRoleDefaultPath(targetUser.roleCode));
     }
