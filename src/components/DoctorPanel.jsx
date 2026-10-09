@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope, AlertCircle, Search, Filter, Layers, Tag, Plus, Minus, Trash2, ClipboardList } from 'lucide-react';
+import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope, AlertCircle, Search, Filter, Layers, Tag, Plus, Minus, Trash2, ClipboardList, Loader2, CheckCircle2 } from 'lucide-react';
 import { useDoctorQueue } from '../hooks/useDoctorQueue';
 import { getCatalogue, getCategories } from '../api/treatmentApi';
+import { createConsultation } from '../api/consultationApi';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
   const currentDoctorId = db?.currentUser?.id || 'STF-001';
@@ -270,6 +271,70 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       return acc + price * qty;
     }, 0);
   }, [prescribedItems]);
+
+  // Loading state for consultation submission (Step F13)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Complete consultation and send to billing via createConsultation API
+  const handleCompleteVisit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+
+    // Inline validation check
+    if (!diagnosis || !diagnosis.trim()) {
+      setTouched((prev) => ({ ...prev, diagnosis: true }));
+      validateField('diagnosis', '');
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (followUpDate && followUpDate < todayStr) {
+      setTouched((prev) => ({ ...prev, followUpDate: true }));
+      validateField('followUpDate', followUpDate);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const resolvedApptId =
+        activeAppt?.appointment_id ||
+        (typeof activeAppointmentId === 'number'
+          ? activeAppointmentId
+          : parseInt(String(activeAppointmentId).replace(/\D/g, ''), 10) || 1);
+
+      const itemsPayload = prescribedItems.map((item) => ({
+        treatment_id:
+          typeof item.treatment_id === 'number'
+            ? item.treatment_id
+            : parseInt(String(item.service_code || item.treatment_id || '1').replace(/\D/g, ''), 10) || 1,
+        quantity: Number(item.quantity) || 1,
+        instructions: item.instructions || undefined,
+      }));
+
+      const vitalsPayload = {
+        bp: vitals.bp || undefined,
+        heart_rate: vitals.hr ? parseInt(vitals.hr, 10) || undefined : undefined,
+        temperature: vitals.temp ? parseFloat(vitals.temp) || undefined : undefined,
+        spo2: vitals.spo2 ? parseInt(vitals.spo2, 10) || undefined : undefined,
+        weight: vitals.weight ? parseFloat(vitals.weight) || undefined : undefined,
+      };
+
+      const payload = {
+        appointment_id: resolvedApptId,
+        diagnosis: diagnosis.trim(),
+        clinical_notes: clinicalNotes.trim() || undefined,
+        doctor_notes: doctorNotes.trim() || undefined,
+        follow_up_date: followUpDate || undefined,
+        vitals: vitalsPayload,
+        items: itemsPayload,
+      };
+
+      await createConsultation(payload);
+    } catch (err) {
+      console.error('Error completing consultation:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Navigate to consultation room route, passing appointment_id and patient_id
   const handleSelectPatient = (queueItem) => {
@@ -862,6 +927,39 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Complete Visit Action Button (Step F13) */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xs">
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm">Complete Clinical Session</h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Save clinical findings, prescribe itemized treatments, and route invoice to billing desk
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCompleteVisit}
+                disabled={isSubmitting}
+                className={`px-6 py-3 rounded-xl font-bold text-sm text-white transition-all shadow-md flex items-center space-x-2 cursor-pointer ${
+                  isSubmitting
+                    ? 'bg-emerald-400 cursor-not-allowed opacity-80'
+                    : 'bg-emerald-600 hover:bg-emerald-700 active:scale-98'
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Submitting Consultation...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Complete Visit & Send to Billing</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
