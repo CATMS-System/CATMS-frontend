@@ -1,42 +1,32 @@
+import api from './axios';
 import { apiErrorMessage } from './apiError.js';
 
-const REPORTS_BASE = '/api/v1/reports';
-
-async function handleResponse(response) {
-  if (!response.ok) {
-    let message = 'Request failed.';
-
-    try {
-      const error = await response.json();
-      message = apiErrorMessage(error, response.status);
-    } catch {
-      // Response did not contain JSON.
-    }
-
+function handleAxiosError(error) {
+  if (error.response) {
+    const message = apiErrorMessage(error.response.data, error.response.status);
     throw new Error(message);
   }
-
-  return response.json();
+  throw error;
 }
 
 function addBranchFilter(params, branchId) {
   if (branchId !== null && branchId !== undefined && branchId !== '') {
-    params.set('branch_id', branchId);
+    params.branch_id = branchId;
   }
 }
 
 export async function getBranchDailySummary(reportDate, branchId = null) {
-  const params = new URLSearchParams({
+  const params = {
     report_date: reportDate,
-  });
-
+  };
   addBranchFilter(params, branchId);
 
-  const response = await fetch(
-    `${REPORTS_BASE}/branch-daily-summary?${params.toString()}`
-  );
-
-  return handleResponse(response);
+  try {
+    const response = await api.get('/reports/branch-daily-summary', { params });
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
 }
 
 export async function getDoctorRevenue(
@@ -44,32 +34,30 @@ export async function getDoctorRevenue(
   endDate,
   branchId = null
 ) {
-  const params = new URLSearchParams({
+  const params = {
     start_date: startDate,
     end_date: endDate,
-  });
-
+  };
   addBranchFilter(params, branchId);
 
-  const response = await fetch(
-    `${REPORTS_BASE}/doctor-revenue?${params.toString()}`
-  );
-
-  return handleResponse(response);
+  try {
+    const response = await api.get('/reports/doctor-revenue', { params });
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
 }
 
 export async function getOutstandingBalances(branchId = null) {
-  const params = new URLSearchParams();
-
+  const params = {};
   addBranchFilter(params, branchId);
 
-  const query = params.toString();
-
-  const response = await fetch(
-    `${REPORTS_BASE}/outstanding-balances${query ? `?${query}` : ''}`
-  );
-
-  return handleResponse(response);
+  try {
+    const response = await api.get('/reports/outstanding-balances', { params });
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
 }
 
 export async function getTreatmentUsage(
@@ -77,18 +65,18 @@ export async function getTreatmentUsage(
   endDate,
   branchId = null
 ) {
-  const params = new URLSearchParams({
+  const params = {
     start_date: startDate,
     end_date: endDate,
-  });
-
+  };
   addBranchFilter(params, branchId);
 
-  const response = await fetch(
-    `${REPORTS_BASE}/treatment-usage?${params.toString()}`
-  );
-
-  return handleResponse(response);
+  try {
+    const response = await api.get('/reports/treatment-usage', { params });
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
 }
 
 export async function getInsuranceVsOutOfPocket(
@@ -96,16 +84,16 @@ export async function getInsuranceVsOutOfPocket(
   endDate,
   branchId = null
 ) {
-  const params = new URLSearchParams({
+  const params = {
     start_date: startDate,
     end_date: endDate,
-  });
-
+  };
   addBranchFilter(params, branchId);
 
-  const response = await fetch(
-    `${REPORTS_BASE}/insurance-vs-out-of-pocket?${params.toString()}`
-  );
-
-  return handleResponse(response);
+  try {
+    const response = await api.get('/reports/insurance-vs-out-of-pocket', { params });
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
 }
