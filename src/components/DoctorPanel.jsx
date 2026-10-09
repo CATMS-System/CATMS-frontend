@@ -7,9 +7,15 @@ import { createConsultation, getPatientHistory, getConsultation } from '../api/c
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
   const currentDoctorId = db?.currentUser?.id || 'STF-001';
   const currentDoctorName = db?.currentUser?.name || 'Dr. Alexander Bennett';
+  // TODO: branch_id should come from auth context once Member 1's auth work lands
+  const currentBranchId = db?.currentUser?.branch_id || db?.currentUser?.branchId || 1;
 
   // Wire doctor's daily appointment queue through isolated hook
-  const { queue, loading, updateQueueStatus } = useDoctorQueue(currentDoctorId, db?.liveQueue);
+  const { queue, loading, updateQueueStatus } = useDoctorQueue(
+    currentDoctorId,
+    currentBranchId,
+    db?.liveQueue
+  );
 
   // Parse appointment_id and patient_id from route / URL
   const { activeAppointmentId, activePatientId } = useMemo(() => {

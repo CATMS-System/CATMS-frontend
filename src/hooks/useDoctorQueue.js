@@ -5,11 +5,17 @@ import api from '../api/axios';
  * Custom hook to isolate doctor's daily appointment queue data source.
  * Attempts to fetch from Member 3's appointment queue endpoint if available on develop,
  * otherwise isolates the data source in this hook with fallback data so it can be swapped later.
+ * 
+ * TODO: branchId should come from auth context once Member 1's auth work lands
  */
-export function useDoctorQueue(doctorIdentifier, initialQueue = []) {
+export function useDoctorQueue(doctorIdentifier, branchId = 1, initialQueue = []) {
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Gracefully handle if branchId is omitted or passed as array (backward compatibility)
+  const resolvedBranchId = Array.isArray(branchId) ? 1 : (Number(branchId) || 1);
+  const resolvedInitialQueue = Array.isArray(branchId) ? branchId : initialQueue;
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
@@ -17,7 +23,10 @@ export function useDoctorQueue(doctorIdentifier, initialQueue = []) {
     try {
       // Attempt to call Member 3's queue endpoint if implemented on backend
       const response = await api.get('/appointments/queue', {
-        params: { doctor_id: doctorIdentifier },
+        params: {
+          branch_id: resolvedBranchId,
+          doctor_id: doctorIdentifier,
+        },
       });
       if (response?.data && Array.isArray(response.data)) {
         setQueue(response.data);
@@ -90,7 +99,7 @@ export function useDoctorQueue(doctorIdentifier, initialQueue = []) {
     } else {
       setQueue(defaultData);
     }
-  }, [doctorIdentifier, initialQueue]);
+  }, [doctorIdentifier, resolvedBranchId, resolvedInitialQueue]);
 
   useEffect(() => {
     fetchQueue();
