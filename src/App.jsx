@@ -4,9 +4,26 @@ import {
   DollarSign, TrendingUp, Download, LogOut, ClipboardList, AlertCircle,
   CheckCircle2, Lock, User, ShieldCheck, UserCheck, Menu, X, Keyboard
 } from 'lucide-react';
-import api from './api/axios';
-import { useAuth, DEMO_LOGINS } from './contexts/AuthContext.jsx';
+import api from './api/axios.js';
+import { useAuth } from './contexts/AuthContext.jsx';
 import { getFrontendRoleCode } from './utils/authRole.js';
+
+export const ROLE_ALLOWED_PREFIXES = {
+  ROLE_ADMIN: ['/admin/', '/manager/', '/reception/', '/doctor/', '/billing/', '/portal/'],
+  ROLE_BRANCH_MANAGER: ['/manager/'],
+  ROLE_RECEPTIONIST: ['/reception/'],
+  ROLE_NURSE: ['/reception/', '/nurse/'],
+  ROLE_DOCTOR: ['/doctor/'],
+  ROLE_BILLING_STAFF: ['/billing/'],
+  ROLE_PATIENT: ['/portal/']
+};
+
+export function isPathAllowed(roleCode, path) {
+  if (!roleCode || !path) return false;
+  if (path === '/login' || path === '/') return true;
+  const prefixes = ROLE_ALLOWED_PREFIXES[roleCode] || [];
+  return prefixes.some(prefix => path.startsWith(prefix));
+}
 
 // Import Workspace Panels
 import AdminPanel from './components/AdminPanel';
@@ -86,7 +103,7 @@ export default function App() {
   // ==========================================
   // AUTH CONTEXT
   // ==========================================
-  const { currentUser, isHydrated, login, logout, quickSwitchRole } = useAuth();
+  const { currentUser, isHydrated, login, logout } = useAuth();
 
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
@@ -267,8 +284,8 @@ export default function App() {
         navigateTo('/login');
       }
     } else {
-      // If at login or root, redirect to role home
-      if (currentPath === '/login' || currentPath === '/') {
+      // If at login, root, or unauthorized path, redirect to role default path
+      if (currentPath === '/login' || currentPath === '/' || !isPathAllowed(currentUser.roleCode, currentPath)) {
         navigateTo(getRoleDefaultPath(currentUser.roleCode));
       }
     }
@@ -361,14 +378,6 @@ export default function App() {
     navigateTo('/login');
   };
 
-  // Developer rapid role swapper (claim bypass switcher)
-  const handleQuickSwitchRole = (roleCode) => {
-    const targetUser = quickSwitchRole(roleCode);
-    if (targetUser) {
-      triggerToast(`Bypassed to role: ${targetUser.role}`);
-      navigateTo(getRoleDefaultPath(targetUser.roleCode));
-    }
-  };
 
   // State bundle pack
   const db = { staffList, patientList, appointmentList, liveQueue, invoiceList, auditLogs, branches, currentUser, selectedBranch, medicalHistories };
@@ -456,26 +465,7 @@ export default function App() {
               </button>
             </form>
 
-            <div className="pt-6 border-t border-slate-200">
-              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 text-center">
-                Demo Accounts Quick-Login Selector
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {DEMO_LOGINS.map((demo) => (
-                  <button
-                    key={demo.role}
-                    onClick={() => {
-                      setEmailInput(demo.email);
-                      setPasswordInput(demo.password);
-                    }}
-                    className="p-2.5 border border-slate-200 rounded-xl text-left hover:bg-slate-50 hover:border-slate-300 transition-all text-xs cursor-pointer shadow-2xs"
-                  >
-                    <span className="font-bold text-slate-900 block">{demo.role}</span>
-                    <span className="text-slate-400 truncate block font-mono text-[9px]">{demo.email}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+
           </div>
         </div>
       </div>
@@ -715,22 +705,14 @@ export default function App() {
           </nav>
         </div>
 
-        {/* System log details */}
-        <div className="p-4 border-t border-slate-900 bg-slate-950/50 space-y-4">
-          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">
-            Role Bypasses (Bypass Switcher)
+        {/* User Session Info */}
+        <div className="p-4 border-t border-slate-900 bg-slate-950/50">
+          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            Active Session
           </div>
-          <div className="grid grid-cols-2 gap-1 text-[9px] font-semibold">
-            {DEMO_LOGINS.map(demo => (
-              <button
-                key={demo.role}
-                onClick={() => handleQuickSwitchRole(demo.roleCode)}
-                className={`py-1 border rounded text-center transition-all cursor-pointer ${currentUser.roleCode === demo.roleCode ? 'bg-blue-600 border-blue-600 text-white shadow-xs' : 'bg-transparent border-slate-800 text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
-              >
-                {demo.role.split(' ')[0]}
-              </button>
-            ))}
+          <div className="text-xs font-semibold text-slate-300 mt-1 flex items-center space-x-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
+            <span>{currentUser.roleCode.replace('ROLE_', '')}</span>
           </div>
         </div>
       </aside>
@@ -814,6 +796,25 @@ export default function App() {
           {(() => {
             // Simple path routing mapping
             const path = currentPath;
+
+            // Enforce role-versus-path workspace guard
+            if (!isPathAllowed(currentUser.roleCode, path)) {
+              return (
+                <div className="bg-white border border-red-200 rounded-xl p-10 text-center text-slate-700 shadow-xs">
+                  <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+                  <h3 className="font-bold text-slate-900 text-lg">Access Denied</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Your account role ({currentUser.roleCode.replace('ROLE_', '')}) does not have permission to access {path}.
+                  </p>
+                  <button
+                    onClick={() => navigateTo(getRoleDefaultPath(currentUser.roleCode))}
+                    className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    Return to My Workspace
+                  </button>
+                </div>
+              );
+            }
 
             if (path.startsWith('/admin/')) {
               const subView = path.replace('/admin/', '');

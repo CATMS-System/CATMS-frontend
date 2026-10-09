@@ -17,13 +17,13 @@ after(async () => { await server?.close(); });
 
 for (const [backend, frontend] of Object.entries({
   Admin: 'ROLE_ADMIN', Doctor: 'ROLE_DOCTOR', Receptionist: 'ROLE_RECEPTIONIST',
-  Nurse: 'ROLE_NURSE', Billing_Staff: 'ROLE_BILLING_STAFF', Branch_Manager: 'ROLE_BRANCH_MANAGER'
+  Nurse: 'ROLE_NURSE', Billing_Staff: 'ROLE_BILLING_STAFF', Branch_Manager: 'ROLE_BRANCH_MANAGER',
+  Patient: 'ROLE_PATIENT'
 })) {
   test(`profile role ${backend} maps to ${frontend}`, () => assert.equal(getFrontendRoleCode(backend), frontend));
 }
 test('unknown profile roles retain the existing fallback', () => {
   assert.equal(getFrontendRoleCode('Unknown'), 'ROLE_RECEPTIONIST');
-  assert.equal(getFrontendRoleCode('Patient'), 'ROLE_RECEPTIONIST');
 });
 
 function browser(t, user, pathname) {
@@ -89,3 +89,22 @@ test('existing fetch client retains authenticated paths and readable validation 
     return true;
   });
 });
+
+test('route guard denies Doctor access to Admin workspace', t => {
+  browser(t, { name: 'Test Doc', email: 'doc@example.invalid', roleCode: 'ROLE_DOCTOR', branch: 'Colombo Main' }, '/admin/dashboard');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Access Denied'));
+});
+
+test('route guard denies Receptionist access to Billing workspace', t => {
+  browser(t, { name: 'Test Recept', email: 'recept@example.invalid', roleCode: 'ROLE_RECEPTIONIST', branch: 'Colombo Main' }, '/billing/invoices');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Access Denied'));
+});
+
+test('route guard denies Patient access to Doctor workbench', t => {
+  browser(t, { name: 'Test Patient', email: 'pat@example.invalid', roleCode: 'ROLE_PATIENT', branch: 'Colombo Main' }, '/doctor/workbench');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Access Denied'));
+});
+
