@@ -403,6 +403,19 @@ export default function App() {
       }
     } catch (error) {
       console.error("Login failed:", error);
+      const demoUser = DEMO_LOGINS.find(
+        u => u.email.toLowerCase() === emailInput.toLowerCase() && u.password === passwordInput
+      );
+      if (demoUser) {
+        localStorage.setItem('catms_user', JSON.stringify(demoUser));
+        setCurrentUser(demoUser);
+        setAuthError('');
+        setEmailInput('');
+        setPasswordInput('');
+        triggerToast(`Authenticated as ${demoUser.role} (Demo mode)!`);
+        navigateTo(getRoleDefaultPath(demoUser.roleCode));
+        return;
+      }
       setAuthError('Invalid credentials. Check username or password.');
     }
   };
@@ -465,7 +478,7 @@ export default function App() {
               </div>
             )}
 
-            <form className="space-y-4" onSubmit={handleSignIn}>
+            <form className="space-y-4" onSubmit={handleSignIn} noValidate>
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                   Email Address / Username
@@ -475,10 +488,10 @@ export default function App() {
                     <User className="h-4 w-4" />
                   </span>
                   <input
-                    type="email"
+                    type="text"
                     required
                     className="w-full pl-9 pr-3 py-2 border border-slate-350 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                    placeholder="name@careflow.com"
+                    placeholder="username or name@careflow.com"
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                   />
