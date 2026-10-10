@@ -142,25 +142,38 @@ export default function PatientPanel({ subView, db, handlers }) {
     }, 0);
   }, [personalInvoices]);
 
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const tomorrowStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  }, []);
+
   // Booking Wizard State
   const [bookingStep, setBookingStep] = useState(1);
   const [bookingForm, setBookingForm] = useState({
-    branch: 'Colombo Main',
+    branch: 'Colombo Main Clinic',
     branchId: 1,
-    specialty: 'General Practice',
-    specialtyId: 1,
+    specialty: 'All Specialties',
+    specialtyId: null,
     doctorId: '',
-    numericDoctorId: 1,
-    date: '2026-08-24', // default tomorrow
+    numericDoctorId: null,
+    date: tomorrowStr,
     time: '09:00',
     reason: ''
   });
 
   // Resolve branch ID for booking
   const selectedBranchId = useMemo(() => {
-    const b = branches?.find(br => br.name === bookingForm.branch || br.Branch_Name === bookingForm.branch);
-    return b ? (b.Branch_ID || 1) : 1;
-  }, [branches, bookingForm.branch]);
+    if (bookingForm.branchId) return Number(bookingForm.branchId);
+    if (!branches || branches.length === 0) return 1;
+    const b = branches.find(br => {
+      const bName = (br.Branch_Name || br.name || '').toLowerCase();
+      const target = (bookingForm.branch || '').toLowerCase();
+      return bName === target || bName.includes(target) || target.includes(bName);
+    });
+    return b ? (b.Branch_ID || b.id || 1) : 1;
+  }, [branches, bookingForm.branchId, bookingForm.branch]);
 
   // Fetch real doctors for the selected branch and specialty
   useEffect(() => {
@@ -183,42 +196,67 @@ export default function PatientPanel({ subView, db, handlers }) {
     if (realDoctors.length > 0) {
       return realDoctors.map(d => ({
         id: `STF-${d.Staff_ID || d.Doctor_ID}`,
-        doctor_id: d.Doctor_ID,
-        name: `Dr. ${d.First_Name} ${d.Last_Name}`,
-        role: d.Job_Title || (Array.isArray(d.Specialties) ? d.Specialties.join(', ') : 'Doctor'),
+        doctor_id: d.Doctor_ID || d.Staff_ID,
+        name: d.Full_Name ? (d.Full_Name.startsWith('Dr.') ? d.Full_Name : `Dr. ${d.Full_Name}`) : `Dr. ${d.First_Name} ${d.Last_Name}`,
+        role: d.Job_Title || (Array.isArray(d.Specialties) ? d.Specialties.join(', ') : (d.Specialties || 'Physician')),
         consultFee: d.Standard_Consultation_Fee,
-        branch: bookingForm.branch
+        branch: d.Branch_Name || bookingForm.branch
       }));
     }
     return staffList.filter(s => {
-      const matchBranch = s.branch === bookingForm.branch;
-      const matchRole = s.role.toLowerCase().includes(bookingForm.specialty.toLowerCase().split(' ')[0]) || s.role === 'Cardiologist' || s.role === 'Dermatologist' || s.role === 'General Practitioner';
-      return matchBranch && matchRole && s.status === 'Active';
+      const matchBranch = s.Branch_ID === selectedBranchId || (s.branch && bookingForm.branch && (s.branch.toLowerCase().includes(bookingForm.branch.toLowerCase()) || bookingForm.branch.toLowerCase().includes(s.branch.toLowerCase())));
+      const isDoc = s.role && (s.role.includes('Doc') || s.role.includes('Card') || s.role.includes('Derm') || s.role.includes('Practitioner') || s.role.includes('Physician') || s.role.includes('Surgeon'));
+      const matchRole = !bookingForm.specialtyId || (s.role && s.role.toLowerCase().includes((bookingForm.specialty || '').toLowerCase().split(' ')[0]));
+      return matchBranch && isDoc && (bookingForm.specialty === 'All Specialties' || matchRole) && s.status === 'Active';
     });
-  }, [realDoctors, staffList, bookingForm.branch, bookingForm.specialty]);
+  }, [realDoctors, staffList, selectedBranchId, bookingForm.branch, bookingForm.specialtyId, bookingForm.specialty]);
 
-  // Set default doctor when available list changes
+  // Set default doctor when available list changes or when chosen doctor is no longer available
   useEffect(() => {
-    if (availableDoctors.length > 0 && !bookingForm.doctorId) {
-      const first = availableDoctors[0];
+    if (availableDoctors.length > 0) {
+      const isSelectedDoctorStillAvailable = availableDoctors.some(
+        d => d.id === bookingForm.doctorId || d.doctor_id === bookingForm.numericDoctorId
+      );
+      if (!isSelectedDoctorStillAvailable) {
+        const first = availableDoctors[0];
+        setBookingForm(prev => ({
+          ...prev,
+          doctorId: first.id,
+          numericDoctorId: first.doctor_id || 1
+        }));
+      }
+    } else {
       setBookingForm(prev => ({
         ...prev,
-        doctorId: first.id,
-        numericDoctorId: first.doctor_id || 1
+        doctorId: '',
+        numericDoctorId: null
       }));
     }
-  }, [availableDoctors, bookingForm.doctorId]);
+  }, [availableDoctors, bookingForm.doctorId, bookingForm.numericDoctorId]);
 
   // Fetch available slots when doctor and date are chosen
   useEffect(() => {
-    if (!bookingForm.numericDoctorId || !bookingForm.date) return;
+    if (!bookingForm.numericDoctorId || !bookingForm.date) {
+      setRealSlots([]);
+      return;
+    }
     let isCurrent = true;
     setSlotsLoading(true);
     getDoctorAvailableSlots(bookingForm.numericDoctorId, bookingForm.date, 30, selectedBranchId)
       .then(slots => {
         if (!isCurrent) return;
         if (Array.isArray(slots) && slots.length > 0) {
-          setRealSlots(slots);
+          const normalized = slots.map((s, idx) => {
+            const st = String(s.Start_Time || s.start_time || '09:00:00').slice(0, 5);
+            const et = String(s.End_Time || s.end_time || '09:30:00').slice(0, 5);
+            return {
+              ...s,
+              slot_id: s.Slot_ID || s.slot_id || s.Schedule_ID || `slot-${idx}-${st}`,
+              start_time: st,
+              end_time: et
+            };
+          });
+          setRealSlots(normalized);
         } else {
           setRealSlots([]);
         }
@@ -227,6 +265,16 @@ export default function PatientPanel({ subView, db, handlers }) {
       .finally(() => isCurrent && setSlotsLoading(false));
     return () => { isCurrent = false; };
   }, [bookingForm.numericDoctorId, bookingForm.date, selectedBranchId]);
+
+  // Keep booking time synced to first available slot if any
+  useEffect(() => {
+    if (realSlots.length > 0) {
+      const firstTime = realSlots[0].start_time;
+      if (firstTime) {
+        setBookingForm(prev => ({ ...prev, time: firstTime }));
+      }
+    }
+  }, [realSlots]);
 
   const handleNextStep = () => {
     if (bookingStep === 1) {
@@ -248,19 +296,26 @@ export default function PatientPanel({ subView, db, handlers }) {
 
   const handleConfirmBooking = async (e) => {
     e.preventDefault();
+    if (!bookingForm.numericDoctorId) {
+      alert('Please select a doctor to continue.');
+      return;
+    }
     setIsSubmittingBooking(true);
     const docObj = availableDoctors.find(s => s.id === bookingForm.doctorId || s.doctor_id === bookingForm.numericDoctorId);
+    const formattedTime = bookingForm.time.length === 5 ? `${bookingForm.time}:00` : bookingForm.time;
+    const visitReason = bookingForm.reason?.trim() || 'Patient self-booked consultation';
 
     try {
       // Attempt to book appointment via real API
       const response = await bookAppointment({
         patient_id: numericPatientId,
-        doctor_id: bookingForm.numericDoctorId || 1,
+        doctor_id: bookingForm.numericDoctorId,
         branch_id: selectedBranchId,
         appointment_date: bookingForm.date,
-        start_time: bookingForm.time,
-        reason: bookingForm.reason || 'Patient self-booked consultation',
-        slot_duration_minutes: 30
+        start_time: formattedTime,
+        duration_minutes: 30,
+        appointment_type: 'Standard',
+        reason_for_visit: visitReason
       });
 
       const newApptId = response?.Appointment_ID ? `APP-${response.Appointment_ID}` : `APP-${(appointmentList.length + 1001).toString()}`;
@@ -270,13 +325,13 @@ export default function PatientPanel({ subView, db, handlers }) {
         date: bookingForm.date,
         time: bookingForm.time,
         doctorId: bookingForm.doctorId,
-        doctor_id: bookingForm.numericDoctorId || 1,
+        doctor_id: bookingForm.numericDoctorId,
         doctorName: docObj ? docObj.name : 'Physician',
         patientId: currentPatientId,
         patient_id: numericPatientId,
         branch: bookingForm.branch,
         status: 'Booked',
-        reason: bookingForm.reason || 'Patient self-booked consultation'
+        reason: visitReason
       };
 
       setAppointmentList([...appointmentList, newAppt]);
@@ -292,13 +347,13 @@ export default function PatientPanel({ subView, db, handlers }) {
       navigateTo('/portal/home');
       setBookingStep(1);
       setBookingForm({
-        branch: 'Colombo Main',
+        branch: 'Colombo Main Clinic',
         branchId: 1,
-        specialty: 'General Practice',
-        specialtyId: 1,
+        specialty: 'All Specialties',
+        specialtyId: null,
         doctorId: '',
-        numericDoctorId: 1,
-        date: '2026-08-24',
+        numericDoctorId: null,
+        date: tomorrowStr,
         time: '09:00',
         reason: ''
       });
@@ -311,13 +366,13 @@ export default function PatientPanel({ subView, db, handlers }) {
         date: bookingForm.date,
         time: bookingForm.time,
         doctorId: bookingForm.doctorId,
-        doctor_id: bookingForm.numericDoctorId || 1,
+        doctor_id: bookingForm.numericDoctorId,
         doctorName: docObj ? docObj.name : 'Physician',
         patientId: currentPatientId,
         patient_id: numericPatientId,
         branch: bookingForm.branch,
         status: 'Booked',
-        reason: bookingForm.reason || 'Patient self-booked consultation'
+        reason: visitReason
       };
 
       setAppointmentList([...appointmentList, newAppt]);
@@ -489,42 +544,65 @@ export default function PatientPanel({ subView, db, handlers }) {
                     <label className="text-xs font-semibold text-slate-500 block mb-1">Clinic Branch Location</label>
                     <select
                       className="w-full border border-slate-350 rounded-lg p-2.5 text-xs font-medium"
-                      value={bookingForm.branch}
-                      onChange={e => setBookingForm(prev => ({ ...prev, branch: e.target.value, doctorId: '' }))}
+                      value={bookingForm.branchId}
+                      onChange={e => {
+                        const bId = Number(e.target.value);
+                        const bObj = branches?.find(b => (b.Branch_ID || b.id) === bId);
+                        const bName = bObj ? (bObj.Branch_Name || bObj.name) : 'Clinic Branch';
+                        setBookingForm(prev => ({
+                          ...prev,
+                          branchId: bId,
+                          branch: bName,
+                          doctorId: '',
+                          numericDoctorId: null
+                        }));
+                      }}
                     >
-                      <option value="Colombo Main">Colombo Main Clinic</option>
-                      <option value="Kandy">Kandy Central Clinic</option>
-                      <option value="Galle">Galle Coastal Clinic</option>
+                      {branches && branches.length > 0 ? (
+                        branches.map(b => (
+                          <option key={b.Branch_ID || b.id} value={b.Branch_ID || b.id}>
+                            {b.Branch_Name || b.name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value={1}>Colombo Main Clinic</option>
+                          <option value={2}>Kandy Central Clinic</option>
+                          <option value={3}>Galle Coastal Clinic</option>
+                        </>
+                      )}
                     </select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-500 block mb-1">Medical Department / Specialty</label>
                     <select
                       className="w-full border border-slate-350 rounded-lg p-2.5 text-xs font-medium"
-                      value={bookingForm.specialty}
+                      value={bookingForm.specialtyId ?? ''}
                       onChange={e => {
-                        const specName = e.target.value;
-                        const specObj = specialtiesList.find(s => (s.Specialty_Name || s.name) === specName);
+                        const val = e.target.value;
+                        const specId = val ? Number(val) : null;
+                        const specObj = specialtiesList.find(s => (s.Specialty_ID || s.id) === specId);
                         setBookingForm(prev => ({
                           ...prev,
-                          specialty: specName,
-                          specialtyId: specObj ? (specObj.Specialty_ID || specObj.id) : 1,
-                          doctorId: ''
+                          specialtyId: specId,
+                          specialty: specObj ? (specObj.Specialty_Name || specObj.name) : 'All Specialties',
+                          doctorId: '',
+                          numericDoctorId: null
                         }));
                       }}
                     >
+                      <option value="">All Specialties / Departments</option>
                       {specialtiesList.length > 0 ? (
                         specialtiesList.map(s => (
-                          <option key={s.Specialty_ID || s.id} value={s.Specialty_Name || s.name}>
+                          <option key={s.Specialty_ID || s.id} value={s.Specialty_ID || s.id}>
                             {s.Specialty_Name || s.name}
                           </option>
                         ))
                       ) : (
                         <>
-                          <option value="General Practice">General Practice (Primary Care)</option>
-                          <option value="Cardiology">Cardiology (Heart & Vascular)</option>
-                          <option value="Dermatology">Dermatology (Skin & Hair)</option>
-                          <option value="Pediatrics">Pediatrics (Child Health)</option>
+                          <option value="1">Cardiology (Heart & Vascular)</option>
+                          <option value="2">General Medicine (Primary Care)</option>
+                          <option value="3">Dermatology (Skin & Hair)</option>
                         </>
                       )}
                     </select>
@@ -578,6 +656,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                     <label className="text-xs font-semibold text-slate-500 block mb-1">Appointment Date</label>
                     <input
                       type="date"
+                      min={todayStr}
                       className="w-full border border-slate-350 rounded-lg p-2.5 text-xs font-medium"
                       value={bookingForm.date}
                       onChange={e => setBookingForm(prev => ({ ...prev, date: e.target.value }))}
@@ -594,11 +673,15 @@ export default function PatientPanel({ subView, db, handlers }) {
                         value={bookingForm.time}
                         onChange={e => setBookingForm(prev => ({ ...prev, time: e.target.value }))}
                       >
-                        {realSlots.map(s => (
-                          <option key={s.slot_id || s.start_time} value={s.start_time.slice(0, 5)}>
-                            {s.start_time.slice(0, 5)} - {s.end_time.slice(0, 5)}
-                          </option>
-                        ))}
+                        {realSlots.map((s, idx) => {
+                          const st = String(s.start_time || s.Start_Time || '09:00').slice(0, 5);
+                          const et = String(s.end_time || s.End_Time || '09:30').slice(0, 5);
+                          return (
+                            <option key={s.slot_id || idx} value={st}>
+                              {st} - {et}
+                            </option>
+                          );
+                        })}
                       </select>
                     ) : (
                       <select
