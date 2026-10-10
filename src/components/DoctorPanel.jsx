@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope, AlertCircle, Search, Filter, Layers, Tag, Plus, Minus, Trash2, ClipboardList, Loader2, CheckCircle2, History, X, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope, AlertCircle, Search, Filter, Layers, Tag, Plus, Minus, Trash2, ClipboardList, Loader2, CheckCircle2, History, X, ChevronDown, ChevronUp, RefreshCw, CalendarDays } from 'lucide-react';
 import { useDoctorQueue } from '../hooks/useDoctorQueue';
 import { getCatalogue, getCategories } from '../api/treatmentApi';
 import { createConsultation, getPatientHistory, getConsultation } from '../api/consultationApi';
+import { getAppointments } from '../services/appointmentService';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
   const currentDoctorId = db?.currentUser?.doctor_id ?? db?.currentUser?.doctorId ?? db?.currentUser?.id ?? 'STF-001';
@@ -10,12 +11,132 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
   // TODO: branch_id should come from auth context once Member 1's auth work lands
   const currentBranchId = db?.currentUser?.branch_id || db?.currentUser?.branchId || 1;
 
+  // Numeric doctor id resolution for appointment queries
+  const numericDoctorId = useMemo(() => {
+    if (db?.currentUser?.Doctor_ID) return Number(db.currentUser.Doctor_ID);
+    if (db?.currentUser?.doctor_id && !isNaN(Number(db.currentUser.doctor_id))) return Number(db.currentUser.doctor_id);
+    if (db?.currentUser?.doctorId && !isNaN(Number(db.currentUser.doctorId))) return Number(db.currentUser.doctorId);
+    if (db?.currentUser?.staff_id && !isNaN(Number(db.currentUser.staff_id))) return Number(db.currentUser.staff_id);
+    const parsed = parseInt(String(db?.currentUser?.id || '').replace(/\D/g, ''), 10);
+    return !isNaN(parsed) && parsed > 0 ? parsed : 1;
+  }, [db?.currentUser]);
+
   // Wire doctor's daily appointment queue through isolated hook
   const { queue, loading, updateQueueStatus } = useDoctorQueue(
     currentDoctorId,
     currentBranchId,
     db?.liveQueue
   );
+
+  // Tab navigation between live queue and upcoming schedule
+  const [activeTab, setActiveTab] = useState(subView === 'appointments' ? 'appointments' : 'queue');
+
+  useEffect(() => {
+    if (subView === 'appointments') {
+      setActiveTab('appointments');
+    } else if (subView === 'workbench') {
+      setActiveTab('queue');
+    }
+  }, [subView]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'appointments') {
+      if (handlers?.navigateTo) handlers.navigateTo('/doctor/appointments');
+    } else {
+      if (handlers?.navigateTo) handlers.navigateTo('/doctor/workbench');
+    }
+  };
+
+  // Doctor upcoming appointments state & queries
+  const [doctorAppointments, setDoctorAppointments] = useState([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState(null);
+
+  // Filter state for upcoming bookings
+  const [dateFilter, setDateFilter] = useState('upcoming');
+  const [customDate, setCustomDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
+  const [searchFilter, setSearchFilter] = useState('');
+
+  const fetchDoctorAppointments = useCallback(async () => {
+    setLoadingAppointments(true);
+    setAppointmentsError(null);
+    try {
+      const data = await getAppointments({ doctor_id: numericDoctorId });
+      setDoctorAppointments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch doctor appointments:', err);
+      setAppointmentsError(err?.message || 'Failed to load doctor appointments');
+      setDoctorAppointments([]);
+    } finally {
+      setLoadingAppointments(false);
+    }
+  }, [numericDoctorId]);
+
+  useEffect(() => {
+    fetchDoctorAppointments();
+  }, [fetchDoctorAppointments]);
+
+  // Date boundary calculations
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const tomorrowStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+  const weekAheadStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  // Filtered upcoming appointments
+  const filteredAppointments = useMemo(() => {
+    return doctorAppointments.filter((appt) => {
+      const apptDate = appt.Appointment_Date;
+      if (dateFilter === 'upcoming') {
+        if (apptDate < todayStr) return false;
+      } else if (dateFilter === 'today') {
+        if (apptDate !== todayStr) return false;
+      } else if (dateFilter === 'tomorrow') {
+        if (apptDate !== tomorrowStr) return false;
+      } else if (dateFilter === 'week') {
+        if (apptDate < todayStr || apptDate > weekAheadStr) return false;
+      } else if (dateFilter === 'custom' && customDate) {
+        if (apptDate !== customDate) return false;
+      }
+
+      if (statusFilter === 'active') {
+        if (!['Scheduled', 'Confirmed', 'In_Progress'].includes(appt.Status)) return false;
+      } else if (statusFilter !== 'ALL') {
+        if (appt.Status !== statusFilter) return false;
+      }
+
+      if (searchFilter.trim()) {
+        const q = searchFilter.toLowerCase();
+        const matchName = (appt.Patient_Name || '').toLowerCase().includes(q);
+        const matchId = String(appt.Patient_ID || '').toLowerCase().includes(q);
+        const matchReason = (appt.Reason_For_Visit || '').toLowerCase().includes(q);
+        if (!matchName && !matchId && !matchReason) return false;
+      }
+
+      return true;
+    });
+  }, [doctorAppointments, dateFilter, customDate, statusFilter, searchFilter, todayStr, tomorrowStr, weekAheadStr]);
+
+  // Summary statistics for appointments
+  const upcomingCount = useMemo(() => {
+    return doctorAppointments.filter((a) => a.Appointment_Date >= todayStr && ['Scheduled', 'Confirmed', 'In_Progress'].includes(a.Status)).length;
+  }, [doctorAppointments, todayStr]);
+
+  const confirmedCount = useMemo(() => {
+    return doctorAppointments.filter((a) => a.Appointment_Date >= todayStr && a.Status === 'Confirmed').length;
+  }, [doctorAppointments, todayStr]);
+
+  const scheduledCount = useMemo(() => {
+    return doctorAppointments.filter((a) => a.Appointment_Date >= todayStr && a.Status === 'Scheduled').length;
+  }, [doctorAppointments, todayStr]);
 
   // Parse appointment_id and patient_id from route / URL
   const { activeAppointmentId, activePatientId } = useMemo(() => {
@@ -484,98 +605,396 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
 
   return (
     <div className="space-y-6">
-      {/* 1. DOCTOR WORKBENCH (QUEUE SUMMARY) */}
-      {subView === 'workbench' && (
+      {/* 1. DOCTOR WORKBENCH & UPCOMING APPOINTMENTS */}
+      {(subView === 'workbench' || subView === 'appointments') && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Clinician Triage Workbench</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Manage waiting room queues, recall diagnostics, and open active clinical consoles
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
-              <h2 className="font-bold text-slate-900 text-md">Daily Consultation Queue</h2>
-              <span className="bg-blue-50 text-blue-800 border border-blue-100 rounded-full px-2.5 py-0.5 text-xs font-semibold font-mono">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Clinician Triage Workbench</h1>
+              <p className="text-sm text-slate-500 mt-1">
+                Manage waiting room queues, recall diagnostics, review upcoming schedules, and open active clinical consoles
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <span className="bg-blue-50 text-blue-800 border border-blue-100 rounded-full px-3 py-1 text-xs font-semibold font-mono">
                 Attending: {currentDoctorName}
               </span>
             </div>
+          </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    <th className="px-6 py-3 text-center">Position</th>
-                    <th className="px-6 py-3">Patient Code & Name</th>
-                    <th className="px-6 py-3">Reason for Visit</th>
-                    <th className="px-6 py-3">Status Tag</th>
-                    <th className="px-6 py-3 text-right">Consultation Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-650">
-                  {loading ? (
-                    <tr>
-                      <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
-                        Loading daily consultation queue...
-                      </td>
+          {/* Navigation Tabs */}
+          <div className="flex border-b border-slate-200 space-x-2">
+            <button
+              type="button"
+              onClick={() => handleTabChange('queue')}
+              className={`flex items-center space-x-2 pb-3 px-4 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
+                activeTab === 'queue'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Activity className="h-4 w-4" />
+              <span>Today's Live Queue</span>
+              <span className="bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded-full font-mono">
+                {queue.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange('appointments')}
+              className={`flex items-center space-x-2 pb-3 px-4 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
+                activeTab === 'appointments'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Calendar className="h-4 w-4" />
+              <span>Upcoming Appointments</span>
+              <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-mono font-bold">
+                {upcomingCount}
+              </span>
+            </button>
+          </div>
+
+          {/* TAB 1: DAILY LIVE TRIAGE QUEUE */}
+          {activeTab === 'queue' && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
+                <h2 className="font-bold text-slate-900 text-md">Daily Consultation Queue</h2>
+                <span className="bg-blue-50 text-blue-800 border border-blue-100 rounded-full px-2.5 py-0.5 text-xs font-semibold font-mono">
+                  Attending: {currentDoctorName}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                      <th className="px-6 py-3 text-center">Position</th>
+                      <th className="px-6 py-3">Patient Code & Name</th>
+                      <th className="px-6 py-3">Reason for Visit</th>
+                      <th className="px-6 py-3">Status Tag</th>
+                      <th className="px-6 py-3 text-right">Consultation Action</th>
                     </tr>
-                  ) : queue.length > 0 ? (
-                    queue.map((q, idx) => (
-                      <tr
-                        key={q.queueNo || q.appointmentId || idx}
-                        onClick={() => handleSelectPatient(q)}
-                        className="hover:bg-slate-50/70 cursor-pointer transition-colors"
-                      >
-                        <td className="px-6 py-4 text-center font-mono font-bold text-slate-900">
-                          #{idx + 1}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-slate-900">{q.patientName || q.patient_name}</div>
-                          <span className="text-xs text-slate-400 font-mono">
-                            {q.patientId || q.patient_id}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 font-medium">{q.reason || 'Routine Checkup'}</td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
-                              q.status === 'IN_PROGRESS'
-                                ? 'bg-blue-50 text-blue-700 border-blue-150 animate-pulse'
-                                : q.status === 'WALK_IN'
-                                ? 'bg-amber-50 text-amber-700 border-amber-150'
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-150'
-                            }`}
-                          >
-                            {q.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSelectPatient(q);
-                            }}
-                            className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
-                          >
-                            <span>{q.status === 'IN_PROGRESS' ? 'Resume Console' : 'Call Patient'}</span>
-                            <CornerDownRight className="h-3.5 w-3.5" />
-                          </button>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-650">
+                    {loading ? (
+                      <tr>
+                        <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
+                          Loading daily consultation queue...
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="5" className="px-6 py-10 text-center text-slate-400">
-                        No triage patients in your queue today. Refresh to monitor check-ins.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    ) : queue.length > 0 ? (
+                      queue.map((q, idx) => (
+                        <tr
+                          key={q.queueNo || q.appointmentId || idx}
+                          onClick={() => handleSelectPatient(q)}
+                          className="hover:bg-slate-50/70 cursor-pointer transition-colors"
+                        >
+                          <td className="px-6 py-4 text-center font-mono font-bold text-slate-900">
+                            #{idx + 1}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-slate-900">{q.patientName || q.patient_name}</div>
+                            <span className="text-xs text-slate-400 font-mono">
+                              {q.patientId || q.patient_id}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-medium">{q.reason || 'Routine Checkup'}</td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
+                                q.status === 'IN_PROGRESS'
+                                  ? 'bg-blue-50 text-blue-700 border-blue-150 animate-pulse'
+                                  : q.status === 'WALK_IN'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-150'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-150'
+                              }`}
+                            >
+                              {q.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectPatient(q);
+                              }}
+                              className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
+                            >
+                              <span>{q.status === 'IN_PROGRESS' ? 'Resume Console' : 'Call Patient'}</span>
+                              <CornerDownRight className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5" className="px-6 py-10 text-center text-slate-400">
+                          No triage patients in your queue today. Refresh to monitor check-ins.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* TAB 2: UPCOMING APPOINTMENTS SCHEDULE */}
+          {activeTab === 'appointments' && (
+            <div className="space-y-6">
+              {/* Metrics Overview Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                  <div className="h-11 w-11 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Upcoming Bookings</span>
+                    <div className="text-xl font-bold text-slate-900 font-mono mt-0.5">{upcomingCount}</div>
+                    <span className="text-[11px] text-slate-400">Future scheduled visits</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                  <div className="h-11 w-11 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Confirmed</span>
+                    <div className="text-xl font-bold text-emerald-700 font-mono mt-0.5">{confirmedCount}</div>
+                    <span className="text-[11px] text-slate-400">Confirmed upcoming</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                  <div className="h-11 w-11 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Scheduled (Pending)</span>
+                    <div className="text-xl font-bold text-amber-700 font-mono mt-0.5">{scheduledCount}</div>
+                    <span className="text-[11px] text-slate-400">Awaiting confirmation</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                  <div className="h-11 w-11 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Today's Live Queue</span>
+                    <div className="text-xl font-bold text-indigo-700 font-mono mt-0.5">{queue.length}</div>
+                    <span className="text-[11px] text-slate-400">Active patients waiting</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter and Control Bar */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap gap-3 items-center justify-between">
+                <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                  {/* Search Input */}
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search patient, ID, or reason..."
+                      value={searchFilter}
+                      onChange={(e) => setSearchFilter(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Date Scope Filter */}
+                  <div className="flex items-center space-x-1.5">
+                    <CalendarDays className="h-4 w-4 text-slate-400 shrink-0" />
+                    <select
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="upcoming">Upcoming (Default)</option>
+                      <option value="today">Today Only</option>
+                      <option value="tomorrow">Tomorrow</option>
+                      <option value="week">Next 7 Days</option>
+                      <option value="all">All Dates</option>
+                      <option value="custom">Custom Date...</option>
+                    </select>
+                  </div>
+
+                  {/* Custom Date Input */}
+                  {dateFilter === 'custom' && (
+                    <input
+                      type="date"
+                      value={customDate}
+                      onChange={(e) => setCustomDate(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700"
+                    />
+                  )}
+
+                  {/* Status Filter */}
+                  <div className="flex items-center space-x-1.5">
+                    <Filter className="h-4 w-4 text-slate-400 shrink-0" />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="active">Active (Scheduled & Confirmed)</option>
+                      <option value="ALL">All Statuses</option>
+                      <option value="Scheduled">Scheduled</option>
+                      <option value="Confirmed">Confirmed</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Refresh Button */}
+                <button
+                  type="button"
+                  onClick={fetchDoctorAppointments}
+                  disabled={loadingAppointments}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer transition-colors"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingAppointments ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              {/* Upcoming Bookings Table */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
+                  <h2 className="font-bold text-slate-900 text-md">Upcoming Booked Consultations</h2>
+                  <span className="text-xs text-slate-500 font-mono">
+                    Showing {filteredAppointments.length} booking{filteredAppointments.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                        <th className="px-6 py-3">Date & Time</th>
+                        <th className="px-6 py-3">Patient Details</th>
+                        <th className="px-6 py-3">Reason for Visit</th>
+                        <th className="px-6 py-3">Type & Branch</th>
+                        <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3 text-right">Consultation Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-650">
+                      {loadingAppointments ? (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
+                            <div className="inline-flex items-center space-x-2">
+                              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                              <span>Loading upcoming appointments...</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : appointmentsError ? (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-8 text-center text-red-500">
+                            {appointmentsError}
+                          </td>
+                        </tr>
+                      ) : filteredAppointments.length > 0 ? (
+                        filteredAppointments.map((appt) => {
+                          const isToday = appt.Appointment_Date === todayStr;
+                          const isFuture = appt.Appointment_Date > todayStr;
+                          return (
+                            <tr
+                              key={appt.Appointment_ID}
+                              className="hover:bg-slate-50/70 transition-colors"
+                            >
+                              <td className="px-6 py-4">
+                                <div className="font-bold text-slate-900">
+                                  {appt.Appointment_Date}
+                                </div>
+                                <div className="text-xs text-slate-500 flex items-center space-x-1 mt-0.5 font-mono">
+                                  <Clock className="h-3 w-3 text-slate-400" />
+                                  <span>{appt.Start_Time ? String(appt.Start_Time).slice(0, 5) : 'Scheduled'}</span>
+                                  <span>({appt.Duration_Minutes || 30}m)</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="font-bold text-slate-900">{appt.Patient_Name || `Patient #${appt.Patient_ID}`}</div>
+                                <div className="text-xs text-slate-400 font-mono">
+                                  ID: {appt.Patient_ID} {appt.Patient_Phone ? `| ${appt.Patient_Phone}` : ''}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 font-medium text-slate-700">
+                                {appt.Reason_For_Visit || 'Routine Checkup'}
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-xs font-semibold text-slate-800">
+                                  {appt.Branch_Name || 'Clinic Branch'}
+                                </div>
+                                <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                                  appt.Appointment_Type === 'Walk_In'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                }`}>
+                                  {appt.Appointment_Type || 'Scheduled'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
+                                    appt.Status === 'Confirmed'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : appt.Status === 'Scheduled'
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : appt.Status === 'In_Progress'
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                                      : appt.Status === 'Completed'
+                                      ? 'bg-slate-100 text-slate-700 border-slate-200'
+                                      : 'bg-red-50 text-red-700 border-red-200'
+                                  }`}
+                                >
+                                  {appt.Status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                {isToday ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectPatient(appt)}
+                                    className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
+                                  >
+                                    <span>Call Patient</span>
+                                    <CornerDownRight className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : isFuture ? (
+                                  <span className="inline-flex items-center space-x-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg font-medium">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>Upcoming</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-400 font-mono">
+                                    Past Record
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-10 text-center text-slate-400">
+                            No upcoming appointments found matching your selected filters.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
