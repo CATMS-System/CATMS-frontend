@@ -66,25 +66,52 @@ const reports = [
 export default function ReportsPanel({ db }) {
   // Use the same role codes as App routing; display names are not permission keys.
   const role = db.currentUser.roleCode;
+  const isManager = role === 'ROLE_BRANCH_MANAGER';
+  const managerBranchId = db.currentUser.branch_id || db.currentUser.Branch_ID || 1;
+  const managerBranchName = db.currentUser.branch || 'Assigned Branch';
+
   const accessibleReports = reports.filter(report => report.roles.includes(role));
   const [selectedReport, setSelectedReport] = useState(() =>
     reports.find(report => report.roles.includes(role))?.id || ''
   );
   const report = accessibleReports.find(item => item.id === selectedReport) || accessibleReports[0];
   const reportId = report?.id;
-  const [branchFilter, setBranchFilter] = useState('');
-  const [reportDate, setReportDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const [branchFilter, setBranchFilter] = useState(() => (isManager ? String(managerBranchId) : ''));
+  const [reportDate, setReportDate] = useState(() => '2026-08-23');
+  const [startDate, setStartDate] = useState(() => '2026-08-01');
+  const [endDate, setEndDate] = useState(() => '2026-08-31');
   const [reload, setReload] = useState(0);
   const [result, setResult] = useState({ key: '', rows: [], loading: true, error: '' });
+
+  useEffect(() => {
+    if (isManager) {
+      setBranchFilter(String(managerBranchId));
+    }
+  }, [isManager, managerBranchId]);
+
+  const setPresetAug2026 = () => {
+    setReportDate('2026-08-23');
+    setStartDate('2026-08-01');
+    setEndDate('2026-08-31');
+  };
+
+  const setPresetCurrent = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const d = new Date();
+    d.setDate(1);
+    setReportDate(today);
+    setStartDate(d.toISOString().slice(0, 10));
+    setEndDate(today);
+  };
+
+  const effectiveBranchId = isManager
+    ? Number(managerBranchId)
+    : (branchFilter === '' ? null : Number(branchFilter));
+
   const dateStart = reportId === 'rep-01' ? reportDate : reportId === 'rep-03' ? '' : startDate;
   const dateEnd = ['rep-01', 'rep-03'].includes(reportId) ? '' : endDate;
-  const requestKey = JSON.stringify([reportId, branchFilter, dateStart, dateEnd, reload]);
+  const requestKey = JSON.stringify([reportId, effectiveBranchId, dateStart, dateEnd, reload]);
 
   useEffect(() => {
     if (!reportId) return;
@@ -92,8 +119,7 @@ export default function ReportsPanel({ db }) {
     const loadReport = async () => {
       setResult({ key: requestKey, rows: [], loading: true, error: '' });
       try {
-        const branchId = branchFilter === '' ? null : Number(branchFilter);
-        if (branchId !== null && (!Number.isInteger(branchId) || branchId <= 0)) {
+        if (effectiveBranchId !== null && (!Number.isInteger(effectiveBranchId) || effectiveBranchId <= 0)) {
           throw new Error('Branch ID must be a positive whole number, or blank for all branches.');
         }
         if (reportId !== 'rep-03' && (!dateStart || (reportId !== 'rep-01' && !dateEnd))) {
@@ -104,21 +130,21 @@ export default function ReportsPanel({ db }) {
         }
         let rows;
         switch (reportId) {
-          case 'rep-01': rows = await getBranchDailySummary(dateStart, branchId); break;
-          case 'rep-02': rows = await getDoctorRevenue(dateStart, dateEnd, branchId); break;
-          case 'rep-03': rows = await getOutstandingBalances(branchId); break;
-          case 'rep-04': rows = await getTreatmentUsage(dateStart, dateEnd, branchId); break;
-          case 'rep-05': rows = await getInsuranceVsOutOfPocket(dateStart, dateEnd, branchId); break;
+          case 'rep-01': rows = await getBranchDailySummary(dateStart, effectiveBranchId); break;
+          case 'rep-02': rows = await getDoctorRevenue(dateStart, dateEnd, effectiveBranchId); break;
+          case 'rep-03': rows = await getOutstandingBalances(effectiveBranchId); break;
+          case 'rep-04': rows = await getTreatmentUsage(dateStart, dateEnd, effectiveBranchId); break;
+          case 'rep-05': rows = await getInsuranceVsOutOfPocket(dateStart, dateEnd, effectiveBranchId); break;
         }
         if (!Array.isArray(rows)) throw new Error('The report API returned an invalid response.');
         if (active) setResult({ key: requestKey, rows, loading: false, error: '' });
       } catch (error) {
-        if (active) setResult({ key: requestKey, rows: [], loading: false, error: error.message || 'Failed to load report.' });
+        if (active) setResult({ key: requestKey, rows, loading: false, error: error.message || 'Failed to load report.' });
       }
     };
     loadReport();
     return () => { active = false; };
-  }, [reportId, branchFilter, dateStart, dateEnd, requestKey]);
+  }, [reportId, effectiveBranchId, dateStart, dateEnd, requestKey]);
 
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
@@ -129,7 +155,7 @@ export default function ReportsPanel({ db }) {
     setExportError('');
     setExporting(true);
     // Capture the visible response and its matching filters before lazy-loading PDF code.
-    const filters = { dateStart, dateEnd, branchId: branchFilter };
+    const filters = { dateStart, dateEnd, branchId: effectiveBranchId ?? '' };
     const rows = result.rows;
     const filename = reportFilename(report, filters);
     try {
@@ -185,12 +211,37 @@ export default function ReportsPanel({ db }) {
       {report ? (
         <>
           <div className="flex flex-wrap items-end gap-4">
-            <label className="space-y-1 text-xs font-semibold text-slate-500">
-              <span className="flex items-center gap-1"><Filter className="h-4 w-4" />Branch ID (optional)</span>
-              <input type="number" min="1" step="1" value={branchFilter}
-                onChange={event => setBranchFilter(event.target.value)} placeholder="All branches"
-                className={`${inputClass} block w-40`} />
-            </label>
+            {isManager ? (
+              <label className="space-y-1 text-xs font-semibold text-slate-500">
+                <span className="flex items-center gap-1"><Filter className="h-4 w-4" />Branch Scope (Locked)</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    disabled
+                    readOnly
+                    value={`Branch ${managerBranchId} - ${managerBranchName}`}
+                    className={`${inputClass} block w-56 bg-slate-100 text-slate-600 cursor-not-allowed select-none`}
+                  />
+                  <span className="text-[10px] uppercase font-bold px-2 py-1 rounded bg-blue-100 text-blue-800">
+                    Scoped
+                  </span>
+                </div>
+              </label>
+            ) : (
+              <label className="space-y-1 text-xs font-semibold text-slate-500">
+                <span className="flex items-center gap-1"><Filter className="h-4 w-4" />Branch ID (optional)</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={branchFilter}
+                  onChange={event => setBranchFilter(event.target.value)}
+                  placeholder="All branches"
+                  className={`${inputClass} block w-40`}
+                />
+              </label>
+            )}
+
             {reportId === 'rep-01' && (
               <label className="space-y-1 text-xs font-semibold text-slate-500">
                 <span className="block">Report date</span>
@@ -209,7 +260,32 @@ export default function ReportsPanel({ db }) {
                 </label>
               </>
             )}
-            <button onClick={() => setReload(value => value + 1)} className={`${inputClass} hover:bg-slate-50 cursor-pointer`}>Refresh report</button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={setPresetAug2026}
+                title="Load seed dataset period (August 2026)"
+                className={`${inputClass} bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 cursor-pointer`}
+              >
+                Seed Period (Aug 2026)
+              </button>
+              <button
+                type="button"
+                onClick={setPresetCurrent}
+                title="Reset to current month"
+                className={`${inputClass} hover:bg-slate-50 cursor-pointer`}
+              >
+                Current Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setReload(value => value + 1)}
+                className={`${inputClass} bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 cursor-pointer`}
+              >
+                Refresh report
+              </button>
+            </div>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden" aria-busy={loading}>
@@ -221,9 +297,23 @@ export default function ReportsPanel({ db }) {
                 <button onClick={() => setReload(value => value + 1)} className="mt-3 font-semibold text-blue-600 hover:text-blue-800 cursor-pointer">Try again</button>
               </div>
             ) : result.rows.length === 0 ? (
-              <p role="status" className="px-6 py-10 text-center text-sm text-slate-500">
-                {reportId === 'rep-03' ? 'No outstanding balances found.' : 'No report results found for the selected filters.'}
-              </p>
+              <div role="status" className="px-6 py-10 text-center text-sm text-slate-500 space-y-2">
+                <p>
+                  {reportId === 'rep-03' ? 'No outstanding balances found.' : 'No report results found for the selected date range.'}
+                </p>
+                {reportId !== 'rep-03' && (
+                  <p className="text-xs text-slate-400">
+                    Looking for seed records?{' '}
+                    <button
+                      type="button"
+                      onClick={setPresetAug2026}
+                      className="font-semibold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                    >
+                      View August 2026 Seed Records
+                    </button>
+                  </p>
+                )}
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">

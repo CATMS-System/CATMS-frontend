@@ -247,16 +247,18 @@ export default function ManagerPanel({ subView, db, handlers }) {
 
       // Revenue from daily summary if available, else local invoices
       let collected = 0;
-      if (Array.isArray(apiDailySummary) && apiDailySummary.length > 0) {
+      const summaryHasRevenue = Array.isArray(apiDailySummary) && apiDailySummary.length > 0 &&
+        apiDailySummary.some(r => r.Gross_Revenue != null || r.Total_Revenue != null);
+      if (summaryHasRevenue) {
         collected = apiDailySummary.reduce((sum, r) => sum + (Number(r.Gross_Revenue) || Number(r.Total_Revenue) || 0), 0);
       } else {
         const localInvoices = invoiceList.filter(i => {
           const appt = appointmentList.find(a => a.id === i.appointmentId || (a.patientId === i.patientId && a.date === i.date));
-          return appt?.branch === managerBranch;
+          return appt?.branch === managerBranch || i.branch === managerBranch || i.branch_id === managerBranchId || i.Branch_ID === managerBranchId;
         });
         collected = localInvoices.reduce((sum, inv) => {
-          if (inv.status === 'Paid') return sum + inv.patientBalance + inv.insuranceCoverage;
-          if (inv.status === 'Partially Paid') return sum + (inv.patientBalance * 0.5) + inv.insuranceCoverage;
+          if (inv.status === 'Paid') return sum + (Number(inv.patientBalance) || 0) + (Number(inv.insuranceCoverage) || 0);
+          if (inv.status === 'Partially Paid') return sum + ((Number(inv.patientBalance) || 0) * 0.5) + (Number(inv.insuranceCoverage) || 0);
           return sum;
         }, 0);
       }
@@ -279,12 +281,12 @@ export default function ManagerPanel({ subView, db, handlers }) {
     
     const localInvoices = invoiceList.filter(i => {
       const appt = appointmentList.find(a => a.id === i.appointmentId || (a.patientId === i.patientId && a.date === i.date));
-      return appt?.branch === managerBranch;
+      return appt?.branch === managerBranch || i.branch === managerBranch || i.branch_id === managerBranchId || i.Branch_ID === managerBranchId;
     });
     
     const collected = localInvoices.reduce((sum, inv) => {
-      if (inv.status === 'Paid') return sum + inv.patientBalance + inv.insuranceCoverage;
-      if (inv.status === 'Partially Paid') return sum + (inv.patientBalance * 0.5) + inv.insuranceCoverage;
+      if (inv.status === 'Paid') return sum + (Number(inv.patientBalance) || 0) + (Number(inv.insuranceCoverage) || 0);
+      if (inv.status === 'Partially Paid') return sum + ((Number(inv.patientBalance) || 0) * 0.5) + (Number(inv.insuranceCoverage) || 0);
       return sum;
     }, 0);
 

@@ -153,4 +153,30 @@ test('changePassword service dispatches POST to /auth/change-password', async t 
   assert.equal(res.message, 'Password changed successfully');
 });
 
+test('Branch_Manager reports panel renders locked branch scope', t => {
+  browser(t, {
+    name: 'Marcus Vance',
+    email: 'vance@careflow.com',
+    roleCode: 'ROLE_BRANCH_MANAGER',
+    branch: 'Colombo Main',
+    branch_id: 1,
+    Branch_ID: 1
+  }, '/manager/reports');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Branch Scope (Locked)'));
+  assert.ok(html.includes('Scoped'));
+});
+
+test('Admin reports panel renders flexible branch filter', t => {
+  browser(t, {
+    name: 'System Admin',
+    email: 'admin@careflow.com',
+    roleCode: 'ROLE_ADMIN',
+    branch: 'Colombo Main'
+  }, '/admin/reports');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Branch ID (optional)'));
+});
+
+
 
