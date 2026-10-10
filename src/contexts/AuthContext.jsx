@@ -3,35 +3,43 @@ import api from '../api/axios';
 import { getFrontendRoleCode } from '../utils/authRole.js';
 
 export const DEMO_LOGINS = [
-  { role: 'Admin', roleCode: 'ROLE_ADMIN', email: 'admin_alana', password: 'admin123', name: 'Alana Smith [Admin]', branch: 'All Branches', branch_id: 1, Branch_ID: 1 },
-  { role: 'Branch Manager', roleCode: 'ROLE_BRANCH_MANAGER', email: 'mgr_vance', password: 'manager123', name: 'Marcus Vance [Manager]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 4, Staff_ID: 4 },
-  { role: 'Receptionist', roleCode: 'ROLE_RECEPTIONIST', email: 'recept_shenaya', password: 'recept123', name: 'Shenaya Perera [Recept]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 9, Staff_ID: 9 },
-  { role: 'Doctor', roleCode: 'ROLE_DOCTOR', email: 'dr_bennett', password: 'doc123', name: 'Dr. Alexander Bennett [Doc]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, id: 'STF-001', doctor_id: 1, doctorId: 1, Doctor_ID: 1, staff_id: 1, Staff_ID: 1 },
-  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_patel', password: 'bill123', name: 'Dilhani Fernando [Billing]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 5, Staff_ID: 5 },
-  { role: 'Patient', roleCode: 'ROLE_PATIENT', email: 'pat_johndoe', password: 'pat123', name: 'John Doe [Patient]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, patientId: 'PAT-0001', patient_id: 1, Patient_ID: 1 }
+  { role: 'Admin', roleCode: 'ROLE_ADMIN', email: 'admin_alana', password: 'Password123!', name: 'Alana Smith [Admin]', branch: 'All Branches', branch_id: 1, Branch_ID: 1 },
+  { role: 'Branch Manager', roleCode: 'ROLE_BRANCH_MANAGER', email: 'mgr_vance', password: 'Password123!', name: 'Marcus Vance [Manager]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 4, Staff_ID: 4 },
+  { role: 'Receptionist', roleCode: 'ROLE_RECEPTIONIST', email: 'recept_shenaya', password: 'Password123!', name: 'Shenaya Perera [Recept]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 9, Staff_ID: 9 },
+  { role: 'Doctor', roleCode: 'ROLE_DOCTOR', email: 'dr_bennett', password: 'Password123!', name: 'Dr. Alexander Bennett [Doc]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, id: 'STF-001', doctor_id: 1, doctorId: 1, Doctor_ID: 1, staff_id: 1, Staff_ID: 1 },
+  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_patel', password: 'Password123!', name: 'Dilhani Fernando [Billing]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 5, Staff_ID: 5 },
+  { role: 'Patient', roleCode: 'ROLE_PATIENT', email: 'pat_johndoe', password: 'Password123!', name: 'John Doe [Patient]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, patientId: 'PAT-0001', patient_id: 1, Patient_ID: 1 }
 ];
 
 export function normalizeUser(me, fallbackEmail = '') {
   const roleCode = getFrontendRoleCode(me.System_Role);
   const isDoctor = roleCode === 'ROLE_DOCTOR';
-  const doctorId = isDoctor ? (me.Doctor_ID || me.Staff_ID || me.doctor_id || 1) : undefined;
+  const doctorId = isDoctor ? (me.Doctor_ID || me.doctor_id || me.Staff_ID || me.staff_id || 1) : undefined;
+  const resolvedPatientId = roleCode === 'ROLE_PATIENT' ? (me.Patient_ID || me.patient_id || me.patientId || 1) : undefined;
+  const patientFormattedId = resolvedPatientId ? `PAT-${String(resolvedPatientId).padStart(4, '0')}` : undefined;
+  const displayName = me.First_Name && me.Last_Name ? `${me.First_Name} ${me.Last_Name}` : (me.Username || me.name);
+
   return {
     Account_ID: me.Account_ID,
-    name: me.Username || me.name,
+    name: displayName,
+    Username: me.Username || me.name,
+    First_Name: me.First_Name,
+    Last_Name: me.Last_Name,
     email: me.Email || fallbackEmail,
     role: me.System_Role,
     roleCode,
     branch: me.branch || 'Colombo Main',
-    branch_id: me.branch_id || me.Branch_ID || 1,
+    branch_id: me.Branch_ID || me.branch_id || 1,
     Branch_ID: me.Branch_ID || me.branch_id || 1,
-    id: isDoctor ? (me.id || 'STF-001') : (me.id || undefined),
+    id: isDoctor ? (me.id || `STF-${String(me.Staff_ID || me.Doctor_ID || 1).padStart(3, '0')}`) : (me.id || undefined),
     doctor_id: doctorId,
     doctorId: doctorId,
     Doctor_ID: doctorId,
     staff_id: me.Staff_ID || me.staff_id || 1,
     Staff_ID: me.Staff_ID || me.staff_id || 1,
-    patientId: roleCode === 'ROLE_PATIENT' ? (me.Patient_ID || me.patientId || 'PAT-0001') : undefined,
-    patient_id: roleCode === 'ROLE_PATIENT' ? (me.Patient_ID || me.patient_id || 1) : undefined
+    patientId: patientFormattedId,
+    patient_id: resolvedPatientId,
+    Patient_ID: resolvedPatientId
   };
 }
 
