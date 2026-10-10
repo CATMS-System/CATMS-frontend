@@ -146,9 +146,10 @@ export async function getAppointmentStatusCounts(params?: {
   return handleResponse<AppointmentStatusCounts>(res);
 }
 
-export async function getDailyQueue(branchId: number, date?: string): Promise<QueueItem[]> {
+export async function getDailyQueue(branchId: number, date?: string, includeCompleted: boolean = false): Promise<QueueItem[]> {
   const params = new URLSearchParams({ branch_id: branchId.toString() });
   if (date) params.append('date', date);
+  if (includeCompleted) params.append('include_completed', 'true');
 
   const res = await fetch(`${API_BASE}/appointments/queue?${params.toString()}`, { headers: getHeaders() });
   return handleResponse<QueueItem[]>(res);

@@ -39,13 +39,14 @@ export function useDoctorQueue(doctorIdentifier, branchId = 1, initialQueue = []
     doctorName: item.Doctor_Name || item.doctor_name || item.assignedDoctor,
     reason: item.Reason_For_Visit || item.reason_for_visit || item.reason || 'Consultation',
     status: item.Status || item.status || 'SCHEDULED',
+    Status: item.Status || item.status || 'SCHEDULED',
   });
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params = { branch_id: resolvedBranchId };
+      const params = { branch_id: resolvedBranchId, include_completed: true };
       if (numericDoctorId) {
         params.doctor_id = numericDoctorId;
       }

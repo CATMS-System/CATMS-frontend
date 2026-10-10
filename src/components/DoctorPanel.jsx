@@ -22,11 +22,32 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
   }, [db?.currentUser]);
 
   // Wire doctor's daily appointment queue through isolated hook
-  const { queue, loading, updateQueueStatus } = useDoctorQueue(
+  const { queue, loading, updateQueueStatus, refreshQueue } = useDoctorQueue(
     currentDoctorId,
     currentBranchId,
     db?.liveQueue
   );
+
+  // Filter state for live triage queue
+  const [queueFilter, setQueueFilter] = useState('all'); // 'all' | 'waiting' | 'completed'
+
+  const queueWaitingCount = useMemo(() => {
+    return queue.filter((q) => !['Completed', 'COMPLETED'].includes(q.status) && !['Completed', 'COMPLETED'].includes(q.Status)).length;
+  }, [queue]);
+
+  const queueCompletedCount = useMemo(() => {
+    return queue.filter((q) => ['Completed', 'COMPLETED'].includes(q.status) || ['Completed', 'COMPLETED'].includes(q.Status)).length;
+  }, [queue]);
+
+  const filteredQueue = useMemo(() => {
+    if (queueFilter === 'waiting') {
+      return queue.filter((q) => !['Completed', 'COMPLETED'].includes(q.status) && !['Completed', 'COMPLETED'].includes(q.Status));
+    }
+    if (queueFilter === 'completed') {
+      return queue.filter((q) => ['Completed', 'COMPLETED'].includes(q.status) || ['Completed', 'COMPLETED'].includes(q.Status));
+    }
+    return queue;
+  }, [queue, queueFilter]);
 
   // Tab navigation between live queue and upcoming schedule
   const [activeTab, setActiveTab] = useState(subView === 'appointments' ? 'appointments' : 'queue');
@@ -137,6 +158,10 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
   const scheduledCount = useMemo(() => {
     return doctorAppointments.filter((a) => a.Appointment_Date >= todayStr && a.Status === 'Scheduled').length;
   }, [doctorAppointments, todayStr]);
+
+  const completedAppointmentsCount = useMemo(() => {
+    return doctorAppointments.filter((a) => a.Status === 'Completed').length;
+  }, [doctorAppointments]);
 
   // Parse appointment_id and patient_id from route / URL
   const { activeAppointmentId, activePatientId } = useMemo(() => {
@@ -668,7 +693,24 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       });
 
       if (activePatientId) {
-        updateQueueStatus(activePatientId, 'COMPLETED');
+        updateQueueStatus(activePatientId, 'Completed');
+      }
+
+      if (handlers?.setAppointmentList) {
+        handlers.setAppointmentList((prev) =>
+          (prev || []).map((a) =>
+            String(a.id) === String(resolvedApptId) ||
+            String(a.Appointment_ID) === String(resolvedApptId) ||
+            String(a.appointment_id) === String(resolvedApptId)
+              ? { ...a, status: 'Completed', Status: 'Completed' }
+              : a
+          )
+        );
+      }
+
+      fetchDoctorAppointments();
+      if (refreshQueue) {
+        refreshQueue();
       }
 
       // Navigate back to workbench queue on success
@@ -773,6 +815,11 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
               <span className="bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded-full font-mono">
                 {queue.length}
               </span>
+              {queueCompletedCount > 0 && (
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
+                  {queueCompletedCount} done
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -794,11 +841,62 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
           {/* TAB 1: DAILY LIVE TRIAGE QUEUE */}
           {activeTab === 'queue' && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
-                <h2 className="font-bold text-slate-900 text-md">Daily Consultation Queue</h2>
-                <span className="bg-blue-50 text-blue-800 border border-blue-100 rounded-full px-2.5 py-0.5 text-xs font-semibold font-mono">
-                  Attending: {currentDoctorName}
-                </span>
+              <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="font-bold text-slate-900 text-md">Daily Consultation Queue</h2>
+                  <div className="flex items-center space-x-1 bg-slate-200/70 p-1 rounded-lg text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setQueueFilter('all')}
+                      className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                        queueFilter === 'all'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      All ({queue.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQueueFilter('waiting')}
+                      className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                        queueFilter === 'waiting'
+                          ? 'bg-white text-blue-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Waiting ({queueWaitingCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQueueFilter('completed')}
+                      className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                        queueFilter === 'completed'
+                          ? 'bg-white text-emerald-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Completed ({queueCompletedCount})
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (refreshQueue) refreshQueue();
+                      fetchDoctorAppointments();
+                    }}
+                    disabled={loading}
+                    className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                    title="Refresh queue"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  </button>
+                  <span className="bg-blue-50 text-blue-800 border border-blue-100 rounded-full px-2.5 py-0.5 text-xs font-semibold font-mono">
+                    Attending: {currentDoctorName}
+                  </span>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -819,55 +917,77 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                           Loading daily consultation queue...
                         </td>
                       </tr>
-                    ) : queue.length > 0 ? (
-                      queue.map((q, idx) => (
-                        <tr
-                          key={q.queueNo || q.appointmentId || idx}
-                          onClick={() => handleSelectPatient(q)}
-                          className="hover:bg-slate-50/70 cursor-pointer transition-colors"
-                        >
-                          <td className="px-6 py-4 text-center font-mono font-bold text-slate-900">
-                            #{idx + 1}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="font-bold text-slate-900">{q.patientName || q.patient_name}</div>
-                            <span className="text-xs text-slate-400 font-mono">
-                              {q.patientId || q.patient_id}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 font-medium">{q.reason || 'Routine Checkup'}</td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
-                                q.status === 'IN_PROGRESS'
-                                  ? 'bg-blue-50 text-blue-700 border-blue-150 animate-pulse'
-                                  : q.status === 'WALK_IN'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-150'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-150'
-                              }`}
-                            >
-                              {q.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
+                    ) : filteredQueue.length > 0 ? (
+                      filteredQueue.map((q, idx) => {
+                        const isCompleted = ['Completed', 'COMPLETED'].includes(q.status) || ['Completed', 'COMPLETED'].includes(q.Status);
+                        return (
+                          <tr
+                            key={q.queueNo || q.appointmentId || idx}
+                            onClick={() => {
+                              if (!isCompleted) {
                                 handleSelectPatient(q);
-                              }}
-                              className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
-                            >
-                              <span>{q.status === 'IN_PROGRESS' ? 'Resume Console' : 'Call Patient'}</span>
-                              <CornerDownRight className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
+                              }
+                            }}
+                            className={`transition-colors ${
+                              isCompleted ? 'bg-emerald-50/20 hover:bg-emerald-50/40' : 'hover:bg-slate-50/70 cursor-pointer'
+                            }`}
+                          >
+                            <td className="px-6 py-4 text-center font-mono font-bold text-slate-900">
+                              #{idx + 1}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-slate-900">{q.patientName || q.patient_name}</div>
+                              <span className="text-xs text-slate-400 font-mono">
+                                {q.patientId || q.patient_id}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 font-medium">{q.reason || 'Routine Checkup'}</td>
+                            <td className="px-6 py-4">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
+                                  isCompleted
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : q.status === 'IN_PROGRESS' || q.Status === 'In_Progress'
+                                    ? 'bg-blue-50 text-blue-700 border-blue-150 animate-pulse'
+                                    : q.status === 'WALK_IN' || q.status === 'Walk_In'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-150'
+                                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                                }`}
+                              >
+                                {isCompleted ? 'Completed' : (q.status || q.Status)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              {isCompleted ? (
+                                <span className="inline-flex items-center space-x-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold ml-auto shadow-2xs">
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                  <span>Completed</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectPatient(q);
+                                  }}
+                                  className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
+                                >
+                                  <span>{q.status === 'IN_PROGRESS' || q.Status === 'In_Progress' ? 'Resume Console' : 'Call Patient'}</span>
+                                  <CornerDownRight className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr>
                         <td colSpan="5" className="px-6 py-10 text-center text-slate-400">
-                          No triage patients in your queue today. Refresh to monitor check-ins.
+                          {queueFilter === 'completed'
+                            ? 'No consultations completed yet today.'
+                            : queueFilter === 'waiting'
+                            ? 'No waiting triage patients in your queue right now.'
+                            : 'No triage patients in your queue today. Refresh to monitor check-ins.'}
                         </td>
                       </tr>
                     )}
@@ -905,13 +1025,13 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                 </div>
 
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
-                  <div className="h-11 w-11 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-                    <Clock className="h-5 w-5" />
+                  <div className="h-11 w-11 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                    <CheckCircle2 className="h-5 w-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Scheduled (Pending)</span>
-                    <div className="text-xl font-bold text-amber-700 font-mono mt-0.5">{scheduledCount}</div>
-                    <span className="text-[11px] text-slate-400">Awaiting confirmation</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Completed</span>
+                    <div className="text-xl font-bold text-emerald-700 font-mono mt-0.5">{completedAppointmentsCount}</div>
+                    <span className="text-[11px] text-slate-400">Finished consultations</span>
                   </div>
                 </div>
 
@@ -921,8 +1041,8 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                   </div>
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Today's Live Queue</span>
-                    <div className="text-xl font-bold text-indigo-700 font-mono mt-0.5">{queue.length}</div>
-                    <span className="text-[11px] text-slate-400">Active patients waiting</span>
+                    <div className="text-xl font-bold text-indigo-700 font-mono mt-0.5">{queueWaitingCount}</div>
+                    <span className="text-[11px] text-slate-400">{queueCompletedCount} completed today</span>
                   </div>
                 </div>
               </div>
@@ -977,11 +1097,11 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                       onChange={(e) => setStatusFilter(e.target.value)}
                       className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="active">Active (Scheduled & Confirmed)</option>
                       <option value="ALL">All Statuses</option>
+                      <option value="active">Active (Scheduled & Confirmed)</option>
+                      <option value="Completed">Completed ({completedAppointmentsCount})</option>
                       <option value="Scheduled">Scheduled</option>
                       <option value="Confirmed">Confirmed</option>
-                      <option value="Completed">Completed</option>
                       <option value="Cancelled">Cancelled</option>
                     </select>
                   </div>
@@ -1079,14 +1199,14 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                               <td className="px-6 py-4">
                                 <span
                                   className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
-                                    appt.Status === 'Confirmed'
+                                    appt.Status === 'Completed'
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                      : appt.Status === 'Scheduled'
+                                      : appt.Status === 'Confirmed'
                                       ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : appt.Status === 'Scheduled'
+                                      ? 'bg-sky-50 text-sky-700 border-sky-200'
                                       : appt.Status === 'In_Progress'
                                       ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
-                                      : appt.Status === 'Completed'
-                                      ? 'bg-slate-100 text-slate-700 border-slate-200'
                                       : 'bg-red-50 text-red-700 border-red-200'
                                   }`}
                                 >
@@ -1094,7 +1214,12 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                {isToday ? (
+                                {appt.Status === 'Completed' ? (
+                                  <span className="inline-flex items-center space-x-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold ml-auto shadow-2xs">
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                    <span>Completed</span>
+                                  </span>
+                                ) : isToday ? (
                                   <button
                                     type="button"
                                     onClick={() => handleSelectPatient(appt)}

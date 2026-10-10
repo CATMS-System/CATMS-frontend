@@ -178,5 +178,41 @@ test('Admin reports panel renders flexible branch filter', t => {
   assert.ok(html.includes('Branch ID (optional)'));
 });
 
+test('Doctor workbench renders live queue with Completed filter and badge support', t => {
+  browser(t, {
+    name: 'Dr. Alexander Bennett',
+    email: 'bennett@careflow.com',
+    roleCode: 'ROLE_DOCTOR',
+    branch: 'Colombo Main',
+    branch_id: 1,
+    doctor_id: 1
+  }, '/doctor/workbench');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Clinician Triage Workbench'));
+  assert.ok(html.includes('Completed ('));
+  assert.ok(html.includes('Waiting ('));
+});
+
+test('getDailyQueue service dispatches include_completed param when requested', async t => {
+  const previousFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = previousFetch; });
+
+  let calledUrl = '';
+  globalThis.fetch = async (url) => {
+    calledUrl = String(url);
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify([]),
+      json: async () => []
+    };
+  };
+
+  const { getDailyQueue } = await server.ssrLoadModule('/src/services/appointmentService.ts');
+  await getDailyQueue(1, '2026-10-10', true);
+  assert.ok(calledUrl.includes('include_completed=true'));
+});
+
+
 
 
