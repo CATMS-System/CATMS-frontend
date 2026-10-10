@@ -58,14 +58,10 @@
   border: 1px solid rgba(241, 245, 249, 0.7);
 }
 
-/* Login screen background - clinic waiting room photo with subtle soft radial brand overlay.
-   To swap with another photo or style with a 1-line change:
-   background-image: url('/clinic-bg.png'); */
+/* Login screen background - raw clinic waiting room photo */
 .login-bg {
   background-color: #f8fafc;
-  background-image:
-    radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.85) 0%, rgba(241, 245, 249, 0.72) 50%, rgba(191, 219, 254, 0.55) 100%),
-    url('/clinic-bg.png');
+  background-image: url('/clinic-bg.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
