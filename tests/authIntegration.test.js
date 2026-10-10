@@ -195,6 +195,35 @@ test('Admin reports panel renders flexible branch filter', t => {
   assert.ok(html.includes('Branch ID (optional)'));
 });
 
+test('Billing_Staff in Galle locks reports to Branch 3 with Scoped badge', t => {
+  browser(t, {
+    name: 'Nirosha Silva',
+    email: 'billing_galle',
+    roleCode: 'ROLE_BILLING_STAFF',
+    branch: 'Galle',
+    branch_id: 3,
+    Branch_ID: 3
+  }, '/billing/reports');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Branch Scope (Locked)'));
+  assert.ok(html.includes('Branch 3 - Galle'));
+  assert.ok(html.includes('Scoped'));
+});
+
+test('Billing_Staff in Galle locks invoices to Branch 3 with Scoped badge', t => {
+  browser(t, {
+    name: 'Nirosha Silva',
+    email: 'billing_galle',
+    roleCode: 'ROLE_BILLING_STAFF',
+    branch: 'Galle',
+    branch_id: 3,
+    Branch_ID: 3
+  }, '/billing/invoices');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Galle (#3)'));
+  assert.ok(html.includes('Scoped'));
+});
+
 test('Doctor workbench renders live queue with Completed filter and badge support', t => {
   browser(t, {
     name: 'Dr. Alexander Bennett',

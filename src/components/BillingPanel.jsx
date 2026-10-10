@@ -32,7 +32,17 @@ export default function BillingPanel({ subView, db, handlers }) {
   } = handlers;
 
   const currentBranch =
-    db.currentUser.branch || 'Colombo Main';
+    db?.currentUser?.branch || 'Colombo Main';
+  const currentBranchId =
+    db?.currentUser?.branch_id || db?.currentUser?.Branch_ID || 1;
+
+  const userRole = db?.currentUser?.roleCode ||
+    (db?.currentUser?.System_Role === 'Admin' || db?.currentUser?.role === 'Admin' ? 'ROLE_ADMIN' :
+     db?.currentUser?.System_Role === 'Billing_Staff' || db?.currentUser?.role === 'Billing Staff' ? 'ROLE_BILLING_STAFF' :
+     db?.currentUser?.System_Role === 'Branch_Manager' || db?.currentUser?.role === 'Branch Manager' ? 'ROLE_BRANCH_MANAGER' :
+     db?.currentUser?.roleCode);
+
+  const isBranchScoped = userRole !== 'ROLE_ADMIN';
 
   // =========================================================
   // REAL BACKEND INVOICE DATA
@@ -319,8 +329,15 @@ export default function BillingPanel({ subView, db, handlers }) {
   // =========================================================
 
   const [invoiceDateFilter, setInvoiceDateFilter] = useState('');
-  const [invoiceBranchFilter, setInvoiceBranchFilter] = useState('');
+  const [invoiceBranchFilter, setInvoiceBranchFilter] = useState(() => (isBranchScoped ? String(currentBranchId) : ''));
   const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
+
+  useEffect(() => {
+    if (isBranchScoped) {
+      setInvoiceBranchFilter(String(currentBranchId));
+    }
+  }, [isBranchScoped, currentBranchId]);
+
   const invoiceBranches = useMemo(() => [...new Map(apiInvoices.map(inv =>
     [String(inv.Branch_ID), { id: inv.Branch_ID, name: inv.Branch_Name }]
   )).values()], [apiInvoices]);
@@ -930,11 +947,26 @@ export default function BillingPanel({ subView, db, handlers }) {
             </label>
             <label className="text-xs font-semibold text-slate-500">
               <span className="block mb-1">Branch</span>
-              <select value={invoiceBranchFilter} onChange={e => setInvoiceBranchFilter(e.target.value)}
-                className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white">
-                <option value="">All branches</option>
-                {invoiceBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name} (#{branch.id})</option>)}
-              </select>
+              {isBranchScoped ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    disabled
+                    readOnly
+                    value={`${currentBranch} (#${currentBranchId})`}
+                    className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-600 cursor-not-allowed select-none"
+                  />
+                  <span className="text-[10px] uppercase font-bold px-2 py-1 rounded bg-blue-100 text-blue-800">
+                    Scoped
+                  </span>
+                </div>
+              ) : (
+                <select value={invoiceBranchFilter} onChange={e => setInvoiceBranchFilter(e.target.value)}
+                  className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="">All branches</option>
+                  {invoiceBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name} (#{branch.id})</option>)}
+                </select>
+              )}
             </label>
           </div>
           <div className="grid grid-cols-1 gap-6">

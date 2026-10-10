@@ -72,9 +72,13 @@ export default function ReportsPanel({ db }) {
      db?.currentUser?.roleCode);
 
   const isManager = role === 'ROLE_BRANCH_MANAGER' ||
+    role === 'ROLE_BILLING_STAFF' ||
     db?.currentUser?.role === 'Branch Manager' ||
     db?.currentUser?.role === 'Branch_Manager' ||
-    db?.currentUser?.System_Role === 'Branch_Manager';
+    db?.currentUser?.System_Role === 'Branch_Manager' ||
+    db?.currentUser?.role === 'Billing Staff' ||
+    db?.currentUser?.role === 'Billing_Staff' ||
+    db?.currentUser?.System_Role === 'Billing_Staff';
 
   const managerBranchName = db?.currentUser?.branch || 'Assigned Branch';
 
