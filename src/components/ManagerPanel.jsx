@@ -20,6 +20,8 @@ export default function ManagerPanel({ subView, db, handlers }) {
     return b ? (b.Branch_ID || 1) : 1;
   }, [managerBranch, db.branches, db.currentUser]);
 
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
   // Real backend states
   const [apiDoctors, setApiDoctors] = useState([]);
   const [apiStaff, setApiStaff] = useState([]);
@@ -271,7 +273,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
     }
 
     // Fallback: calculate from local mock arrays
-    const todayAppts = appointmentList.filter(a => a.branch === managerBranch && a.date === '2026-08-23');
+    const todayAppts = appointmentList.filter(a => a.branch === managerBranch && a.date === todayStr);
     const completed = todayAppts.filter(a => a.status === 'Completed').length;
     const walkins = todayAppts.filter(a => a.isWalkIn || a.status === 'Walk-In').length;
     
@@ -295,7 +297,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
       activeStaff: localStaff.filter(s => s.status === 'Active').length,
       roomCount: 12
     };
-  }, [apiStatusCounts, apiDailySummary, appointmentList, invoiceList, managerBranch, doctorsInBranch, localStaff]);
+  }, [apiStatusCounts, apiDailySummary, appointmentList, invoiceList, managerBranch, doctorsInBranch, localStaff, todayStr]);
 
   return (
     <div className="space-y-6">

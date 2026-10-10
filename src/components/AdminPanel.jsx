@@ -44,6 +44,8 @@ export default function AdminPanel({ subView, db, handlers }) {
   const [auditDateFilter, setAuditDateFilter] = useState('');
   const [expandedAuditId, setExpandedAuditId] = useState(null);
 
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
   // Specialties list for Step 3
   const SPECIALTIES_OPTIONS = ['General Practice', 'Cardiology', 'Dermatology', 'Pediatrics', 'Neurology', 'Orthopedics', 'ENT'];
 
@@ -378,7 +380,7 @@ export default function AdminPanel({ subView, db, handlers }) {
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Appointments Today</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  {appointmentList.filter(a => a.date === '2026-08-23').length}
+                  {appointmentList.filter(a => a.date === todayStr).length}
                 </span>
               </div>
               <div className="p-3.5 bg-purple-50 text-purple-600 rounded-xl">
