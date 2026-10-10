@@ -103,3 +103,15 @@ export function adaptPatientForPanels(patient) {
     }))
   };
 }
+
+export const SRI_LANKA_PROVINCES = [
+  'Western Province',
+  'Central Province',
+  'Southern Province',
+  'Northern Province',
+  'Eastern Province',
+  'North Western Province',
+  'North Central Province',
+  'Uva Province',
+  'Sabaragamuwa Province'
+];

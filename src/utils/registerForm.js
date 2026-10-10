@@ -20,7 +20,7 @@ export const INITIAL_FORM = {
     email: '',
     streetAddress: '',
     city: '',
-    stateProvince: 'Western Province',
+    stateProvince: '',
     postalCode: '',
 
     // exactly one emergency contact

@@ -1,6 +1,5 @@
-// editable patient details part of the update form
-
 import React from 'react';
+import { SRI_LANKA_PROVINCES } from '../../../utils/patientFormat';
 
 export default function UpdatePatientFields({ form, errors, onChange }) {
     return (
@@ -84,12 +83,16 @@ export default function UpdatePatientFields({ form, errors, onChange }) {
                 </div>
                 <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Province</label>
-                    <input
-                        type="text"
-                        className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
-                        value={form.stateProvince}
+                    <select
+                        className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white cursor-pointer"
+                        value={form.stateProvince || ''}
                         onChange={e => onChange('stateProvince', e.target.value)}
-                    />
+                    >
+                        <option value="">Select Province</option>
+                        {SRI_LANKA_PROVINCES.map(prov => (
+                            <option key={prov} value={prov}>{prov}</option>
+                        ))}
+                    </select>
                     {errors.stateProvince && <span className="text-[11px] text-red-600">{errors.stateProvince}</span>}
                 </div>
                 <div>

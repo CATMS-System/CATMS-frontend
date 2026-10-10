@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { createProvider } from '../../services/insuranceService';
-import { isValidPhone, isValidPostalCode, isValidEmail } from '../../utils/patientFormat';
+import { isValidPhone, isValidPostalCode, isValidEmail, SRI_LANKA_PROVINCES } from '../../utils/patientFormat';
 
 export default function ProviderModal({ isOpen, onClose, onSuccess
 }) {
@@ -12,7 +12,7 @@ export default function ProviderModal({ isOpen, onClose, onSuccess
   const [email, setEmail] = useState('');
   const [streetAddress, setStreetAddress] = useState('');
   const [city, setCity] = useState('');
-  const [stateProvince, setStateProvince] = useState('Western Province');
+  const [stateProvince, setStateProvince] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState('');
@@ -26,7 +26,7 @@ export default function ProviderModal({ isOpen, onClose, onSuccess
     setEmail('');
     setStreetAddress('');
     setCity('');
-    setStateProvince('Western Province');
+    setStateProvince('');
     setPostalCode('');
     setErrors({});
     setGeneralError('');
@@ -202,12 +202,16 @@ export default function ProviderModal({ isOpen, onClose, onSuccess
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Province *</label>
-              <input
-                type="text"
-                className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
+              <select
+                className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white cursor-pointer"
                 value={stateProvince}
                 onChange={e => setStateProvince(e.target.value)}
-              />
+              >
+                <option value="">Select Province</option>
+                {SRI_LANKA_PROVINCES.map(prov => (
+                  <option key={prov} value={prov}>{prov}</option>
+                ))}
+              </select>
               {errors.stateProvince && <span className="text-[11px] text-red-600">{errors.stateProvince}</span>}
             </div>
             <div>
