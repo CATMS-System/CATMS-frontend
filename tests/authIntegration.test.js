@@ -108,3 +108,17 @@ test('route guard denies Patient access to Doctor workbench', t => {
   assert.ok(html.includes('Access Denied'));
 });
 
+test('Doctor workspace renders upcoming appointments view', t => {
+  browser(t, { name: 'Dr. Test Doc', email: 'doc@example.invalid', roleCode: 'ROLE_DOCTOR', branch: 'Colombo Main' }, '/doctor/appointments');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Clinician Triage Workbench'));
+  assert.ok(html.includes('Upcoming Appointments'));
+  assert.ok(html.includes('Upcoming Bookings'));
+});
+
+test('route guard denies Patient access to Doctor appointments', t => {
+  browser(t, { name: 'Test Patient', email: 'pat@example.invalid', roleCode: 'ROLE_PATIENT', branch: 'Colombo Main' }, '/doctor/appointments');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Access Denied'));
+});
+

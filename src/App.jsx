@@ -620,11 +620,19 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/doctor/workbench')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath.startsWith('/doctor/') ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/doctor/workbench' || currentPath.startsWith('/doctor/consultation') ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
                     }`}
                 >
                   <Activity className="h-4.5 w-4.5" />
                   <span>Consult Workbench</span>
+                </button>
+                <button
+                  onClick={() => navigateTo('/doctor/appointments')}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/doctor/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
+                >
+                  <Calendar className="h-4.5 w-4.5" />
+                  <span>Upcoming Bookings</span>
                 </button>
               </>
             )}
