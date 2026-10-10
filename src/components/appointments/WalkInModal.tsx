@@ -147,7 +147,7 @@ export const WalkInModal: React.FC<WalkInModalProps> = ({
               >
                 {doctors.map((doc) => (
                   <option key={doc.Doctor_ID} value={doc.Doctor_ID}>
-                    Dr. {doc.First_Name} {doc.Last_Name} ({doc.Specialties && doc.Specialties.length > 0 ? doc.Specialties.join(', ') : 'General Practice'})
+                    Dr. {doc.First_Name} {doc.Last_Name} ({Array.isArray(doc.Specialties) ? doc.Specialties.join(', ') : (doc.Specialties || 'General Practice')})
                   </option>
                 ))}
               </select>

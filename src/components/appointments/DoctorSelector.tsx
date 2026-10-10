@@ -98,7 +98,7 @@ export const DoctorSelector: React.FC<DoctorSelectorProps> = ({
                       </p>
                       <p className="text-xs text-blue-700 flex items-center gap-1 mt-0.5">
                         <Stethoscope className="w-3 h-3 shrink-0" />
-                        {doc.Specialties && doc.Specialties.length > 0 ? doc.Specialties.join(', ') : 'General Practice'}
+                        {Array.isArray(doc.Specialties) ? doc.Specialties.join(', ') : (doc.Specialties || 'General Practice')}
                       </p>
                     </div>
                     {isSelected && <UserCheck className="w-4 h-4 text-blue-600 shrink-0" />}

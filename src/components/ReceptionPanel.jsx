@@ -20,7 +20,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
   const [selectedDocId, setSelectedDocId] = useState(
     staffList.find(s => s.branch === currentBranch && (s.role.includes('Doc') || s.role === 'Cardiologist' || s.role === 'Dermatologist' || s.role === 'General Practitioner'))?.id || ''
   );
-  const [selectedDate, setSelectedDate] = useState('2026-08-23');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [showBookModal, setShowBookModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -141,7 +141,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
     const newApptId = `APP-${(appointmentList.length + 1001).toString()}`;
     const newAppt = {
       id: newApptId,
-      date: '2026-08-23',
+      date: new Date().toISOString().slice(0, 10),
       time: new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false }),
       doctorId: walkinDocId,
       doctorName: docObj ? docObj.name : 'Unknown Doctor',
@@ -222,7 +222,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
 
     // Auto add to liveQueue if date is today
     let updatedQueue = [...liveQueue];
-    if (selectedDate === '2026-08-23') {
+    if (selectedDate === new Date().toISOString().slice(0, 10)) {
       const qNo = liveQueue.length > 0 ? Math.max(...liveQueue.map(q => q.queueNo)) + 1 : 1;
       updatedQueue.push({
         queueNo: qNo,
