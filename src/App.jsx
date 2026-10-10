@@ -386,9 +386,22 @@ export default function App() {
   // ==========================================
 
   // 1. AUTH PORTAL (Logged out view)
+  // Background style: Modern clinic photo with soft radial glow and brand gradient overlay
+  // To swap with any other photo or style with a 1-line change:
+  // backgroundImage: "url('/clinic-bg.png')"
+  const LOGIN_BG_STYLE = {
+    backgroundImage: `radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.85) 0%, rgba(241, 245, 249, 0.72) 50%, rgba(191, 219, 254, 0.55) 100%), url('/clinic-bg.png')`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  };
+
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+      <div
+        className="min-h-screen login-bg flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans"
+        style={LOGIN_BG_STYLE}
+      >
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
           <div className="flex justify-center items-center space-x-2.5">
             <div className="p-2.5 bg-blue-600 rounded-2xl text-white shadow-lg animate-pulse">
