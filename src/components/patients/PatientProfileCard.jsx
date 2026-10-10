@@ -109,6 +109,33 @@ export default function PatientProfileCard({
           </span>
         </div>
 
+        {/* patient portal login credentials */}
+        <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-blue-800 font-bold uppercase tracking-wider flex items-center space-x-1">
+              <Shield className="h-3.5 w-3.5 text-blue-600 inline mr-1" />
+              Patient Portal Access
+            </span>
+            <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+              Active Login
+            </span>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-1 pt-1 border-t border-blue-200/50">
+            <div>
+              <span className="text-slate-500 text-[11px]">Username: </span>
+              <strong className="text-blue-900 font-mono font-semibold">
+                {patient.portal_access?.username || `pat_${patient.nic?.toLowerCase()}`}
+              </strong>
+            </div>
+            <div>
+              <span className="text-slate-500 text-[11px]">Default Pass: </span>
+              <code className="bg-white px-1.5 py-0.5 rounded border border-blue-200 text-slate-700 font-mono text-[11px]">
+                Password123!
+              </code>
+            </div>
+          </div>
+        </div>
+
         {/* address */}
         <div>
           <span className="block text-[10px] text-slate-450 font-bold uppercase tracking-wider">

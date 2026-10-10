@@ -122,3 +122,35 @@ test('route guard denies Patient access to Doctor appointments', t => {
   assert.ok(html.includes('Access Denied'));
 });
 
+test('App shell renders Change Password button for authenticated user', t => {
+  browser(t, { name: 'Test User', email: 'test@example.invalid', roleCode: 'ROLE_ADMIN', branch: 'Colombo Main' }, '/admin/dashboard');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('title="Change Password"'), 'Missing Change Password button in header');
+});
+
+test('changePassword service dispatches POST to /auth/change-password', async t => {
+  const { changePassword } = await server.ssrLoadModule('/src/services/authService.js');
+  let calledUrl = null;
+  let calledOptions = null;
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (url, options) => {
+    calledUrl = url;
+    calledOptions = options;
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ message: 'Password changed successfully' })
+    };
+  };
+
+  const res = await changePassword('CurrentPass123!', 'NewPass456!');
+  assert.equal(calledUrl, '/api/v1/auth/change-password');
+  assert.equal(calledOptions.method, 'POST');
+  const body = JSON.parse(calledOptions.body);
+  assert.equal(body.current_password, 'CurrentPass123!');
+  assert.equal(body.new_password, 'NewPass456!');
+  assert.equal(res.message, 'Password changed successfully');
+});
+
+

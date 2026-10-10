@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, Building, Calendar, Clock, Search, Plus, Activity, FileText,
   DollarSign, TrendingUp, Download, LogOut, ClipboardList, AlertCircle,
-  CheckCircle2, Lock, User, ShieldCheck, UserCheck, Menu, X, Keyboard
+  CheckCircle2, Lock, User, ShieldCheck, UserCheck, Menu, X, Keyboard, KeyRound
 } from 'lucide-react';
 import api from './api/axios.js';
 import { useAuth } from './contexts/AuthContext.jsx';
@@ -33,6 +33,7 @@ import DoctorPanel from './components/DoctorPanel';
 import BillingPanel from './components/BillingPanel';
 import PatientPanel from './components/PatientPanel';
 import ReportsPanel from './components/ReportsPanel';
+import ChangePasswordModal from './components/ChangePasswordModal';
 import { searchPatients } from './services/patientService';
 import { adaptPatientForPanels } from './utils/patientAdapter';
 import { formatPatientId, formatPatientName } from './utils/patientFormat';
@@ -200,6 +201,7 @@ export default function App() {
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // Save states to localStorage
   useEffect(() => {
@@ -783,6 +785,15 @@ export default function App() {
                 <span className="text-[10px] text-slate-400 block font-mono mt-0.5">{currentUser.email}</span>
               </div>
 
+              {/* Change Password button */}
+              <button
+                onClick={() => setShowChangePasswordModal(true)}
+                className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-xl transition-all cursor-pointer"
+                title="Change Password"
+              >
+                <KeyRound className="h-4.5 w-4.5" />
+              </button>
+
               {/* Logout button */}
               <button
                 onClick={handleLogout}
@@ -932,6 +943,13 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+        triggerToast={triggerToast}
+      />
     </div>
   );
 }

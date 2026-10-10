@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar, DollarSign, Clock, Check, Plus, AlertCircle, FileText, Download, ShieldAlert, ArrowRight, CornerRightDown } from 'lucide-react';
+import { Calendar, DollarSign, Clock, Check, Plus, AlertCircle, FileText, Download, ShieldAlert, ArrowRight, CornerRightDown, KeyRound } from 'lucide-react';
 import { getSpecialties, getDoctors, getDoctorAvailableSlots, bookAppointment, getAppointments } from '../services/appointmentService';
 import { getPatientHistory } from '../api/consultationApi';
 import { getInvoices } from '../api/billingApi';
+import ChangePasswordModal from './ChangePasswordModal';
 
 export default function PatientPanel({ subView, db, handlers }) {
   const { appointmentList, invoiceList, patientList, staffList, medicalHistories, branches, liveQueue } = db;
   const { setAppointmentList, setLiveQueue, triggerToast, addAuditLog, navigateTo } = handlers;
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const currentPatientId = db.currentUser.patientId || 'PAT-0001';
   const currentPatientName = db.currentUser.name || 'John Doe';
@@ -449,13 +451,23 @@ export default function PatientPanel({ subView, db, handlers }) {
                 <span>Insurance: {patientObj?.insurance?.provider || 'Cash / Self'}</span>
               </div>
             </div>
-            <button
-              onClick={() => navigateTo('/portal/book')}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold hover:shadow-xs transition-all flex items-center space-x-1 cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Book Appointment</span>
-            </button>
+            <div className="flex items-center space-x-2.5">
+              <button
+                onClick={() => setShowChangePassword(true)}
+                className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold hover:shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer"
+                title="Change Password"
+              >
+                <KeyRound className="h-4 w-4 text-amber-400" />
+                <span>Change Password</span>
+              </button>
+              <button
+                onClick={() => navigateTo('/portal/book')}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold hover:shadow-xs transition-all flex items-center space-x-1 cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Book Appointment</span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -930,6 +942,12 @@ export default function PatientPanel({ subView, db, handlers }) {
           </div>
         </div>
       )}
+
+      <ChangePasswordModal
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        triggerToast={triggerToast}
+      />
     </div>
   );
 }

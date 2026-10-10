@@ -54,7 +54,8 @@ export default function PatientsSection({ triggerToast, addAuditLog, onPatientsC
     const handleRegistered = (created) => {
         const name = formatPatientName(created.first_name, created.last_name);
         addAuditLog('CREATE_PATIENT', `Registered new patient ${name}`, 'null', JSON.stringify(created));
-        triggerToast(`Patient registered! Code: ${formatPatientId(created.patient_id)}`);
+        const username = created.portal_access?.username || `pat_${created.nic?.toLowerCase()}`;
+        triggerToast(`Patient registered! Code: ${formatPatientId(created.patient_id)} | Login: ${username} | Pass: Password123!`);
         setSelectedId(created.patient_id);
         refreshAll();
     };
