@@ -5,8 +5,8 @@ import { getPatientHistory } from '../api/consultationApi';
 import { getInvoices } from '../api/billingApi';
 
 export default function PatientPanel({ subView, db, handlers }) {
-  const { appointmentList, invoiceList, patientList, staffList, medicalHistories, branches } = db;
-  const { setAppointmentList, triggerToast, addAuditLog, navigateTo } = handlers;
+  const { appointmentList, invoiceList, patientList, staffList, medicalHistories, branches, liveQueue } = db;
+  const { setAppointmentList, setLiveQueue, triggerToast, addAuditLog, navigateTo } = handlers;
 
   const currentPatientId = db.currentUser.patientId || 'PAT-0001';
   const currentPatientName = db.currentUser.name || 'John Doe';
@@ -318,24 +318,56 @@ export default function PatientPanel({ subView, db, handlers }) {
         reason_for_visit: visitReason
       });
 
-      const newApptId = response?.Appointment_ID ? `APP-${response.Appointment_ID}` : `APP-${(appointmentList.length + 1001).toString()}`;
+      const confirmedApptId = response?.Appointment_ID;
+      const newApptId = confirmedApptId ? `APP-${confirmedApptId}` : `APP-${(appointmentList.length + 1001).toString()}`;
       const newAppt = {
         id: newApptId,
-        Appointment_ID: response?.Appointment_ID,
+        Appointment_ID: confirmedApptId,
+        appointment_id: confirmedApptId,
         date: bookingForm.date,
         time: bookingForm.time,
         doctorId: bookingForm.doctorId,
         doctor_id: bookingForm.numericDoctorId,
+        Doctor_ID: bookingForm.numericDoctorId,
         doctorName: docObj ? docObj.name : 'Physician',
         patientId: currentPatientId,
         patient_id: numericPatientId,
+        Patient_ID: numericPatientId,
+        patientName: currentPatientName,
         branch: bookingForm.branch,
+        branch_id: selectedBranchId,
+        Branch_ID: selectedBranchId,
         status: 'Booked',
         reason: visitReason
       };
 
       setAppointmentList([...appointmentList, newAppt]);
       setApiAppointments(prev => [newAppt, ...prev]);
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (bookingForm.date === todayStr && setLiveQueue) {
+        setLiveQueue(prev => [
+          ...(prev || []),
+          {
+            queueNo: (prev?.length || 0) + 1,
+            Appointment_ID: confirmedApptId,
+            appointment_id: confirmedApptId,
+            appointmentId: newApptId,
+            patientId: currentPatientId,
+            patient_id: numericPatientId,
+            Patient_ID: numericPatientId,
+            patientName: currentPatientName,
+            reason: visitReason,
+            assignedDoctor: newAppt.doctorName,
+            doctorId: bookingForm.doctorId,
+            doctor_id: bookingForm.numericDoctorId,
+            Doctor_ID: bookingForm.numericDoctorId,
+            status: 'SCHEDULED',
+            estWaitTime: 10,
+            room: 'Room 101'
+          }
+        ]);
+      }
       addAuditLog(
         'CREATE_APPOINTMENT',
         `Patient ${currentPatientName} self-booked appointment ${newApptId} with ${newAppt.doctorName} for ${newAppt.date} @ ${newAppt.time}`,
