@@ -3,7 +3,7 @@ import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermom
 import { useDoctorQueue } from '../hooks/useDoctorQueue';
 import { getCatalogue, getCategories } from '../api/treatmentApi';
 import { createConsultation, getPatientHistory, getConsultation } from '../api/consultationApi';
-import { getAppointments } from '../services/appointmentService';
+import { getAppointments, getAppointmentById } from '../services/appointmentService';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
   const currentDoctorId = db?.currentUser?.doctor_id ?? db?.currentUser?.doctorId ?? db?.currentUser?.id ?? 'STF-001';
@@ -150,6 +150,17 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       if (parts.length > 1) {
         patId = parts[1];
       }
+
+      if (paramId.includes('?')) {
+        const queryPart = paramId.split('?')[1];
+        const params = new URLSearchParams(queryPart);
+        if (!patId && params.get('patient_id')) {
+          patId = params.get('patient_id');
+        }
+        if (!apptId && params.get('appointment_id')) {
+          apptId = params.get('appointment_id');
+        }
+      }
     }
 
     if (typeof window !== 'undefined' && window.location.search) {
@@ -168,37 +179,133 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
     };
   }, [paramId]);
 
-  // Resolve active appointment and patient data from db
+  // Real-time backend appointment fetch by ID for active consultation console
+  const [fetchedAppt, setFetchedAppt] = useState(null);
+
+  useEffect(() => {
+    if (!activeAppointmentId) {
+      setFetchedAppt(null);
+      return;
+    }
+    const cleanId = String(activeAppointmentId).replace(/\D/g, '');
+    const numId = cleanId ? parseInt(cleanId, 10) : null;
+    if (!numId || numId >= 1000) return;
+
+    let isCurrent = true;
+    getAppointmentById(numId)
+      .then((data) => {
+        if (isCurrent && data) {
+          setFetchedAppt(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not fetch appointment by ID from API:', err);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [activeAppointmentId]);
+
+  // Resolve active appointment and patient data from API and db
   const activeAppt = useMemo(() => {
     if (!activeAppointmentId) return null;
-    return (
-      db?.appointmentList?.find(
-        (a) => a.id === activeAppointmentId || String(a.appointment_id) === String(activeAppointmentId)
-      ) || {
-        id: activeAppointmentId,
-        date: new Date().toISOString().split('T')[0],
-        time: '10:00 AM',
-        reason: 'Clinical consultation',
-        status: 'In-Progress',
-      }
+    const cleanId = String(activeAppointmentId).replace(/\D/g, '');
+    const numId = cleanId ? parseInt(cleanId, 10) : null;
+
+    if (fetchedAppt) {
+      return {
+        ...fetchedAppt,
+        id: fetchedAppt.Appointment_ID || activeAppointmentId,
+        appointment_id: fetchedAppt.Appointment_ID,
+        Appointment_ID: fetchedAppt.Appointment_ID,
+        patientId: fetchedAppt.Patient_ID ? `PAT-${String(fetchedAppt.Patient_ID).padStart(4, '0')}` : activePatientId,
+        patient_id: fetchedAppt.Patient_ID,
+        Patient_ID: fetchedAppt.Patient_ID,
+        date: fetchedAppt.Appointment_Date,
+        time: fetchedAppt.Start_Time ? String(fetchedAppt.Start_Time).slice(0, 5) : '10:00 AM',
+        reason: fetchedAppt.Reason_For_Visit || 'Clinical consultation',
+        status: fetchedAppt.Status || 'In-Progress',
+      };
+    }
+
+    const fromDocList = doctorAppointments.find(
+      (a) =>
+        String(a.Appointment_ID) === String(activeAppointmentId) ||
+        (numId && a.Appointment_ID === numId)
     );
-  }, [db?.appointmentList, activeAppointmentId]);
+    if (fromDocList) {
+      return {
+        ...fromDocList,
+        id: fromDocList.Appointment_ID,
+        appointment_id: fromDocList.Appointment_ID,
+        Appointment_ID: fromDocList.Appointment_ID,
+        patientId: fromDocList.Patient_ID ? `PAT-${String(fromDocList.Patient_ID).padStart(4, '0')}` : activePatientId,
+        patient_id: fromDocList.Patient_ID,
+        Patient_ID: fromDocList.Patient_ID,
+        date: fromDocList.Appointment_Date,
+        time: fromDocList.Start_Time ? String(fromDocList.Start_Time).slice(0, 5) : '10:00 AM',
+        reason: fromDocList.Reason_For_Visit || 'Clinical consultation',
+        status: fromDocList.Status || 'In-Progress',
+      };
+    }
+
+    const fromDb = db?.appointmentList?.find(
+      (a) =>
+        String(a.id) === String(activeAppointmentId) ||
+        String(a.appointment_id) === String(activeAppointmentId) ||
+        String(a.Appointment_ID) === String(activeAppointmentId) ||
+        (numId && (a.Appointment_ID === numId || a.appointment_id === numId || parseInt(String(a.id).replace(/\D/g, ''), 10) === numId))
+    );
+    if (fromDb) return fromDb;
+
+    return {
+      id: activeAppointmentId,
+      Appointment_ID: numId || undefined,
+      appointment_id: numId || undefined,
+      date: new Date().toISOString().split('T')[0],
+      time: '10:00 AM',
+      reason: 'Clinical consultation',
+      status: 'In-Progress',
+    };
+  }, [fetchedAppt, doctorAppointments, db?.appointmentList, activeAppointmentId, activePatientId]);
 
   const activePatient = useMemo(() => {
-    const pId = activePatientId || activeAppt?.patientId || activeAppt?.patient_id;
+    const pId = activePatientId || activeAppt?.patientId || activeAppt?.patient_id || activeAppt?.Patient_ID;
     if (!pId) return null;
-    return (
-      db?.patientList?.find(
-        (p) => p.id === pId || String(p.patient_id) === String(pId)
-      ) || {
+    const cleanPId = parseInt(String(pId).replace(/\D/g, ''), 10);
+
+    const fromDb = db?.patientList?.find(
+      (p) =>
+        String(p.id) === String(pId) ||
+        String(p.patient_id) === String(pId) ||
+        String(p.Patient_ID) === String(pId) ||
+        (cleanPId && (p.patient_id === cleanPId || p.Patient_ID === cleanPId || parseInt(String(p.id).replace(/\D/g, ''), 10) === cleanPId))
+    );
+    if (fromDb) return fromDb;
+
+    if (activeAppt?.Patient_Name) {
+      return {
         id: pId,
-        name: 'Patient ' + pId,
+        patient_id: cleanPId || 1,
+        name: activeAppt.Patient_Name,
         dob: '1990-01-01',
         gender: 'Not specified',
         nic: '900000000V',
+        phone: activeAppt.Patient_Phone || '',
         insurance: { provider: 'Standard Health' },
-      }
-    );
+      };
+    }
+
+    return {
+      id: pId,
+      patient_id: cleanPId || 1,
+      name: 'Patient ' + pId,
+      dob: '1990-01-01',
+      gender: 'Not specified',
+      nic: '900000000V',
+      insurance: { provider: 'Standard Health' },
+    };
   }, [db?.patientList, activePatientId, activeAppt]);
 
   // Calculate age from date of birth
@@ -512,11 +619,14 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
 
     setIsSubmitting(true);
     try {
-      const resolvedApptId =
+      const rawApptId =
+        activeAppt?.Appointment_ID ||
         activeAppt?.appointment_id ||
         (typeof activeAppointmentId === 'number'
           ? activeAppointmentId
           : parseInt(String(activeAppointmentId).replace(/\D/g, ''), 10) || 1);
+
+      const resolvedApptId = Number(rawApptId) || 1;
 
       const itemsPayload = prescribedItems.map((item) => ({
         treatment_id:
@@ -589,8 +699,33 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
 
   // Navigate to consultation room route, passing appointment_id and patient_id
   const handleSelectPatient = (queueItem) => {
-    const apptId = queueItem.appointmentId || queueItem.appointment_id || 'APP-1001';
-    const patientId = queueItem.patientId || queueItem.patient_id || 'PAT-0001';
+    const rawApptId =
+      queueItem.Appointment_ID ||
+      queueItem.appointment_id ||
+      queueItem.appointmentId ||
+      queueItem.id;
+
+    const rawPatientId =
+      queueItem.Patient_ID ||
+      queueItem.patient_id ||
+      queueItem.patientId;
+
+    let resolvedApptId = rawApptId;
+    if (!resolvedApptId && rawPatientId && db?.appointmentList) {
+      const match = db.appointmentList.find(
+        (a) =>
+          (String(a.patientId) === String(rawPatientId) ||
+           String(a.patient_id) === String(rawPatientId) ||
+           String(a.Patient_ID) === String(rawPatientId)) &&
+          a.status !== 'Completed'
+      );
+      if (match) {
+        resolvedApptId = match.Appointment_ID || match.appointment_id || match.id;
+      }
+    }
+
+    const apptId = resolvedApptId || 1;
+    const patientId = rawPatientId || 'PAT-0001';
 
     updateQueueStatus(patientId, 'IN_PROGRESS');
 
