@@ -397,7 +397,7 @@ export default function App() {
               <Activity className="h-6 w-6" />
             </div>
             <span className="text-3xl font-extrabold tracking-tight text-slate-900">
-              CareFlow <span className="text-blue-600">OS</span>
+              CareFlow <span className="text-blue-600">CATMS</span>
             </span>
           </div>
           <h2 className="mt-4 text-sm font-medium text-slate-500 uppercase tracking-widest">
