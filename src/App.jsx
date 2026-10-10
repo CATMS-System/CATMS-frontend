@@ -33,7 +33,7 @@ import DoctorPanel from './components/DoctorPanel';
 import BillingPanel from './components/BillingPanel';
 import PatientPanel from './components/PatientPanel';
 import ReportsPanel from './components/ReportsPanel';
-import { searchPatients, getPatient } from './services/patientService';
+import { searchPatients } from './services/patientService';
 import { adaptPatientForPanels } from './utils/patientAdapter';
 import { formatPatientId, formatPatientName } from './utils/patientFormat';
 
@@ -229,13 +229,9 @@ export default function App() {
     if (!currentUser) return;
     let isCurrent = true;
     searchPatients('', 1, 50)
-      .then(res => Promise.allSettled((res.items || []).map(p => getPatient(p.patient_id))))
-      .then(results => {
+      .then(res => {
         if (!isCurrent) return;
-        const full = results
-          .filter(r => r.status === 'fulfilled' && r.value)
-          .map(r => r.value);
-        setPatientList(full.map(adaptPatientForPanels));
+        setPatientList((res.items || []).map(adaptPatientForPanels));
       })
       .catch(() => isCurrent && setPatientList([]));
     return () => {
