@@ -73,9 +73,13 @@ export default function ReportsPanel({ db }) {
   const report = accessibleReports.find(item => item.id === selectedReport) || accessibleReports[0];
   const reportId = report?.id;
   const [branchFilter, setBranchFilter] = useState('');
-  const [reportDate, setReportDate] = useState('2026-08-23');
-  const [startDate, setStartDate] = useState('2026-08-23');
-  const [endDate, setEndDate] = useState('2026-08-23');
+  const [reportDate, setReportDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [reload, setReload] = useState(0);
   const [result, setResult] = useState({ key: '', rows: [], loading: true, error: '' });
   const dateStart = reportId === 'rep-01' ? reportDate : reportId === 'rep-03' ? '' : startDate;
