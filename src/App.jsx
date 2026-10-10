@@ -410,15 +410,20 @@ export default function App() {
             </span>
           </div>
           <h2 className="mt-4 text-sm font-medium text-slate-500 uppercase tracking-widest">
-            Clinic Appointment & Treatment Management System
+            CLINIC APPOINTMENT & TREATMENT MANAGEMENT SYSTEM
           </h2>
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white py-8 px-4 border border-slate-200 shadow-2xl rounded-2xl sm:px-10 space-y-6">
-            <h3 className="text-lg font-bold text-slate-900 text-center border-b border-slate-100 pb-3">
-              Staff Portal Authentication
-            </h3>
+            <div className="text-center border-b border-slate-100 pb-3">
+              <h3 className="text-xl font-bold text-slate-900">
+                Welcome Back
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Sign in to access your account
+              </p>
+            </div>
 
             {authError && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl flex items-center space-x-2 text-xs">
@@ -449,7 +454,7 @@ export default function App() {
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Secure Password
+                  Password
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
