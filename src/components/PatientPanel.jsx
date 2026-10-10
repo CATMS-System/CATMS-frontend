@@ -218,7 +218,7 @@ export default function PatientPanel({ subView, db, handlers }) {
       .then(slots => {
         if (!isCurrent) return;
         if (Array.isArray(slots) && slots.length > 0) {
-          setRealSlots(slots.filter(s => s.is_available));
+          setRealSlots(slots);
         } else {
           setRealSlots([]);
         }

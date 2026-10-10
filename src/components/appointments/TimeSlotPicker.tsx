@@ -1,6 +1,7 @@
-import React from 'react';
-import { Calendar, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
-import type { AvailableSlot, DoctorProfile } from '../../types/doctor';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { getDoctorSchedules } from '../../services/appointmentService';
+import type { AvailableSlot, DoctorProfile, DoctorWeeklySchedule } from '../../types/doctor';
 
 interface TimeSlotPickerProps {
   selectedDoctor: DoctorProfile | null;
@@ -22,6 +23,52 @@ export const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
   isLoading = false,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
+  const [schedules, setSchedules] = useState<DoctorWeeklySchedule[]>([]);
+
+  useEffect(() => {
+    if (!selectedDoctor?.Doctor_ID) {
+      setSchedules([]);
+      return;
+    }
+    let isMounted = true;
+    getDoctorSchedules(selectedDoctor.Doctor_ID)
+      .then((data) => {
+        if (isMounted) setSchedules(data || []);
+      })
+      .catch(() => {
+        if (isMounted) setSchedules([]);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedDoctor?.Doctor_ID]);
+
+  const activeSchedules = schedules.filter((s) => s.Availability_Status === 'Active');
+  const workingDays = Array.from(new Set(activeSchedules.map((s) => s.Day_Of_Week)));
+
+  const selectedDayName = selectedDate
+    ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' })
+    : '';
+  const isWorkingOnSelectedDay = workingDays.length === 0 || workingDays.includes(selectedDayName);
+
+  const getNextAvailableDate = () => {
+    if (workingDays.length === 0 || !selectedDate) return null;
+    const current = new Date(selectedDate + 'T00:00:00');
+    for (let i = 1; i <= 7; i++) {
+      current.setDate(current.getDate() + 1);
+      const day = current.toLocaleDateString('en-US', { weekday: 'long' });
+      if (workingDays.includes(day)) {
+        return {
+          dateStr: current.toISOString().split('T')[0],
+          dayName: day,
+          formatted: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' }),
+        };
+      }
+    }
+    return null;
+  };
+
+  const nextWorkingDate = getNextAvailableDate();
 
   return (
     <div className="space-y-4">
@@ -57,6 +104,25 @@ export const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
         </div>
       </div>
 
+      {selectedDoctor && workingDays.length > 0 && (
+        <div className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+            <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>Weekly Roster: <strong className="text-slate-900">{workingDays.join(', ')}</strong></span>
+          </div>
+          {!isWorkingOnSelectedDay && nextWorkingDate && (
+            <button
+              type="button"
+              onClick={() => onDateChange(nextWorkingDate.dateStr)}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline cursor-pointer flex items-center gap-1"
+            >
+              <span>Switch to next shift ({nextWorkingDate.formatted})</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
+
       <div>
         <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
           Available Time Slots ({availableSlots.length})
@@ -72,10 +138,28 @@ export const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
             Fetching available slots for {selectedDate}...
           </div>
         ) : availableSlots.length === 0 ? (
-          <div className="p-8 text-center text-sm text-amber-700 bg-amber-50/60 rounded-lg border border-amber-200 flex flex-col items-center justify-center gap-1.5">
-            <AlertCircle className="w-5 h-5 text-amber-600" />
-            <span className="font-medium">No available slots on this date</span>
-            <span className="text-xs text-amber-600">The physician may not have scheduled shifts or all slots are already booked.</span>
+          <div className="p-6 text-center text-sm text-amber-800 bg-amber-50/70 rounded-lg border border-amber-200 flex flex-col items-center justify-center gap-2">
+            <AlertCircle className="w-6 h-6 text-amber-600" />
+            <span className="font-bold text-base">
+              {!isWorkingOnSelectedDay && workingDays.length > 0
+                ? `${selectedDoctor.First_Name ? `Dr. ${selectedDoctor.First_Name} ${selectedDoctor.Last_Name}` : 'Doctor'} is not on duty on ${selectedDayName}s`
+                : 'No Available Slots on This Date'}
+            </span>
+            <span className="text-xs text-amber-700 max-w-md">
+              {!isWorkingOnSelectedDay && workingDays.length > 0
+                ? `This physician is rostered on ${workingDays.join(', ')}. Please select one of their scheduled working days to view and book consultation slots.`
+                : 'All consultation slots for this date are already booked or the doctor shift is full. Please choose another date.'}
+            </span>
+            {nextWorkingDate && (
+              <button
+                type="button"
+                onClick={() => onDateChange(nextWorkingDate.dateStr)}
+                className="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Switch to Next Shift ({nextWorkingDate.formatted})</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
