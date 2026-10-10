@@ -3,7 +3,10 @@ import {
   DollarSign,
   AlertCircle,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  RefreshCw,
+  CreditCard,
+  Eye
 } from 'lucide-react';
 
 import ReportsPanel from './ReportsPanel';
@@ -175,12 +178,61 @@ export default function BillingPanel({ subView, db, handlers }) {
   }, []);
 
   // =========================================================
-  // DASHBOARD CALCULATIONS
-  //
-  // Existing dashboard still uses the original mock data.
+  // DASHBOARD CALCULATIONS (Live database + fallback)
   // =========================================================
 
   const metrics = useMemo(() => {
+    // If real backend invoices are available, calculate live metrics from database:
+    if (Array.isArray(apiInvoices) && apiInvoices.length > 0) {
+      const branchId = db.currentUser?.branch_id || db.currentUser?.Branch_ID;
+      // Filter by user's assigned branch if not corporate/all branches
+      const relevant = branchId && db.currentUser?.roleCode !== 'ROLE_ADMIN'
+        ? apiInvoices.filter(i => Number(i.Branch_ID) === Number(branchId) || !i.Branch_ID)
+        : apiInvoices;
+
+      const billedToday = relevant.reduce((sum, inv) => {
+        const amt = Number(inv.Invoice_Total) || Number(inv.Billed_Consultation_Fee) || 0;
+        return sum + amt;
+      }, 0);
+
+      const collectedToday = relevant.reduce((sum, inv) => {
+        const paid = Number(inv.Patient_Paid) || 0;
+        const ins = Number(inv.Insurance_Covered) || 0;
+        if (paid > 0 || ins > 0) return sum + paid + ins;
+        if (inv.Invoice_Status === 'Paid') {
+          return sum + (Number(inv.Invoice_Total) || Number(inv.Billed_Consultation_Fee) || 0);
+        }
+        if (inv.Invoice_Status === 'Partially Paid' || inv.Invoice_Status === 'Partially_Paid') {
+          return sum + ((Number(inv.Invoice_Total) || Number(inv.Billed_Consultation_Fee) || 0) * 0.5);
+        }
+        return sum;
+      }, 0);
+
+      const outstanding = relevant.reduce((sum, inv) => {
+        if (inv.Outstanding_Balance != null) {
+          return sum + Number(inv.Outstanding_Balance);
+        }
+        if (inv.Invoice_Status === 'Issued' || inv.Invoice_Status === 'Draft') {
+          return sum + (Number(inv.Invoice_Total) || Number(inv.Billed_Consultation_Fee) || 0);
+        }
+        if (inv.Invoice_Status === 'Partially Paid' || inv.Invoice_Status === 'Partially_Paid') {
+          return sum + ((Number(inv.Invoice_Total) || Number(inv.Billed_Consultation_Fee) || 0) * 0.5);
+        }
+        return sum;
+      }, 0);
+
+      const pendingClaims = relevant.filter(
+        i => i.Invoice_Status === 'Issued' || i.Invoice_Status === 'Draft' || i.Invoice_Status === 'Partially Paid' || i.Invoice_Status === 'Partially_Paid'
+      ).length;
+
+      return {
+        billedToday,
+        collectedToday,
+        outstanding,
+        pendingClaims
+      };
+    }
+
     const localInvoices = invoiceList.filter(i => {
       const appt = appointmentList.find(
         a =>
@@ -255,9 +307,11 @@ export default function BillingPanel({ subView, db, handlers }) {
       pendingClaims
     };
   }, [
+    apiInvoices,
     invoiceList,
     appointmentList,
-    currentBranch
+    currentBranch,
+    db.currentUser
   ]);
 
   // =========================================================
@@ -309,6 +363,15 @@ export default function BillingPanel({ subView, db, handlers }) {
     invoiceDateFilter,
     invoiceBranchFilter
   ]);
+
+  const dashboardInvoices = useMemo(() => {
+    if (!Array.isArray(apiInvoices) || apiInvoices.length === 0) return [];
+    const branchId = db.currentUser?.branch_id || db.currentUser?.Branch_ID;
+    const list = branchId && db.currentUser?.roleCode !== 'ROLE_ADMIN'
+      ? apiInvoices.filter(i => Number(i.Branch_ID) === Number(branchId) || !i.Branch_ID)
+      : apiInvoices;
+    return [...list].sort((a, b) => Number(b.Invoice_ID) - Number(a.Invoice_ID));
+  }, [apiInvoices, db.currentUser]);
 
   // =========================================================
   // LOAD ONE REAL INVOICE
@@ -562,97 +625,208 @@ export default function BillingPanel({ subView, db, handlers }) {
       {subView === 'dashboard' && (
         <div className="space-y-6 animate-fade-in">
 
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Billing Desk Dashboard
-            </h1>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">
+                Billing Desk Dashboard
+              </h1>
 
-            <p className="text-sm text-slate-500 mt-1">
-              Settle itemized invoices,
-              review co-pay ratios, and
-              submit insurance claims for{' '}
-              {currentBranch}
-            </p>
+              <p className="text-sm text-slate-500 mt-1">
+                Settle itemized invoices, review co-pay ratios, and submit insurance claims for{' '}
+                <span className="font-semibold text-slate-700">{currentBranch}</span>
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={loadInvoices}
+              disabled={invoicesLoading}
+              className="px-3.5 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
+            >
+              <RefreshCw className={`h-4 w-4 ${invoicesLoading ? 'animate-spin' : ''}`} />
+              {invoicesLoading ? 'Refreshing Data...' : 'Refresh Invoices'}
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
-
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
-                  Billed Today
+                  Total Billed
                 </span>
 
-                <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">
-                  $
-                  {metrics.billedToday.toFixed(2)}
+                <span className="text-xl font-bold text-slate-900 mt-1 block font-mono">
+                  Rs. {metrics.billedToday.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
               <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
                 <DollarSign className="h-6 w-6" />
               </div>
-
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
-
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
                   Payments Collected
                 </span>
 
-                <span className="text-2xl font-bold text-emerald-600 mt-1 block font-mono">
-                  $
-                  {metrics.collectedToday.toFixed(2)}
+                <span className="text-xl font-bold text-emerald-600 mt-1 block font-mono">
+                  Rs. {metrics.collectedToday.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
               <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
                 <CheckCircle2 className="h-6 w-6" />
               </div>
-
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
-
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
                   Outstanding Balance
                 </span>
 
-                <span className="text-2xl font-bold text-red-500 mt-1 block font-mono">
-                  $
-                  {metrics.outstanding.toFixed(2)}
+                <span className="text-xl font-bold text-red-500 mt-1 block font-mono">
+                  Rs. {metrics.outstanding.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
               <div className="p-3 bg-red-50 text-red-600 rounded-xl">
                 <AlertCircle className="h-6 w-6" />
               </div>
-
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
-
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
-                  Pending Claims
+                  Pending Settlements
                 </span>
 
-                <span className="text-2xl font-bold text-amber-600 mt-1 block font-mono">
+                <span className="text-xl font-bold text-amber-600 mt-1 block font-mono">
                   {metrics.pendingClaims}{' '}
-                  Claims
+                  Invoices
                 </span>
               </div>
 
               <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
                 <Clock className="h-6 w-6" />
               </div>
-
             </div>
 
+          </div>
+
+          {/* =====================================================
+              LIVE INVOICE QUEUE & ACTIONS TABLE
+              ===================================================== */}
+
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-slate-100 flex flex-wrap justify-between items-center gap-2 bg-slate-50/50">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Live Consultation Invoices &amp; Settlement Queue
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Real-time consultation invoices awaiting cashier settlement or review
+                </p>
+              </div>
+
+              <span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg">
+                {dashboardInvoices.length} Invoices Available
+              </span>
+            </div>
+
+            {invoicesLoading ? (
+              <div className="p-10 text-center text-sm text-slate-400">Loading live invoices...</div>
+            ) : dashboardInvoices.length === 0 ? (
+              <div className="p-10 text-center text-sm text-slate-400 space-y-2">
+                <p>No invoices currently found for your branch.</p>
+                <p className="text-xs text-slate-400">
+                  Invoices appear immediately once a doctor completes a consultation with treatments.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                      <th className="px-4 py-3">Invoice / Patient</th>
+                      <th className="px-4 py-3">Branch &amp; Date</th>
+                      <th className="px-4 py-3 text-right">Total (Rs.)</th>
+                      <th className="px-4 py-3 text-right">Balance Due</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-650">
+                    {dashboardInvoices.slice(0, 10).map(inv => {
+                      const isPaid = inv.Invoice_Status === 'Paid';
+                      const total = Number(inv.Invoice_Total || inv.Billed_Consultation_Fee || 0);
+                      const due = inv.Outstanding_Balance != null ? Number(inv.Outstanding_Balance) : (isPaid ? 0 : total);
+                      return (
+                        <tr key={inv.Invoice_ID} className="hover:bg-slate-50/50">
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-900">
+                              Invoice #{inv.Invoice_ID}
+                              {inv.Patient_Name ? <span className="font-normal text-slate-600 ml-1.5">— {inv.Patient_Name}</span> : null}
+                            </div>
+                            <span className="text-xs text-slate-400 font-mono">
+                              Consultation #{inv.Consultation_ID}
+                              {inv.Doctor_Name ? ` | Dr. ${inv.Doctor_Name}` : ''}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            <span className="font-medium text-slate-700 block">{inv.Branch_Name || `Branch #${inv.Branch_ID || 1}`}</span>
+                            <span className="text-slate-400">{inv.Invoice_Date}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900">
+                            Rs. {total.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-semibold">
+                            {due > 0 ? (
+                              <span className="text-red-600">Rs. {due.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            ) : (
+                              <span className="text-emerald-600">Settled (0.00)</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                              isPaid ? 'bg-emerald-100 text-emerald-800' :
+                              inv.Invoice_Status === 'Issued' ? 'bg-amber-100 text-amber-800' :
+                              inv.Invoice_Status === 'Partially Paid' || inv.Invoice_Status === 'Partially_Paid' ? 'bg-blue-100 text-blue-800' :
+                              'bg-slate-100 text-slate-700'
+                            }`}>
+                              {inv.Invoice_Status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right space-x-2">
+                            {!isPaid && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPayment(inv)}
+                                className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1 shadow-xs"
+                              >
+                                <CreditCard className="h-3.5 w-3.5" />
+                                Settle / Pay
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleViewInvoice(inv.Invoice_ID)}
+                              className="px-2.5 py-1.5 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-50 cursor-pointer inline-flex items-center gap-1"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -664,15 +838,26 @@ export default function BillingPanel({ subView, db, handlers }) {
       {subView === 'invoices' && (
         <div className="space-y-6 animate-fade-in">
 
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Billing Invoices Manager
-            </h1>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">
+                Billing Invoices Manager
+              </h1>
 
-            <p className="text-sm text-slate-500 mt-1">
-              Review invoices stored in
-              the CATMS billing database
-            </p>
+              <p className="text-sm text-slate-500 mt-1">
+                Review invoices stored in the CATMS billing database
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={loadInvoices}
+              disabled={invoicesLoading}
+              className="px-3.5 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
+            >
+              <RefreshCw className={`h-4 w-4 ${invoicesLoading ? 'animate-spin' : ''}`} />
+              {invoicesLoading ? 'Refreshing Data...' : 'Refresh Invoices'}
+            </button>
           </div>
 
           {/* FILTERS */}
@@ -869,15 +1054,20 @@ export default function BillingPanel({ subView, db, handlers }) {
                               {
                                 inv.Invoice_ID
                               }
+                              {inv.Patient_Name ? (
+                                <span className="font-normal text-slate-600 ml-1.5">— {inv.Patient_Name}</span>
+                              ) : null}
 
                             </div>
 
-                            <span className="text-xs text-slate-405 font-mono">
+                            <span className="text-xs text-slate-400 font-mono">
 
                               Consultation #
                               {
                                 inv.Consultation_ID
                               }
+
+                              {inv.Doctor_Name ? ` | Dr. ${inv.Doctor_Name}` : ''}
 
                               {' | '}
 
@@ -886,31 +1076,42 @@ export default function BillingPanel({ subView, db, handlers }) {
                                 inv.Invoice_Date
                               }
 
+                              {inv.Branch_Name ? ` | ${inv.Branch_Name}` : ''}
+
                             </span>
 
                           </td>
 
-                          {/* CONSULTATION FEE */}
+                          {/* INVOICE TOTAL & STATUS */}
 
                           <td className="px-4 py-3 text-right">
 
-                            <div className="font-mono font-bold text-slate-800">
+                            <div className="font-mono font-bold text-slate-900">
 
                               Rs.{' '}
 
                               {Number(
-                                inv.Billed_Consultation_Fee
-                              ).toFixed(2)}
+                                inv.Invoice_Total || inv.Billed_Consultation_Fee || 0
+                              ).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 
                             </div>
 
-                            <span className="text-xs text-slate-400">
+                            <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                              {inv.Outstanding_Balance != null && Number(inv.Outstanding_Balance) > 0 ? (
+                                <span className="text-[11px] font-mono text-red-600 font-semibold">
+                                  Due: Rs. {Number(inv.Outstanding_Balance).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              ) : null}
 
-                              {
-                                inv.Invoice_Status
-                              }
-
-                            </span>
+                              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                inv.Invoice_Status === 'Paid' ? 'bg-emerald-100 text-emerald-800' :
+                                inv.Invoice_Status === 'Issued' ? 'bg-amber-100 text-amber-800' :
+                                inv.Invoice_Status === 'Partially Paid' || inv.Invoice_Status === 'Partially_Paid' ? 'bg-blue-100 text-blue-800' :
+                                'bg-slate-100 text-slate-700'
+                              }`}>
+                                {inv.Invoice_Status}
+                              </span>
+                            </div>
 
                           </td>
 
