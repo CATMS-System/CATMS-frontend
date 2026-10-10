@@ -66,9 +66,9 @@ const INITIAL_APPOINTMENTS = [
 ];
 
 const INITIAL_QUEUE = [
-  { queueNo: 1, appointmentId: 'APP-0002', appointment_id: 2, Appointment_ID: 2, patientId: 'PAT-0002', patient_id: 2, Patient_ID: 2, patientName: 'Clara Oswald', reason: 'Severe throat infection', assignedDoctor: 'Dr. Sarah Jenkins', doctorId: 'STF-002', doctor_id: 2, Doctor_ID: 2, estWaitTime: 15, room: 'Room 101', status: 'SCHEDULED' },
-  { queueNo: 2, appointmentId: 'APP-0003', appointment_id: 3, Appointment_ID: 3, patientId: 'PAT-0003', patient_id: 3, Patient_ID: 3, patientName: 'David Miller', reason: 'Eczema flare up', assignedDoctor: 'Dr. Nimal Perera', doctorId: 'STF-008', doctor_id: 8, Doctor_ID: 8, estWaitTime: 35, room: 'Consultation Room B', status: 'WALK_IN' },
-  { queueNo: 3, appointmentId: 'APP-0004', appointment_id: 4, Appointment_ID: 4, patientId: 'PAT-0001', patient_id: 1, Patient_ID: 1, patientName: 'John Doe', reason: 'Routine cardiovascular follow-up', assignedDoctor: 'Dr. Alexander Bennett', doctorId: 'STF-001', doctor_id: 1, Doctor_ID: 1, estWaitTime: 10, room: 'Room 105', status: 'SCHEDULED' }
+  { queueNo: 1, appointmentId: 'APP-0008', appointment_id: 8, Appointment_ID: 8, patientId: 'PAT-0002', patient_id: 2, Patient_ID: 2, patientName: 'Clara Oswald', reason: 'Recurrent severe throat infection and hoarseness', assignedDoctor: 'Dr. Alexander Bennett', doctorId: 'STF-001', doctor_id: 1, Doctor_ID: 1, estWaitTime: 15, room: 'Room 101', status: 'SCHEDULED' },
+  { queueNo: 2, appointmentId: 'APP-0010', appointment_id: 10, Appointment_ID: 10, patientId: 'PAT-0001', patient_id: 1, Patient_ID: 1, patientName: 'John Doe', reason: 'Hypertension evaluation and chest follow-up', assignedDoctor: 'Dr. Alexander Bennett', doctorId: 'STF-001', doctor_id: 1, Doctor_ID: 1, estWaitTime: 25, room: 'Room 105', status: 'SCHEDULED' },
+  { queueNo: 3, appointmentId: 'APP-0011', appointment_id: 11, Appointment_ID: 11, patientId: 'PAT-0004', patient_id: 4, Patient_ID: 4, patientName: 'Ananya Jayawardena', reason: 'General health checkup', assignedDoctor: 'Dr. Alexander Bennett', doctorId: 'STF-001', doctor_id: 1, Doctor_ID: 1, estWaitTime: 40, room: 'Room 102', status: 'SCHEDULED' }
 ];
 
 const INITIAL_INVOICES = [

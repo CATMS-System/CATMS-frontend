@@ -230,6 +230,31 @@ test('getDailyQueue service dispatches include_completed param when requested', 
   assert.ok(calledUrl.includes('include_completed=true'));
 });
 
+test('Doctor consultation room renders active Complete Visit & Send to Billing button for scheduled visit', t => {
+  browser(t, {
+    name: 'Dr. Alexander Bennett',
+    email: 'bennett@careflow.com',
+    roleCode: 'ROLE_DOCTOR',
+    branch: 'Colombo Main',
+    branch_id: 1,
+    doctor_id: 1
+  }, '/doctor/consultation/8');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Clinical Diagnosis'));
+  assert.ok(html.includes('Complete Visit &amp; Send to Billing') || html.includes('Complete Visit & Send to Billing'));
+});
 
-
-
+test('Doctor consultation room renders completed banner and badge for completed visit', t => {
+  browser(t, {
+    name: 'Dr. Alexander Bennett',
+    email: 'bennett@careflow.com',
+    roleCode: 'ROLE_DOCTOR',
+    branch: 'Colombo Main',
+    branch_id: 1,
+    doctor_id: 1
+  }, '/doctor/consultation/APP-1001');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Consultation Already Completed'));
+  assert.ok(html.includes('Consultation Completed'));
+  assert.ok(html.includes('Return to Queue'));
+});

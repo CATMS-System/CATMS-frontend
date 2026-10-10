@@ -342,6 +342,12 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
     return calculated > 0 && !isNaN(calculated) ? `${calculated} yrs` : 'N/A';
   }, [activePatient?.dob]);
 
+  // Check if active consultation appointment is already finalized
+  const isAlreadyCompleted = useMemo(() => {
+    const s = String(activeAppt?.status || activeAppt?.Status || '').toLowerCase();
+    return s === 'completed';
+  }, [activeAppt]);
+
   // Vitals inputs state
   const [vitals, setVitals] = useState({
     bp: '',
@@ -628,10 +634,32 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
   const handleCompleteVisit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
 
-    // Inline validation check
+    // Prevent submitting if already completed
+    if (isAlreadyCompleted) {
+      const infoMsg = 'This consultation has already been completed and sent to billing.';
+      handlers?.triggerToast?.(infoMsg);
+      setToastState({
+        type: 'success',
+        message: infoMsg,
+      });
+      return;
+    }
+
+    // Inline validation check with prominent toast and smooth auto-scroll to missing diagnosis
     if (!diagnosis || !diagnosis.trim()) {
       setTouched((prev) => ({ ...prev, diagnosis: true }));
       validateField('diagnosis', '');
+      const valMsg = 'Clinical diagnosis is required before completing the visit.';
+      handlers?.triggerToast?.(valMsg);
+      setToastState({
+        type: 'error',
+        message: valMsg,
+      });
+      const textarea = document.querySelector('textarea[placeholder*="diagnosis"]');
+      if (textarea) {
+        textarea.focus();
+        textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
@@ -639,6 +667,12 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
     if (followUpDate && followUpDate < todayStr) {
       setTouched((prev) => ({ ...prev, followUpDate: true }));
       validateField('followUpDate', followUpDate);
+      const dateMsg = 'Follow-up date cannot be in the past.';
+      handlers?.triggerToast?.(dateMsg);
+      setToastState({
+        type: 'error',
+        message: dateMsg,
+      });
       return;
     }
 
@@ -723,11 +757,55 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         }
       }, 1200);
     } catch (err) {
-      // Error feedback (Step F14)
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.message ||
-        'Failed to complete consultation. Please check required fields and try again.';
+      // Safely extract error message (handles FastAPI string or validation array)
+      let errorMsg = 'Failed to complete consultation. Please check required fields and try again.';
+      const detail = err?.response?.data?.detail;
+      if (typeof detail === 'string') {
+        errorMsg = detail;
+      } else if (Array.isArray(detail)) {
+        errorMsg = detail
+          .map((d) => (typeof d === 'string' ? d : d.msg || JSON.stringify(d)))
+          .join(', ');
+      } else if (err?.message) {
+        errorMsg = err.message;
+      }
+
+      // If already completed in backend (HTTP 409)
+      const isAlreadyFinalized =
+        err?.response?.status === 409 ||
+        errorMsg.toLowerCase().includes('already exists') ||
+        errorMsg.toLowerCase().includes('status \'completed\'') ||
+        errorMsg.toLowerCase().includes('status "completed"');
+
+      if (isAlreadyFinalized) {
+        const completedMsg = 'This consultation was already completed and sent to the billing desk.';
+        handlers?.triggerToast?.(completedMsg);
+        setToastState({
+          type: 'success',
+          message: completedMsg,
+        });
+
+        if (activePatientId) {
+          updateQueueStatus(activePatientId, 'Completed');
+        }
+        if (handlers?.setAppointmentList) {
+          handlers.setAppointmentList((prev) =>
+            (prev || []).map((a) =>
+              String(a.id) === String(resolvedApptId) ||
+              String(a.Appointment_ID) === String(resolvedApptId) ||
+              String(a.appointment_id) === String(resolvedApptId)
+                ? { ...a, status: 'Completed', Status: 'Completed' }
+                : a
+            )
+          );
+        }
+        setTimeout(() => {
+          if (handlers?.navigateTo) {
+            handlers.navigateTo('/doctor/workbench');
+          }
+        }, 1500);
+        return;
+      }
 
       handlers?.triggerToast?.(`Error: ${errorMsg}`);
       setToastState({
@@ -1261,6 +1339,30 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       {/* 2. CONSULTATION ROOM ROUTE */}
       {subView === 'consultation' && (
         <div className="space-y-6 animate-fade-in">
+          {/* Completed Consultation Notice Banner */}
+          {isAlreadyCompleted && (
+            <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-emerald-900 shadow-xs">
+              <div className="flex items-center space-x-3">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                <div>
+                  <h4 className="font-bold text-sm">Consultation Already Completed & Billed</h4>
+                  <p className="text-xs text-emerald-700 mt-0.5">
+                    This clinical consultation has already been finalized and routed to the billing desk.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  handlers?.navigateTo ? handlers.navigateTo('/doctor/workbench') : window.history.back()
+                }
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shrink-0 transition-colors cursor-pointer"
+              >
+                Return to Workbench
+              </button>
+            </div>
+          )}
+
           {/* Patient Header (Name, Age, Appointment info) */}
           <div className="bg-slate-900 rounded-xl p-6 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
             <div className="flex items-center space-x-4">
@@ -1756,28 +1858,46 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={handleCompleteVisit}
-                disabled={isSubmitting}
-                className={`px-6 py-3 rounded-xl font-bold text-sm text-white transition-all shadow-md flex items-center space-x-2 cursor-pointer ${
-                  isSubmitting
-                    ? 'bg-emerald-400 cursor-not-allowed opacity-80'
-                    : 'bg-emerald-600 hover:bg-emerald-700 active:scale-98'
-                }`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Submitting Consultation...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Complete Visit & Send to Billing</span>
-                  </>
-                )}
-              </button>
+              {isAlreadyCompleted ? (
+                <div className="flex items-center space-x-3">
+                  <span className="inline-flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-xs border border-emerald-200">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span>Consultation Completed</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handlers?.navigateTo ? handlers.navigateTo('/doctor/workbench') : window.history.back()
+                    }
+                    className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors"
+                  >
+                    Return to Queue
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCompleteVisit}
+                  disabled={isSubmitting}
+                  className={`px-6 py-3 rounded-xl font-bold text-sm text-white transition-all shadow-md flex items-center space-x-2 cursor-pointer ${
+                    isSubmitting
+                      ? 'bg-emerald-400 cursor-not-allowed opacity-80'
+                      : 'bg-emerald-600 hover:bg-emerald-700 active:scale-98'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Submitting Consultation...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Complete Visit & Send to Billing</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
