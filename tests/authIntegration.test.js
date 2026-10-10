@@ -165,6 +165,23 @@ test('Branch_Manager reports panel renders locked branch scope', t => {
   const html = renderToStaticMarkup(React.createElement(App));
   assert.ok(html.includes('Branch Scope (Locked)'));
   assert.ok(html.includes('Scoped'));
+  assert.ok(html.includes('Branch 1 - Colombo Main'));
+  assert.ok(!html.includes('REP-05'));
+});
+
+test('Branch_Manager in Kandy locks to Branch 2', t => {
+  browser(t, {
+    name: 'Samantha Silva',
+    email: 'silva@careflow.com',
+    roleCode: 'ROLE_BRANCH_MANAGER',
+    branch: 'Kandy',
+    branch_id: 2,
+    Branch_ID: 2
+  }, '/manager/reports');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Branch Scope (Locked)'));
+  assert.ok(html.includes('Branch 2 - Kandy'));
+  assert.ok(!html.includes('REP-05'));
 });
 
 test('Admin reports panel renders flexible branch filter', t => {

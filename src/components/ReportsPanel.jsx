@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Download, FileText, Filter } from 'lucide-react';
 import { createReportCsv, createReportPdf, downloadCsv, reportFilename } from '../utils/reportExport';
 import {
@@ -65,10 +65,27 @@ const reports = [
 
 export default function ReportsPanel({ db }) {
   // Use the same role codes as App routing; display names are not permission keys.
-  const role = db.currentUser.roleCode;
-  const isManager = role === 'ROLE_BRANCH_MANAGER';
-  const managerBranchId = db.currentUser.branch_id || db.currentUser.Branch_ID || 1;
-  const managerBranchName = db.currentUser.branch || 'Assigned Branch';
+  const role = db?.currentUser?.roleCode ||
+    (db?.currentUser?.System_Role === 'Branch_Manager' || db?.currentUser?.role === 'Branch Manager' || db?.currentUser?.role === 'Branch_Manager' ? 'ROLE_BRANCH_MANAGER' :
+     db?.currentUser?.System_Role === 'Admin' || db?.currentUser?.role === 'Admin' ? 'ROLE_ADMIN' :
+     db?.currentUser?.System_Role === 'Billing_Staff' || db?.currentUser?.role === 'Billing Staff' || db?.currentUser?.role === 'Billing_Staff' ? 'ROLE_BILLING_STAFF' :
+     db?.currentUser?.roleCode);
+
+  const isManager = role === 'ROLE_BRANCH_MANAGER' ||
+    db?.currentUser?.role === 'Branch Manager' ||
+    db?.currentUser?.role === 'Branch_Manager' ||
+    db?.currentUser?.System_Role === 'Branch_Manager';
+
+  const managerBranchName = db?.currentUser?.branch || 'Assigned Branch';
+
+  const managerBranchId = useMemo(() => {
+    if (db?.currentUser?.branch_id) return Number(db.currentUser.branch_id);
+    if (db?.currentUser?.Branch_ID) return Number(db.currentUser.Branch_ID);
+    const found = db?.branches?.find(
+      b => b.name === managerBranchName || b.Branch_Name === managerBranchName
+    );
+    return found ? (found.Branch_ID || found.id || 1) : 1;
+  }, [db?.currentUser, db?.branches, managerBranchName]);
 
   const accessibleReports = reports.filter(report => report.roles.includes(role));
   const [selectedReport, setSelectedReport] = useState(() =>
@@ -134,7 +151,10 @@ export default function ReportsPanel({ db }) {
           case 'rep-02': rows = await getDoctorRevenue(dateStart, dateEnd, effectiveBranchId); break;
           case 'rep-03': rows = await getOutstandingBalances(effectiveBranchId); break;
           case 'rep-04': rows = await getTreatmentUsage(dateStart, dateEnd, effectiveBranchId); break;
-          case 'rep-05': rows = await getInsuranceVsOutOfPocket(dateStart, dateEnd, effectiveBranchId); break;
+          case 'rep-05':
+            if (isManager) throw new Error('Access denied: Branch Managers cannot view organization-wide insurance reports.');
+            rows = await getInsuranceVsOutOfPocket(dateStart, dateEnd, effectiveBranchId);
+            break;
         }
         if (!Array.isArray(rows)) throw new Error('The report API returned an invalid response.');
         if (active) setResult({ key: requestKey, rows, loading: false, error: '' });
