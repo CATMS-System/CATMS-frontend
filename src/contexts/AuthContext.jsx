@@ -8,8 +8,8 @@ export const DEMO_LOGINS = [
   { role: 'Receptionist', roleCode: 'ROLE_RECEPTIONIST', email: 'recept_shenaya', password: 'Password123!', name: 'Shenaya Perera [Recept]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 9, Staff_ID: 9 },
   { role: 'Doctor', roleCode: 'ROLE_DOCTOR', email: 'dr_bennett', password: 'Password123!', name: 'Dr. Alexander Bennett [Doc]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, id: 'STF-001', doctor_id: 1, doctorId: 1, Doctor_ID: 1, staff_id: 1, Staff_ID: 1 },
   { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_patel', password: 'Password123!', name: 'Sophia Patel [Colombo Billing]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 5, Staff_ID: 5 },
-  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_kandy', password: 'Password123!', name: 'Kamal Perera [Kandy Billing]', branch: 'Kandy', branch_id: 2, Branch_ID: 2, staff_id: 11, Staff_ID: 11 },
-  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_galle', password: 'Password123!', name: 'Nirosha Silva [Galle Billing]', branch: 'Galle', branch_id: 3, Branch_ID: 3, staff_id: 12, Staff_ID: 12 },
+  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_kandy', password: 'Password123!', name: 'Kamal Perera [Kandy Billing]', branch: 'Kandy', branch_id: 2, Branch_ID: 2, staff_id: 31, Staff_ID: 31 },
+  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_galle', password: 'Password123!', name: 'Nirosha Silva [Galle Billing]', branch: 'Galle', branch_id: 3, Branch_ID: 3, staff_id: 32, Staff_ID: 32 },
   { role: 'Patient', roleCode: 'ROLE_PATIENT', email: 'pat_johndoe', password: 'Password123!', name: 'John Doe [Patient]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, patientId: 'PAT-0001', patient_id: 1, Patient_ID: 1 }
 ];
 
@@ -21,6 +21,17 @@ export function normalizeUser(me, fallbackEmail = '') {
   const patientFormattedId = resolvedPatientId ? `PAT-${String(resolvedPatientId).padStart(4, '0')}` : undefined;
   const displayName = me.First_Name && me.Last_Name ? `${me.First_Name} ${me.Last_Name}` : (me.Username || me.name);
 
+  const branchMap = {
+    1: 'Colombo Main',
+    2: 'Kandy',
+    3: 'Galle'
+  };
+  const resolvedBranch =
+    me.branch ||
+    (me.Branch_Name ? me.Branch_Name : (me.Branch_ID ? branchMap[me.Branch_ID] : null)) ||
+    (me.branch_id ? branchMap[me.branch_id] : null) ||
+    'Colombo Main';
+
   return {
     Account_ID: me.Account_ID,
     name: displayName,
@@ -30,7 +41,7 @@ export function normalizeUser(me, fallbackEmail = '') {
     email: me.Email || fallbackEmail,
     role: me.System_Role,
     roleCode,
-    branch: me.branch || 'Colombo Main',
+    branch: resolvedBranch,
     branch_id: me.Branch_ID || me.branch_id || 1,
     Branch_ID: me.Branch_ID || me.branch_id || 1,
     id: isDoctor ? (me.id || `STF-${String(me.Staff_ID || me.Doctor_ID || 1).padStart(3, '0')}`) : (me.id || undefined),
