@@ -128,10 +128,8 @@ export default function PatientProfileCard({
               </strong>
             </div>
             <div>
-              <span className="text-slate-500 text-[11px]">Default Pass: </span>
-              <code className="bg-white px-1.5 py-0.5 rounded border border-blue-200 text-slate-700 font-mono text-[11px]">
-                Password123!
-              </code>
+              <span className="text-slate-500 text-[11px]">Password: </span>
+              <span className="text-slate-700 text-[11px]">given to the patient at registration</span>
             </div>
           </div>
         </div>
