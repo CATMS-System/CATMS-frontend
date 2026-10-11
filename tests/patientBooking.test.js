@@ -7,12 +7,13 @@ import { createServer } from 'vite';
 let server;
 let PatientPanel;
 let normalizeUser;
-let DEMO_LOGINS;
+let authModule;
 
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, ws: false, hmr: false }, appType: 'custom' });
   ({ default: PatientPanel } = await server.ssrLoadModule('/src/components/PatientPanel.jsx'));
-  ({ normalizeUser, DEMO_LOGINS } = await server.ssrLoadModule('/src/contexts/AuthContext.jsx'));
+  authModule = await server.ssrLoadModule('/src/contexts/AuthContext.jsx');
+  ({ normalizeUser } = authModule);
 });
 
 after(async () => {
@@ -62,10 +63,8 @@ test('normalizeUser properly maps doctor profile metadata and IDs', () => {
   assert.equal(normalized.name, 'Nimal Perera');
 });
 
-test('DEMO_LOGINS use Password123! credentials', () => {
-  for (const login of DEMO_LOGINS) {
-    assert.equal(login.password, 'Password123!', `Demo login for ${login.role} should be Password123!`);
-  }
+test('no demo logins or passwords ship in the frontend', () => {
+  assert.equal(authModule.DEMO_LOGINS, undefined);
 });
 
 test('PatientPanel self-booking wizard renders branches and specialty options', () => {
