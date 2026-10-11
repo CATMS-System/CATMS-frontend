@@ -201,19 +201,25 @@ export default function BillingPanel({ subView, db, handlers }) {
         : apiInvoices;
 
       const billedToday = relevant.reduce((sum, inv) => {
-        const amt = Number(inv.Invoice_Total) || Number(inv.Billed_Consultation_Fee) || 0;
-        return sum + amt;
+        const amt = inv.Invoice_Total != null
+          ? Number(inv.Invoice_Total)
+          : (Number(inv.Billed_Consultation_Fee || 0) + Number(inv.Total_Treatments_Fee || 0));
+        return sum + (Number.isFinite(amt) ? amt : 0);
       }, 0);
 
       const collectedToday = relevant.reduce((sum, inv) => {
         const paid = Number(inv.Patient_Paid) || 0;
         const ins = Number(inv.Insurance_Covered) || 0;
         if (paid > 0 || ins > 0) return sum + paid + ins;
+        const invTotal = inv.Invoice_Total != null
+          ? Number(inv.Invoice_Total)
+          : (Number(inv.Billed_Consultation_Fee || 0) + Number(inv.Total_Treatments_Fee || 0));
+        const validTotal = Number.isFinite(invTotal) ? invTotal : 0;
         if (inv.Invoice_Status === 'Paid') {
-          return sum + (Number(inv.Invoice_Total) || Number(inv.Billed_Consultation_Fee) || 0);
+          return sum + validTotal;
         }
         if (inv.Invoice_Status === 'Partially Paid' || inv.Invoice_Status === 'Partially_Paid') {
-          return sum + ((Number(inv.Invoice_Total) || Number(inv.Billed_Consultation_Fee) || 0) * 0.5);
+          return sum + (validTotal * 0.5);
         }
         return sum;
       }, 0);
@@ -222,11 +228,15 @@ export default function BillingPanel({ subView, db, handlers }) {
         if (inv.Outstanding_Balance != null) {
           return sum + Number(inv.Outstanding_Balance);
         }
+        const invTotal = inv.Invoice_Total != null
+          ? Number(inv.Invoice_Total)
+          : (Number(inv.Billed_Consultation_Fee || 0) + Number(inv.Total_Treatments_Fee || 0));
+        const validTotal = Number.isFinite(invTotal) ? invTotal : 0;
         if (inv.Invoice_Status === 'Issued' || inv.Invoice_Status === 'Draft') {
-          return sum + (Number(inv.Invoice_Total) || Number(inv.Billed_Consultation_Fee) || 0);
+          return sum + validTotal;
         }
         if (inv.Invoice_Status === 'Partially Paid' || inv.Invoice_Status === 'Partially_Paid') {
-          return sum + ((Number(inv.Invoice_Total) || Number(inv.Billed_Consultation_Fee) || 0) * 0.5);
+          return sum + (validTotal * 0.5);
         }
         return sum;
       }, 0);
@@ -770,7 +780,9 @@ export default function BillingPanel({ subView, db, handlers }) {
                     <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
                       <th className="px-4 py-3">Invoice / Patient</th>
                       <th className="px-4 py-3">Branch &amp; Date</th>
-                      <th className="px-4 py-3 text-right">Total (Rs.)</th>
+                      <th className="px-4 py-3 text-right">Consultation Fee</th>
+                      <th className="px-4 py-3 text-right">Treatment Charges</th>
+                      <th className="px-4 py-3 text-right">Total</th>
                       <th className="px-4 py-3 text-right">Balance Due</th>
                       <th className="px-4 py-3 text-center">Status</th>
                       <th className="px-4 py-3 text-right">Actions</th>
@@ -779,7 +791,9 @@ export default function BillingPanel({ subView, db, handlers }) {
                   <tbody className="divide-y divide-slate-100 text-slate-650">
                     {dashboardInvoices.slice(0, 10).map(inv => {
                       const isPaid = inv.Invoice_Status === 'Paid';
-                      const total = Number(inv.Invoice_Total || inv.Billed_Consultation_Fee || 0);
+                      const consultFee = Number(inv.Billed_Consultation_Fee || 0);
+                      const treatmentFee = Number(inv.Total_Treatments_Fee || 0);
+                      const total = Number(inv.Invoice_Total != null ? inv.Invoice_Total : (consultFee + treatmentFee));
                       const due = inv.Outstanding_Balance != null ? Number(inv.Outstanding_Balance) : (isPaid ? 0 : total);
                       return (
                         <tr key={inv.Invoice_ID} className="hover:bg-slate-50/50">
@@ -796,6 +810,12 @@ export default function BillingPanel({ subView, db, handlers }) {
                           <td className="px-4 py-3 text-xs">
                             <span className="font-medium text-slate-700 block">{inv.Branch_Name || `Branch #${inv.Branch_ID || 1}`}</span>
                             <span className="text-slate-400">{inv.Invoice_Date}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-slate-700">
+                            Rs. {consultFee.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-slate-700">
+                            Rs. {treatmentFee.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900">
                             Rs. {total.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
