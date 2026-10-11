@@ -65,7 +65,7 @@ export const RescheduleModal: React.FC<RescheduleModalProps> = ({
     setIsLoadingSlots(true);
     setConflictError(null);
 
-    getDoctorAvailableSlots(appointment.Doctor_ID, selectedDate, appointment.Duration_Minutes || 30, appointment.Branch_ID)
+    getDoctorAvailableSlots(appointment.Doctor_ID, selectedDate, appointment.Duration_Minutes || 30, appointment.Branch_ID, true)
       .then((slots) => {
         if (isMounted) {
           setAvailableSlots(slots);
@@ -94,7 +94,7 @@ export const RescheduleModal: React.FC<RescheduleModalProps> = ({
     setConflictError(null);
     setFormError(null);
 
-    if (!selectedSlot) {
+    if (!selectedSlot || selectedSlot.Is_Booked) {
       setFormError('Please select a new available time slot.');
       return;
     }

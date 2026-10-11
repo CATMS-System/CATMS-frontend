@@ -164,7 +164,9 @@ export const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
             {availableSlots.map((slot) => {
+              const isBooked = Boolean(slot.Is_Booked || slot.Status === 'Booked');
               const isSelected =
+                !isBooked &&
                 selectedSlot?.Start_Time === slot.Start_Time &&
                 selectedSlot?.Date === slot.Date;
 
@@ -172,18 +174,23 @@ export const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
                 <button
                   key={`${slot.Date}-${slot.Start_Time}`}
                   type="button"
-                  onClick={() => onSelectSlot(slot)}
+                  disabled={isBooked}
+                  onClick={() => !isBooked && onSelectSlot(slot)}
                   className={`p-2.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-1 ${
-                    isSelected
+                    isBooked
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-75'
+                      : isSelected
                       ? 'border-blue-600 bg-blue-600 text-white shadow-sm ring-2 ring-blue-600/30'
-                      : 'border-emerald-200 bg-emerald-50/40 text-emerald-900 hover:bg-emerald-100/70 hover:border-emerald-300'
+                      : 'border-emerald-200 bg-emerald-50/40 text-emerald-900 hover:bg-emerald-100/70 hover:border-emerald-300 cursor-pointer'
                   }`}
                 >
-                  <span className="text-sm font-semibold tracking-wide">
+                  <span className={`text-sm font-semibold tracking-wide ${isBooked ? 'line-through text-gray-400' : ''}`}>
                     {slot.Start_Time.slice(0, 5)} - {slot.End_Time.slice(0, 5)}
                   </span>
-                  <span className={`text-[11px] flex items-center gap-1 ${isSelected ? 'text-blue-100' : 'text-emerald-700'}`}>
-                    {isSelected ? (
+                  <span className={`text-[11px] flex items-center gap-1 ${isBooked ? 'text-gray-500 font-medium' : isSelected ? 'text-blue-100' : 'text-emerald-700'}`}>
+                    {isBooked ? (
+                      'Booked'
+                    ) : isSelected ? (
                       <>
                         <CheckCircle2 className="w-3 h-3" />
                         Selected

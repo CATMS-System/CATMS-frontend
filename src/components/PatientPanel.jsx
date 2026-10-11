@@ -244,18 +244,21 @@ export default function PatientPanel({ subView, db, handlers }) {
     }
     let isCurrent = true;
     setSlotsLoading(true);
-    getDoctorAvailableSlots(bookingForm.numericDoctorId, bookingForm.date, 30, selectedBranchId)
+    getDoctorAvailableSlots(bookingForm.numericDoctorId, bookingForm.date, 30, selectedBranchId, true)
       .then(slots => {
         if (!isCurrent) return;
         if (Array.isArray(slots) && slots.length > 0) {
           const normalized = slots.map((s, idx) => {
             const st = String(s.Start_Time || s.start_time || '09:00:00').slice(0, 5);
             const et = String(s.End_Time || s.end_time || '09:30:00').slice(0, 5);
+            const isBooked = Boolean(s.Is_Booked || s.is_booked || s.Status === 'Booked' || s.status === 'Booked');
             return {
               ...s,
               slot_id: s.Slot_ID || s.slot_id || s.Schedule_ID || `slot-${idx}-${st}`,
               start_time: st,
-              end_time: et
+              end_time: et,
+              is_booked: isBooked,
+              status: isBooked ? 'Booked' : 'Available'
             };
           });
           setRealSlots(normalized);
@@ -271,12 +274,15 @@ export default function PatientPanel({ subView, db, handlers }) {
   // Keep booking time synced to first available slot if any
   useEffect(() => {
     if (realSlots.length > 0) {
-      const firstTime = realSlots[0].start_time;
-      if (firstTime) {
-        setBookingForm(prev => ({ ...prev, time: firstTime }));
+      const currentSelected = realSlots.find(s => s.start_time === bookingForm.time);
+      if (!currentSelected || currentSelected.is_booked) {
+        const firstAvailable = realSlots.find(s => !s.is_booked);
+        if (firstAvailable) {
+          setBookingForm(prev => ({ ...prev, time: firstAvailable.start_time }));
+        }
       }
     }
-  }, [realSlots]);
+  }, [realSlots, bookingForm.time]);
 
   const handleNextStep = () => {
     if (bookingStep === 1) {
@@ -292,6 +298,11 @@ export default function PatientPanel({ subView, db, handlers }) {
         alert('Please choose date and time slot.');
         return;
       }
+      const chosenSlot = realSlots.find(s => s.start_time === bookingForm.time);
+      if (chosenSlot && chosenSlot.is_booked) {
+        alert(`The selected time slot (${bookingForm.time}) is already booked. Please choose an available time slot.`);
+        return;
+      }
       setBookingStep(4);
     }
   };
@@ -302,6 +313,14 @@ export default function PatientPanel({ subView, db, handlers }) {
       alert('Please select a doctor to continue.');
       return;
     }
+
+    const chosenSlot = realSlots.find(s => s.start_time === bookingForm.time);
+    if (chosenSlot && chosenSlot.is_booked) {
+      alert(`The time slot ${bookingForm.time} is already booked. Please select an available slot.`);
+      setBookingStep(3);
+      return;
+    }
+
     setIsSubmittingBooking(true);
     const docObj = availableDoctors.find(s => s.id === bookingForm.doctorId || s.doctor_id === bookingForm.numericDoctorId);
     const formattedTime = bookingForm.time.length === 5 ? `${bookingForm.time}:00` : bookingForm.time;
@@ -392,35 +411,41 @@ export default function PatientPanel({ subView, db, handlers }) {
         reason: ''
       });
     } catch (err) {
-      console.warn('Backend booking API error, using optimistic local reservation:', err);
-      // Graceful offline fallback
-      const newApptId = `APP-${(appointmentList.length + 1001).toString()}`;
-      const newAppt = {
-        id: newApptId,
-        date: bookingForm.date,
-        time: bookingForm.time,
-        doctorId: bookingForm.doctorId,
-        doctor_id: bookingForm.numericDoctorId,
-        doctorName: docObj ? docObj.name : 'Physician',
-        patientId: currentPatientId,
-        patient_id: numericPatientId,
-        branch: bookingForm.branch,
-        status: 'Booked',
-        reason: visitReason
-      };
+      console.error('Booking failed:', err);
+      const errorMsg =
+        err?.response?.data?.detail ||
+        err?.message ||
+        'The selected time slot is already booked or unavailable. Please choose an open slot.';
+      alert(`Booking Failed: ${errorMsg}`);
 
-      setAppointmentList([...appointmentList, newAppt]);
-      setApiAppointments(prev => [newAppt, ...prev]);
-      addAuditLog(
-        'CREATE_APPOINTMENT',
-        `Patient ${currentPatientName} self-booked appointment ${newApptId} with ${newAppt.doctorName} for ${newAppt.date} @ ${newAppt.time}`,
-        'null',
-        JSON.stringify(newAppt)
-      );
-
-      triggerToast(`Appointment self-booked successfully! ID: ${newApptId}`);
-      navigateTo('/portal/home');
-      setBookingStep(1);
+      // Refresh slots for this doctor and date so user immediately sees booked states
+      if (bookingForm.numericDoctorId && bookingForm.date) {
+        setSlotsLoading(true);
+        getDoctorAvailableSlots(bookingForm.numericDoctorId, bookingForm.date, 30, selectedBranchId, true)
+          .then(slots => {
+            if (Array.isArray(slots) && slots.length > 0) {
+              const normalized = slots.map((s, idx) => {
+                const st = String(s.Start_Time || s.start_time || '09:00:00').slice(0, 5);
+                const et = String(s.End_Time || s.end_time || '09:30:00').slice(0, 5);
+                const isBooked = Boolean(s.Is_Booked || s.is_booked || s.Status === 'Booked' || s.status === 'Booked');
+                return {
+                  ...s,
+                  slot_id: s.Slot_ID || s.slot_id || s.Schedule_ID || `slot-${idx}-${st}`,
+                  start_time: st,
+                  end_time: et,
+                  is_booked: isBooked,
+                  status: isBooked ? 'Booked' : 'Available'
+                };
+              });
+              setRealSlots(normalized);
+            } else {
+              setRealSlots([]);
+            }
+          })
+          .catch(() => {})
+          .finally(() => setSlotsLoading(false));
+      }
+      setBookingStep(3);
     } finally {
       setIsSubmittingBooking(false);
     }
@@ -720,28 +745,77 @@ export default function PatientPanel({ subView, db, handlers }) {
                         {realSlots.map((s, idx) => {
                           const st = String(s.start_time || s.Start_Time || '09:00').slice(0, 5);
                           const et = String(s.end_time || s.End_Time || '09:30').slice(0, 5);
+                          const isBooked = Boolean(s.is_booked || s.Is_Booked || s.Status === 'Booked');
                           return (
-                            <option key={s.slot_id || idx} value={st}>
-                              {st} - {et}
+                            <option key={s.slot_id || idx} value={st} disabled={isBooked}>
+                              {st} - {et} {isBooked ? '(Booked - Unavailable)' : '(Available)'}
                             </option>
                           );
                         })}
                       </select>
                     ) : (
-                      <select
-                        className="w-full border border-slate-350 rounded-lg p-2.5 text-xs font-medium"
-                        value={bookingForm.time}
-                        onChange={e => setBookingForm(prev => ({ ...prev, time: e.target.value }))}
-                      >
-                        <option value="09:00">09:00 AM (Morning Slot)</option>
-                        <option value="10:30">10:30 AM (Morning Slot)</option>
-                        <option value="11:45">11:45 AM (Noon Slot)</option>
-                        <option value="14:00">02:00 PM (Afternoon Slot)</option>
-                        <option value="15:30">03:30 PM (Evening Slot)</option>
-                      </select>
+                      <div className="w-full border border-amber-200 bg-amber-50 text-amber-800 rounded-lg p-2.5 text-xs font-medium">
+                        {slotsLoading ? 'Checking schedule...' : 'No slots scheduled for this date. Please select another date.'}
+                      </div>
                     )}
                   </div>
                 </div>
+
+                {realSlots.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-xs text-slate-600 mb-2 font-medium">
+                      <span>Click to Select Time Slot:</span>
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                          Available
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
+                          Selected
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block" />
+                          Booked
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {realSlots.map((s, idx) => {
+                        const st = String(s.start_time || s.Start_Time || '09:00').slice(0, 5);
+                        const et = String(s.end_time || s.End_Time || '09:30').slice(0, 5);
+                        const isBooked = Boolean(s.is_booked || s.Is_Booked || s.Status === 'Booked');
+                        const isSelected = !isBooked && bookingForm.time === st;
+                        return (
+                          <button
+                            key={s.slot_id || idx}
+                            type="button"
+                            disabled={isBooked}
+                            onClick={() => {
+                              if (!isBooked) {
+                                setBookingForm(prev => ({ ...prev, time: st }));
+                              }
+                            }}
+                            className={`p-2.5 rounded-lg border text-center transition-all ${
+                              isBooked
+                                ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : isSelected
+                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm ring-2 ring-blue-600/30'
+                                : 'border-emerald-200 bg-emerald-50/50 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-300 cursor-pointer'
+                            }`}
+                          >
+                            <div className={`text-xs font-semibold ${isBooked ? 'line-through text-slate-400' : ''}`}>
+                              {st} - {et}
+                            </div>
+                            <div className={`text-[10px] mt-0.5 ${isBooked ? 'text-slate-400 font-medium' : isSelected ? 'text-blue-100' : 'text-emerald-700'}`}>
+                              {isBooked ? 'Booked' : isSelected ? 'Selected' : 'Available'}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="text-xs font-semibold text-slate-500 block mb-1">Reason for Consultation (Optional)</label>

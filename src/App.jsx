@@ -55,7 +55,9 @@ const INITIAL_STAFF = [
   { id: 'STF-005', name: 'Sophia Patel', role: 'Lead Billing Clerk', branch: 'Colombo Main', status: 'Active', details: { email: 'patel@careflow.com', contact: '+94 77 999 0000' } },
   { id: 'STF-006', name: 'Samantha Silva', role: 'Branch Manager', branch: 'Kandy', status: 'Active', details: { email: 'silva@careflow.com', contact: '+94 81 222 3333' } },
   { id: 'STF-007', name: 'Rohan De Silva', role: 'Branch Manager', branch: 'Galle', status: 'Active', details: { email: 'rohan@careflow.com', contact: '+94 91 333 4444' } },
-  { id: 'STF-008', name: 'Dr. Nimal Perera', role: 'Dermatologist', branch: 'Galle', status: 'Active', details: { email: 'nimal@careflow.com', contact: '+94 71 456 7890', license: 'SLMC-66321', consultFee: 2000, specialties: ['Dermatology'] } }
+  { id: 'STF-008', name: 'Dr. Nimal Perera', role: 'Dermatologist', branch: 'Galle', status: 'Active', details: { email: 'nimal@careflow.com', contact: '+94 71 456 7890', license: 'SLMC-66321', consultFee: 2000, specialties: ['Dermatology'] } },
+  { id: 'STF-011', name: 'Kamal Perera', role: 'Billing Officer', branch: 'Kandy', status: 'Active', details: { email: 'kamal.perera@careflow.com', contact: '+94 81 223 9999' } },
+  { id: 'STF-012', name: 'Nirosha Silva', role: 'Billing Officer', branch: 'Galle', status: 'Active', details: { email: 'nirosha.silva@careflow.com', contact: '+94 91 222 8888' } }
 ];
 
 const INITIAL_APPOINTMENTS = [

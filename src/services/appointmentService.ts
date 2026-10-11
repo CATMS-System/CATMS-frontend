@@ -73,10 +73,12 @@ export async function getDoctorAvailableSlots(
   doctorId: number,
   date: string,
   durationMinutes: number = 30,
-  branchId?: number
+  branchId?: number,
+  includeBooked: boolean = false
 ): Promise<AvailableSlot[]> {
   const params = new URLSearchParams({ date, duration_minutes: durationMinutes.toString() });
   if (branchId) params.append('branch_id', branchId.toString());
+  if (includeBooked) params.append('include_booked', 'true');
 
   const res = await fetch(`${API_BASE}/doctors/${doctorId}/available-slots?${params.toString()}`, { headers: getHeaders() });
   return handleResponse<AvailableSlot[]>(res);

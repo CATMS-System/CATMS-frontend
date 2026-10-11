@@ -62,7 +62,7 @@ export const AppointmentBookingModal: React.FC<AppointmentBookingModalProps> = (
     setIsLoadingSlots(true);
     setConflictError(null);
 
-    getDoctorAvailableSlots(selectedDoctorId, selectedDate, 30, selectedBranchId || undefined)
+    getDoctorAvailableSlots(selectedDoctorId, selectedDate, 30, selectedBranchId || undefined, true)
       .then((slots) => {
         if (isMounted) {
           setAvailableSlots(slots);
@@ -93,7 +93,7 @@ export const AppointmentBookingModal: React.FC<AppointmentBookingModalProps> = (
 
     if (!selectedPatient) return setFormError('Please select a patient.');
     if (!selectedDoctor) return setFormError('Please select a doctor.');
-    if (!selectedSlot) return setFormError('Please select an available time slot.');
+    if (!selectedSlot || selectedSlot.Is_Booked) return setFormError('Please select an available time slot.');
     if (!reasonForVisit.trim()) return setFormError('Please enter a reason for visit.');
 
     setIsSubmitting(true);

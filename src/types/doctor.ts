@@ -45,4 +45,6 @@ export interface AvailableSlot {
   Branch_Name: string;
   Schedule_ID?: number | null;
   Date: string;
+  Is_Booked?: boolean;
+  Status?: string;
 }
