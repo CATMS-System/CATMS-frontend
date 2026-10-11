@@ -470,17 +470,6 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
   // Today's minimum date string for follow-up validation
   const minDate = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  // Standard treatment catalogue fallback dataset
-  const DEFAULT_CATALOGUE = useMemo(() => [
-    { treatment_id: 1, service_code: 'TRT-001', treatment_name: 'General Consultation Fee', category_name: 'Consultations', standard_unit_price: 1500, category_id: 1 },
-    { treatment_id: 2, service_code: 'TRT-002', treatment_name: 'ECG / Electrocardiogram', category_name: 'Diagnostic Tests', standard_unit_price: 5000, category_id: 2 },
-    { treatment_id: 3, service_code: 'TRT-003', treatment_name: 'Blood Sugar Rapid Test', category_name: 'Diagnostic Tests', standard_unit_price: 600, category_id: 2 },
-    { treatment_id: 4, service_code: 'TRT-004', treatment_name: 'Chest X-Ray Digital', category_name: 'Imaging & Radiology', standard_unit_price: 8000, category_id: 3 },
-    { treatment_id: 5, service_code: 'TRT-005', treatment_name: 'Nebulizer Therapy Session', category_name: 'Procedures', standard_unit_price: 2500, category_id: 4 },
-    { treatment_id: 6, service_code: 'TRT-006', treatment_name: 'Stitch / Laceration Care', category_name: 'Procedures', standard_unit_price: 4000, category_id: 4 },
-    { treatment_id: 7, service_code: 'TRT-007', treatment_name: 'IV Saline Infusion 500ml', category_name: 'Procedures', standard_unit_price: 3000, category_id: 4 },
-  ], []);
-
   // Catalogue browser state
   const [catalogue, setCatalogue] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -522,20 +511,8 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         }
       } catch (err) {
         if (isMounted) {
-          // Graceful local fallback filter
-          let list = DEFAULT_CATALOGUE;
-          if (catalogueSearch.trim()) {
-            const q = catalogueSearch.toLowerCase();
-            list = list.filter(
-              (c) =>
-                (c.treatment_name && c.treatment_name.toLowerCase().includes(q)) ||
-                (c.service_code && c.service_code.toLowerCase().includes(q))
-            );
-          }
-          if (selectedCategory) {
-            list = list.filter((c) => c.category_id === Number(selectedCategory));
-          }
-          setCatalogue(list);
+          // show an empty list instead of made-up treatments when the catalogue cannot load
+          setCatalogue([]);
         }
       } finally {
         if (isMounted) setLoadingCatalogue(false);
@@ -547,7 +524,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       isMounted = false;
       clearTimeout(debounceTimer);
     };
-  }, [catalogueSearch, selectedCategory, DEFAULT_CATALOGUE]);
+  }, [catalogueSearch, selectedCategory]);
 
   // Prescribed treatments state (Step F11)
   const [prescribedItems, setPrescribedItems] = useState([]);
@@ -634,11 +611,12 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
     let isMounted = true;
 
     const fetchHistory = async () => {
-      const pId = activePatientId || activePatient?.id || 1;
+      const pId = activePatientId || activePatient?.id;
       const numPId =
         typeof pId === 'number'
           ? pId
-          : parseInt(String(pId).replace(/\D/g, ''), 10) || 1;
+          : parseInt(String(pId).replace(/\D/g, ''), 10);
+      if (!numPId) return;
 
       setLoadingHistory(true);
       try {
@@ -753,22 +731,23 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       return;
     }
 
+    // use the real appointment id, never fall back to a made-up one
+    const rawApptId =
+      activeAppt?.Appointment_ID ||
+      activeAppt?.appointment_id ||
+      activeAppointmentId;
+    const resolvedApptId = Number(String(rawApptId ?? '').replace(/\D/g, ''));
+    if (!resolvedApptId) {
+      const idMsg = 'This appointment has no valid ID. Refresh the queue and try again.';
+      handlers?.triggerToast?.(idMsg);
+      setToastState({ type: 'error', message: idMsg });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const rawApptId =
-        activeAppt?.Appointment_ID ||
-        activeAppt?.appointment_id ||
-        (typeof activeAppointmentId === 'number'
-          ? activeAppointmentId
-          : parseInt(String(activeAppointmentId).replace(/\D/g, ''), 10) || 1);
-
-      const resolvedApptId = Number(rawApptId) || 1;
-
       const itemsPayload = prescribedItems.map((item) => ({
-        treatment_id:
-          typeof item.treatment_id === 'number'
-            ? item.treatment_id
-            : parseInt(String(item.service_code || item.treatment_id || '1').replace(/\D/g, ''), 10) || 1,
+        treatment_id: Number(item.treatment_id),
         quantity: Number(item.quantity) || 1,
         instructions: item.instructions || undefined,
       }));
@@ -940,89 +919,6 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         return;
       }
 
-      // If 404 for mock/frontend appointment IDs (e.g. APP-1003 or ID >= 1000)
-      const isMockAppt =
-        (typeof activeAppointmentId === 'string' && activeAppointmentId.startsWith('APP-')) ||
-        resolvedApptId >= 1000;
-
-      if (err?.response?.status === 404 && isMockAppt) {
-        const mockInvoiceId = `INV-${Date.now().toString().slice(-5)}`;
-        const docFee = Number(activeAppt?.doctorFee || 2000);
-        const treatmentsTotal = prescribedItems.reduce(
-          (acc, it) => acc + (Number(it.unit_price || it.price || 0) * (Number(it.quantity) || 1)),
-          0
-        );
-        const mockInvoice = {
-          invoiceId: mockInvoiceId,
-          patientId: activePatientId || activeAppt?.patientId || 'PAT-0003',
-          patientName: activeAppt?.patientName || activePatient?.name || 'David Miller',
-          date: new Date().toISOString().split('T')[0],
-          appointmentId: activeAppointmentId || resolvedApptId,
-          items: prescribedItems.map((p) => ({
-            name: p.treatment_name || p.name || 'Treatment',
-            qty: Number(p.quantity) || 1,
-            price: Number(p.unit_price || p.price || 0),
-          })),
-          doctorFee: docFee,
-          treatmentsSubtotal: treatmentsTotal,
-          insuranceCoverage: 0,
-          patientBalance: docFee + treatmentsTotal,
-          status: 'Unpaid',
-          claimStatus: 'PENDING',
-          paymentMethod: '',
-        };
-
-        if (handlers?.setInvoiceList) {
-          handlers.setInvoiceList((prev) => [mockInvoice, ...(prev || [])]);
-        }
-        if (activePatientId) {
-          updateQueueStatus(activePatientId, 'Completed');
-        }
-        if (resolvedApptId) {
-          updateQueueStatus(resolvedApptId, 'Completed');
-        }
-        if (handlers?.setLiveQueue) {
-          handlers.setLiveQueue((prev) =>
-            (prev || []).map((q) => {
-              const match =
-                String(q.Appointment_ID || q.appointment_id || q.appointmentId || q.id) === String(resolvedApptId) ||
-                String(q.Patient_ID || q.patient_id || q.patientId) === String(activePatientId);
-              return match ? { ...q, status: 'Completed', Status: 'Completed' } : q;
-            })
-          );
-        }
-        if (handlers?.setAppointmentList) {
-          handlers.setAppointmentList((prev) =>
-            (prev || []).map((a) =>
-              String(a.id) === String(resolvedApptId) ||
-              String(a.id) === String(activeAppointmentId) ||
-              String(a.Appointment_ID) === String(resolvedApptId) ||
-              String(a.appointment_id) === String(resolvedApptId)
-                ? { ...a, status: 'Completed', Status: 'Completed' }
-                : a
-            )
-          );
-        }
-
-        const successMsg = `Consultation completed! Invoice #${mockInvoiceId} generated and routed to billing desk.`;
-        handlers?.triggerToast?.(successMsg);
-        setToastState({
-          type: 'success',
-          message: successMsg,
-          invoiceId: mockInvoiceId,
-        });
-
-        setTimeout(() => {
-          if (handlers?.navigateTo) {
-            handlers.navigateTo('/doctor/workbench');
-          } else {
-            window.history.pushState(null, '', '/doctor/workbench');
-            window.dispatchEvent(new PopStateEvent('popstate'));
-          }
-        }, 1200);
-        return;
-      }
-
       handlers?.triggerToast?.(`Error: ${errorMsg}`);
       setToastState({
         type: 'error',
@@ -1060,7 +956,11 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       }
     }
 
-    const apptId = resolvedApptId || 1;
+    if (!resolvedApptId) {
+      handlers?.triggerToast?.('This queue entry has no appointment yet. Book it at reception first.');
+      return;
+    }
+    const apptId = resolvedApptId;
     const patientId = rawPatientId || 'PAT-0001';
 
     const isCompleted = isQueueItemCompleted(queueItem);
