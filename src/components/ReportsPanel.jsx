@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Download, FileText, Filter } from 'lucide-react';
 import { createReportCsv, createReportPdf, downloadCsv, reportFilename } from '../utils/reportExport';
+import { getCurrentReportDates } from '../utils/reportDates.js';
 import {
   getBranchDailySummary,
   getDoctorRevenue,
@@ -99,9 +100,10 @@ export default function ReportsPanel({ db }) {
   const reportId = report?.id;
 
   const [branchFilter, setBranchFilter] = useState(() => (isManager ? String(managerBranchId) : ''));
-  const [reportDate, setReportDate] = useState(() => '2026-08-23');
-  const [startDate, setStartDate] = useState(() => '2026-08-01');
-  const [endDate, setEndDate] = useState(() => '2026-08-31');
+  const [initialDates] = useState(getCurrentReportDates);
+  const [reportDate, setReportDate] = useState(initialDates.reportDate);
+  const [startDate, setStartDate] = useState(initialDates.startDate);
+  const [endDate, setEndDate] = useState(initialDates.endDate);
   const [reload, setReload] = useState(0);
   const [result, setResult] = useState({ key: '', rows: [], loading: true, error: '' });
 
@@ -118,12 +120,10 @@ export default function ReportsPanel({ db }) {
   };
 
   const setPresetCurrent = () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const d = new Date();
-    d.setDate(1);
-    setReportDate(today);
-    setStartDate(d.toISOString().slice(0, 10));
-    setEndDate(today);
+    const dates = getCurrentReportDates();
+    setReportDate(dates.reportDate);
+    setStartDate(dates.startDate);
+    setEndDate(dates.endDate);
   };
 
   const effectiveBranchId = isManager
