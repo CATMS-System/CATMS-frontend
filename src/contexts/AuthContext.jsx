@@ -136,8 +136,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('catms_user');
+    // clear every cached catms_* list too, so the next user never sees them
+    Object.keys(localStorage)
+      .filter((key) => key === 'token' || key.startsWith('catms_'))
+      .forEach((key) => localStorage.removeItem(key));
     setCurrentUser(null);
   };
 
