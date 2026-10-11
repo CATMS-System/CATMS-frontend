@@ -376,5 +376,106 @@ test('Admin Executive Dashboard renders Revenue Collected and Outstanding Balanc
   assert.ok(html.includes('Total Patients'));
   assert.ok(html.includes('Active Doctors'));
   assert.ok(html.includes('Appointments Today'));
+  assert.ok(html.includes('Branch Scope:'));
+  assert.ok(html.includes('id="admin-branch-select"'));
 });
+
+test('Admin Executive Dashboard branch selector filters stat cards by branch', async t => {
+  const { default: AdminPanel } = await server.ssrLoadModule('/src/components/AdminPanel.jsx');
+
+  const mockDb = {
+    staffList: [
+      { id: 'STF-1', name: 'Dr. Bennett', isDoctor: true, status: 'Active', Branch_ID: 1, branch: 'Colombo Main' },
+      { id: 'STF-2', name: 'Dr. Jenkins', isDoctor: true, status: 'Active', Branch_ID: 2, branch: 'Kandy' },
+      { id: 'STF-3', name: 'Dr. Perera', isDoctor: true, status: 'Active', Branch_ID: 3, branch: 'Galle' },
+      { id: 'STF-4', name: 'Marcus Vance', isDoctor: false, status: 'Active', Branch_ID: 1, branch: 'Colombo Main' }
+    ],
+    patientList: [
+      { patient_id: 1, first_name: 'John', last_name: 'Doe' },
+      { patient_id: 2, first_name: 'Jane', last_name: 'Smith' },
+      { patient_id: 3, first_name: 'Kamal', last_name: 'Perera' },
+      { patient_id: 4, first_name: 'Sunil', last_name: 'Silva' },
+      { patient_id: 5, first_name: 'Nimal', last_name: 'Fernando' }
+    ],
+    totalPatients: 5,
+    appointmentList: [
+      { Appointment_ID: 1, Patient_ID: 1, Branch_ID: 1, branch: 'Colombo Main', Appointment_Date: new Date().toISOString().slice(0, 10), date: new Date().toISOString().slice(0, 10), status: 'Scheduled' },
+      { Appointment_ID: 2, Patient_ID: 2, Branch_ID: 1, branch: 'Colombo Main', Appointment_Date: '2026-01-01', date: '2026-01-01', status: 'Completed' },
+      { Appointment_ID: 3, Patient_ID: 3, Branch_ID: 2, branch: 'Kandy', Appointment_Date: '2026-01-01', date: '2026-01-01', status: 'Completed' },
+      { Appointment_ID: 4, Patient_ID: 4, Branch_ID: 2, branch: 'Kandy', Appointment_Date: '2026-01-01', date: '2026-01-01', status: 'Completed' },
+      { Appointment_ID: 5, Patient_ID: 5, Branch_ID: 3, branch: 'Galle', Appointment_Date: '2026-01-01', date: '2026-01-01', status: 'Completed' }
+    ],
+    invoiceList: [
+      { Invoice_ID: 1, Branch_ID: 1, branch: 'Colombo Main', Patient_ID: 1, Patient_Paid: 5000, Insurance_Covered: 6000, Outstanding_Balance: 12500, Invoice_Total: 23500, Invoice_Status: 'Partially_Paid' },
+      { Invoice_ID: 2, Branch_ID: 1, branch: 'Colombo Main', Patient_ID: 2, Patient_Paid: 0, Insurance_Covered: 0, Outstanding_Balance: 10000, Invoice_Total: 10000, Invoice_Status: 'Issued' },
+      { Invoice_ID: 3, Branch_ID: 2, branch: 'Kandy', Patient_ID: 3, Patient_Paid: 5900, Insurance_Covered: 0, Outstanding_Balance: 1350, Invoice_Total: 7250, Invoice_Status: 'Partially_Paid' },
+      { Invoice_ID: 4, Branch_ID: 3, branch: 'Galle', Patient_ID: 5, Patient_Paid: 3800, Insurance_Covered: 0, Outstanding_Balance: 0, Invoice_Total: 3800, Invoice_Status: 'Paid' }
+    ],
+    auditLogs: [],
+    branches: [
+      { Branch_ID: 1, Branch_Name: 'Colombo Main', name: 'Colombo Main' },
+      { Branch_ID: 2, Branch_Name: 'Kandy', name: 'Kandy' },
+      { Branch_ID: 3, Branch_Name: 'Galle', name: 'Galle' }
+    ]
+  };
+
+  const handlers = {
+    setStaffList: () => {},
+    setBranches: () => {},
+    setAuditLogs: () => {},
+    addAuditLog: () => {},
+    triggerToast: () => {},
+    navigateTo: () => {},
+    setSelectedBranch: () => {}
+  };
+
+  // 1. All Branches (unfiltered)
+  const allHtml = renderToStaticMarkup(React.createElement(AdminPanel, {
+    subView: 'dashboard',
+    db: { ...mockDb, selectedBranch: 'All Branches' },
+    handlers
+  }));
+  assert.ok(allHtml.includes('Rs. 20,700.00'));
+  assert.ok(allHtml.includes('Rs. 23,850.00'));
+  assert.ok(allHtml.includes('>5<')); // total patients
+  assert.ok(allHtml.includes('>3<')); // active doctors
+  assert.ok(allHtml.includes('>1<')); // appointments today
+
+  // 2. Colombo Main (Branch 1)
+  const colomboHtml = renderToStaticMarkup(React.createElement(AdminPanel, {
+    subView: 'dashboard',
+    db: { ...mockDb, selectedBranch: 'Colombo Main' },
+    handlers
+  }));
+  assert.ok(colomboHtml.includes('Rs. 11,000.00'));
+  assert.ok(colomboHtml.includes('Rs. 22,500.00'));
+  assert.ok(colomboHtml.includes('>2<')); // 2 distinct patients (Patient 1, Patient 2)
+  assert.ok(colomboHtml.includes('>1<')); // 1 active doctor in Colombo
+  assert.ok(colomboHtml.includes('>1<')); // 1 appointment today in Colombo
+
+  // 3. Kandy (Branch 2)
+  const kandyHtml = renderToStaticMarkup(React.createElement(AdminPanel, {
+    subView: 'dashboard',
+    db: { ...mockDb, selectedBranch: 'Kandy' },
+    handlers
+  }));
+  assert.ok(kandyHtml.includes('Rs. 5,900.00'));
+  assert.ok(kandyHtml.includes('Rs. 1,350.00'));
+  assert.ok(kandyHtml.includes('>2<')); // 2 distinct patients (Patient 3, Patient 4)
+  assert.ok(kandyHtml.includes('>1<')); // 1 active doctor in Kandy
+  assert.ok(kandyHtml.includes('>0<')); // 0 appointments today in Kandy
+
+  // 4. Galle (Branch 3)
+  const galleHtml = renderToStaticMarkup(React.createElement(AdminPanel, {
+    subView: 'dashboard',
+    db: { ...mockDb, selectedBranch: 'Galle' },
+    handlers
+  }));
+  assert.ok(galleHtml.includes('Rs. 3,800.00'));
+  assert.ok(galleHtml.includes('Rs. 0.00'));
+  assert.ok(galleHtml.includes('>1<')); // 1 distinct patient in Galle
+  assert.ok(galleHtml.includes('>1<')); // 1 active doctor in Galle
+  assert.ok(galleHtml.includes('>0<')); // 0 appointments today in Galle
+});
+
 

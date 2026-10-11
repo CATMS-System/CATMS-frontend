@@ -1,12 +1,103 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Users, Building, AlertCircle, Calendar, Plus, MapPin, Key, RefreshCw, Check, ArrowLeftRight, UserX, UserCheck, ShieldCheck } from 'lucide-react';
 import api from '../api/axios';
 import ReportsPanel from './ReportsPanel';
 import AddStaffDrawer from './AddStaffDrawer';
 
 export default function AdminPanel({ subView, db, handlers }) {
-  const { staffList, patientList, appointmentList, liveQueue, invoiceList, auditLogs, branches } = db;
-  const { setStaffList, setBranches, setAuditLogs, addAuditLog, triggerToast, navigateTo } = handlers;
+  const { staffList, patientList, appointmentList, liveQueue, invoiceList, auditLogs, branches, selectedBranch: initialSelectedBranch } = db;
+  const { setStaffList, setBranches, setAuditLogs, addAuditLog, triggerToast, navigateTo, setSelectedBranch: setGlobalSelectedBranch } = handlers;
+
+  // Selected branch scope state for dashboard
+  const [selectedBranch, setSelectedBranch] = useState(initialSelectedBranch || 'All Branches');
+
+  // Keep synced if global header dropdown changes db.selectedBranch
+  useEffect(() => {
+    if (db.selectedBranch && db.selectedBranch !== selectedBranch) {
+      setSelectedBranch(db.selectedBranch);
+    }
+  }, [db.selectedBranch]);
+
+  const handleBranchChange = (newBranch) => {
+    setSelectedBranch(newBranch);
+    if (typeof setGlobalSelectedBranch === 'function') {
+      setGlobalSelectedBranch(newBranch);
+    }
+  };
+
+  // Map selected branch string to numeric Branch_ID (null for network-wide)
+  const selectedBranchId = useMemo(() => {
+    if (!selectedBranch || selectedBranch === 'All Branches' || selectedBranch === 'All') {
+      return null;
+    }
+    const found = (branches || []).find(b =>
+      b.Branch_ID === selectedBranch ||
+      b.Branch_ID === Number(selectedBranch) ||
+      b.Branch_Name === selectedBranch ||
+      b.name === selectedBranch ||
+      (b.Branch_Name && b.Branch_Name.toLowerCase().includes(selectedBranch.toLowerCase())) ||
+      (selectedBranch && selectedBranch.toLowerCase().includes((b.Branch_Name || '').toLowerCase()))
+    );
+    if (found) return Number(found.Branch_ID);
+    const lower = selectedBranch.toLowerCase();
+    if (lower.includes('colombo')) return 1;
+    if (lower.includes('kandy')) return 2;
+    if (lower.includes('galle')) return 3;
+    const parsed = parseInt(selectedBranch, 10);
+    return !isNaN(parsed) ? parsed : null;
+  }, [selectedBranch, branches]);
+
+  // Branch matching helper for client-side filtering fallback
+  const matchesBranch = (itemBranchId, itemBranchName) => {
+    if (!selectedBranchId) return true;
+    if (itemBranchId != null && Number(itemBranchId) === selectedBranchId) return true;
+    if (itemBranchName) {
+      const name = String(itemBranchName).toLowerCase();
+      if (selectedBranchId === 1 && name.includes('colombo')) return true;
+      if (selectedBranchId === 2 && name.includes('kandy')) return true;
+      if (selectedBranchId === 3 && name.includes('galle')) return true;
+    }
+    return false;
+  };
+
+  // Live filtered dashboard data state
+  const [dashInvoices, setDashInvoices] = useState(null);
+  const [dashAppointments, setDashAppointments] = useState(null);
+  const [dashStaff, setDashStaff] = useState(null);
+
+  // Trigger re-fetch of filtered data whenever selected branch changes
+  useEffect(() => {
+    let isCurrent = true;
+    const params = selectedBranchId ? { branch_id: selectedBranchId } : {};
+
+    Promise.all([
+      api.get('/billing/invoices', { params }).catch(err => {
+        console.error("API Error fetching dashboard invoices:", err);
+        return null;
+      }),
+      api.get('/appointments', { params }).catch(err => {
+        console.error("API Error fetching dashboard appointments:", err);
+        return null;
+      }),
+      api.get('/staff', { params }).catch(err => {
+        console.error("API Error fetching dashboard staff:", err);
+        return null;
+      })
+    ]).then(([invRes, apptRes, staffRes]) => {
+      if (!isCurrent) return;
+      if (invRes && invRes.data) {
+        setDashInvoices(invRes.data);
+      }
+      if (apptRes && apptRes.data) {
+        setDashAppointments(apptRes.data);
+      }
+      if (staffRes && staffRes.data) {
+        setDashStaff(staffRes.data);
+      }
+    });
+
+    return () => { isCurrent = false; };
+  }, [selectedBranchId]);
 
   // Onboarding Drawer states
   const [showAddStaffDrawer, setShowAddStaffDrawer] = useState(false);
@@ -182,38 +273,128 @@ export default function AdminPanel({ subView, db, handlers }) {
     });
   }, [auditLogs, auditSearchQuery, auditActionFilter, auditDateFilter]);
 
+  // Active datasets for dashboard cards: uses live re-fetched branch data, falling back to client-filtered state
+  const activeInvoices = useMemo(() => {
+    if (dashInvoices) return dashInvoices;
+    if (!selectedBranchId) return invoiceList || [];
+    return (invoiceList || []).filter(inv => matchesBranch(inv.Branch_ID, inv.branch));
+  }, [dashInvoices, invoiceList, selectedBranchId]);
+
+  const activeAppointments = useMemo(() => {
+    if (dashAppointments) return dashAppointments;
+    if (!selectedBranchId) return appointmentList || [];
+    return (appointmentList || []).filter(a => matchesBranch(a.Branch_ID, a.branch));
+  }, [dashAppointments, appointmentList, selectedBranchId]);
+
+  const activeStaff = useMemo(() => {
+    if (dashStaff) return dashStaff;
+    if (!selectedBranchId) return staffList || [];
+    return (staffList || []).filter(s => matchesBranch(s.Branch_ID, s.branch));
+  }, [dashStaff, staffList, selectedBranchId]);
+
   const revenueCollected = useMemo(() => {
-    return (invoiceList || []).reduce((sum, inv) => {
-      const paid = Number(inv.patientBalance != null ? inv.patientBalance : (inv.Patient_Paid || 0));
-      const ins = Number(inv.insuranceCoverage != null ? inv.insuranceCoverage : (inv.Insurance_Covered || 0));
+    return (activeInvoices || []).reduce((sum, inv) => {
+      const paid = Number(inv.Patient_Paid != null ? inv.Patient_Paid : (inv.patientBalance != null ? inv.patientBalance : 0));
+      const ins = Number(inv.Insurance_Covered != null ? inv.Insurance_Covered : (inv.insuranceCoverage != null ? inv.insuranceCoverage : 0));
       if (paid > 0 || ins > 0) return sum + paid + ins;
-      const tot = Number(inv.total != null ? inv.total : (inv.Invoice_Total || 0));
-      if (inv.status === 'Paid' || inv.Invoice_Status === 'Paid') return sum + tot;
-      if (inv.status === 'Partially Paid' || inv.status === 'Partially_Paid' || inv.Invoice_Status === 'Partially_Paid') return sum + (tot * 0.5);
+      const tot = Number(inv.Invoice_Total != null ? inv.Invoice_Total : (inv.total != null ? inv.total : 0));
+      if (inv.Invoice_Status === 'Paid' || inv.status === 'Paid') return sum + tot;
+      if (inv.Invoice_Status === 'Partially_Paid' || inv.Invoice_Status === 'Partially Paid' || inv.status === 'Partially Paid' || inv.status === 'Partially_Paid') return sum + (tot * 0.5);
       return sum;
     }, 0);
-  }, [invoiceList]);
+  }, [activeInvoices]);
 
   const outstandingBalance = useMemo(() => {
-    return (invoiceList || []).reduce((sum, inv) => {
-      const tot = Number(inv.total != null ? inv.total : (inv.Invoice_Total || 0));
-      const paid = Number(inv.patientBalance != null ? inv.patientBalance : (inv.Patient_Paid || 0));
-      const ins = Number(inv.insuranceCoverage != null ? inv.insuranceCoverage : (inv.Insurance_Covered || 0));
-      const directOutstanding = inv.outstandingBalance != null ? Number(inv.outstandingBalance) : (inv.Outstanding_Balance != null ? Number(inv.Outstanding_Balance) : null);
-
-      const balance = directOutstanding != null ? directOutstanding : (tot - paid - ins);
+    return (activeInvoices || []).reduce((sum, inv) => {
+      const directOutstanding = inv.Outstanding_Balance != null ? Number(inv.Outstanding_Balance) : (inv.outstandingBalance != null ? Number(inv.outstandingBalance) : null);
+      if (directOutstanding != null) {
+        return directOutstanding > 0 ? sum + directOutstanding : sum;
+      }
+      const tot = Number(inv.Invoice_Total != null ? inv.Invoice_Total : (inv.total != null ? inv.total : 0));
+      const paid = Number(inv.Patient_Paid != null ? inv.Patient_Paid : (inv.patientBalance != null ? inv.patientBalance : 0));
+      const ins = Number(inv.Insurance_Covered != null ? inv.Insurance_Covered : (inv.insuranceCoverage != null ? inv.insuranceCoverage : 0));
+      const balance = tot - paid - ins;
       return balance > 0 ? sum + balance : sum;
     }, 0);
-  }, [invoiceList]);
+  }, [activeInvoices]);
+
+  const totalPatientsCount = useMemo(() => {
+    if (!selectedBranchId) {
+      return db.totalPatients != null && db.totalPatients > 0 ? db.totalPatients : (patientList || []).length;
+    }
+    const patientIdSet = new Set();
+    (activeAppointments || []).forEach(a => {
+      const pid = a.Patient_ID || (a.patientId ? parseInt(String(a.patientId).replace(/\D/g, ''), 10) : null);
+      if (pid) patientIdSet.add(Number(pid));
+    });
+    (activeInvoices || []).forEach(inv => {
+      const pid = inv.Patient_ID || (inv.patientId ? parseInt(String(inv.patientId).replace(/\D/g, ''), 10) : null);
+      if (pid) patientIdSet.add(Number(pid));
+    });
+    return patientIdSet.size;
+  }, [selectedBranchId, db.totalPatients, patientList, activeAppointments, activeInvoices]);
+
+  const activeDoctorsCount = useMemo(() => {
+    return (activeStaff || []).filter(s => {
+      const isDoc = s.isDoctor || s.System_Role === 'Doctor' || s.systemRole === 'Doctor' ||
+        Boolean(s.Doctor_ID) ||
+        (s.Job_Title && (
+          s.Job_Title.toLowerCase().includes('doc') ||
+          s.Job_Title.toLowerCase().includes('cardiolog') ||
+          s.Job_Title.toLowerCase().includes('dermatolog') ||
+          s.Job_Title.toLowerCase().includes('practitioner') ||
+          s.Job_Title.toLowerCase().includes('physician') ||
+          s.Job_Title.toLowerCase().includes('surgeon') ||
+          s.Job_Title.toLowerCase().includes('specialist')
+        )) ||
+        (s.role && (
+          s.role.toLowerCase().includes('doc') ||
+          s.role.toLowerCase().includes('cardiolog') ||
+          s.role.toLowerCase().includes('dermatolog') ||
+          s.role.toLowerCase().includes('practitioner') ||
+          s.role.toLowerCase().includes('physician') ||
+          s.role.toLowerCase().includes('surgeon') ||
+          s.role.toLowerCase().includes('specialist')
+        ));
+      const isActive = (s.Employment_Status === 'Active' || s.status === 'Active');
+      return isDoc && isActive;
+    }).length;
+  }, [activeStaff]);
+
+  const appointmentsTodayCount = useMemo(() => {
+    return (activeAppointments || []).filter(a => {
+      const apptDate = a.Appointment_Date || a.date;
+      return apptDate === todayStr;
+    }).length;
+  }, [activeAppointments, todayStr]);
 
   return (
     <div className="space-y-6">
       {/* 1. EXECUTIVE DASHBOARD */}
       {subView === 'dashboard' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Executive Administration Dashboard</h1>
-            <p className="text-sm text-slate-500 mt-1">Multi-branch network analytics, live fulfillment monitoring, and operations command</p>
+          {/* Dashboard Header with Branch Scope Selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Executive Administration Dashboard</h1>
+              <p className="text-sm text-slate-500 mt-1">Multi-branch network analytics, live fulfillment monitoring, and operations command</p>
+            </div>
+            <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-xs shrink-0">
+              <Building className="h-4 w-4 text-slate-400" />
+              <label htmlFor="admin-branch-select" className="text-xs font-semibold text-slate-500">Branch Scope:</label>
+              <select
+                id="admin-branch-select"
+                aria-label="Branch Scope"
+                className="border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg text-xs font-bold text-slate-800 py-1 px-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                value={selectedBranch}
+                onChange={e => handleBranchChange(e.target.value)}
+              >
+                <option value="All Branches">All Branches (Network-Wide)</option>
+                <option value="Colombo Main">Colombo Main Clinic</option>
+                <option value="Kandy">Kandy Central Clinic</option>
+                <option value="Galle">Galle Coastal Clinic</option>
+              </select>
+            </div>
           </div>
 
           {/* Metric Cards */}
@@ -221,7 +402,7 @@ export default function AdminPanel({ subView, db, handlers }) {
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Revenue Collected</span>
-                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-revenue-collected">
                   Rs. {revenueCollected.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -233,7 +414,7 @@ export default function AdminPanel({ subView, db, handlers }) {
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Outstanding Balance</span>
-                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-outstanding-balance">
                   Rs. {outstandingBalance.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -245,8 +426,8 @@ export default function AdminPanel({ subView, db, handlers }) {
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Total Patients</span>
-                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  {db.totalPatients != null && db.totalPatients > 0 ? db.totalPatients : patientList.length}
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-total-patients">
+                  {totalPatientsCount}
                 </span>
               </div>
               <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -257,20 +438,8 @@ export default function AdminPanel({ subView, db, handlers }) {
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Active Doctors</span>
-                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  {staffList.filter(s => (
-                    s.isDoctor ||
-                    s.systemRole === 'Doctor' ||
-                    (s.role && (
-                      s.role.toLowerCase().includes('doc') ||
-                      s.role.toLowerCase().includes('cardiolog') ||
-                      s.role.toLowerCase().includes('dermatolog') ||
-                      s.role.toLowerCase().includes('practitioner') ||
-                      s.role.toLowerCase().includes('physician') ||
-                      s.role.toLowerCase().includes('surgeon') ||
-                      s.role.toLowerCase().includes('specialist')
-                    ))
-                  ) && s.status === 'Active').length}
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-active-doctors">
+                  {activeDoctorsCount}
                 </span>
               </div>
               <div className="p-3.5 bg-sky-50 text-sky-600 rounded-xl">
@@ -281,8 +450,8 @@ export default function AdminPanel({ subView, db, handlers }) {
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Appointments Today</span>
-                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  {appointmentList.filter(a => (a.date === todayStr || a.Appointment_Date === todayStr)).length}
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-appointments-today">
+                  {appointmentsTodayCount}
                 </span>
               </div>
               <div className="p-3.5 bg-purple-50 text-purple-600 rounded-xl">

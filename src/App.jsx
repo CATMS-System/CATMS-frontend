@@ -219,6 +219,8 @@ export default function App() {
             invoiceId: inv.Invoice_ID,
             appointmentId: `APP-${inv.Appointment_ID}`,
             patientName: inv.Patient_Name,
+            patientId: inv.Patient_ID ? `PAT-${inv.Patient_ID}` : undefined,
+            Patient_ID: inv.Patient_ID,
             doctorFee: Number(inv.Billed_Consultation_Fee || 0),
             treatmentsSubtotal: Number(inv.Total_Treatments_Fee || 0),
             patientBalance: Number(inv.Patient_Paid || 0),
@@ -448,7 +450,7 @@ export default function App() {
 
   // State bundle pack
   const db = { staffList, patientList, totalPatients, appointmentList, liveQueue, invoiceList, auditLogs, branches, currentUser, selectedBranch, medicalHistories };
-  const handlers = { setStaffList, setAppointmentList, setLiveQueue, setInvoiceList, setMedicalHistories, setAuditLogs, setBranches, addAuditLog, triggerToast, navigateTo, reloadPatients };
+  const handlers = { setStaffList, setAppointmentList, setLiveQueue, setInvoiceList, setMedicalHistories, setAuditLogs, setBranches, addAuditLog, triggerToast, navigateTo, reloadPatients, setSelectedBranch };
 
   // ==========================================
   // RENDER COORDINATOR
