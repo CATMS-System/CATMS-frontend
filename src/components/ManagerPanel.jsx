@@ -355,7 +355,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Local Revenue ($)</span>
-                <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">${localMetrics.revenueCollected.toFixed(2)}</span>
+                <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">Rs. {localMetrics.revenueCollected.toFixed(2)}</span>
               </div>
               <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
                 <DollarSign className="h-6 w-6" />
