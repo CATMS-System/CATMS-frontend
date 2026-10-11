@@ -1750,7 +1750,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                     {prescribedItems.length} {prescribedItems.length === 1 ? 'item' : 'items'}
                   </span>
                   <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold px-3 py-1 rounded-full font-mono">
-                    Estimated Total: ${prescribedGrandTotal.toFixed(2)}
+                    Estimated Total: Rs. {prescribedGrandTotal.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -1784,7 +1784,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right font-mono text-slate-600 font-medium">
-                            ${Number(item.standard_unit_price || 0).toFixed(2)}
+                            Rs. {Number(item.standard_unit_price || 0).toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <div className="inline-flex items-center space-x-1.5 bg-slate-50 border border-slate-250 rounded-lg p-1">
@@ -1819,7 +1819,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                             />
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
-                            ${(Number(item.standard_unit_price || 0) * Number(item.quantity || 1)).toFixed(2)}
+                            Rs. {(Number(item.standard_unit_price || 0) * Number(item.quantity || 1)).toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <button
@@ -1848,7 +1848,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                           Prescription Grand Total (Est.):
                         </td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-slate-950 text-sm">
-                          ${prescribedGrandTotal.toFixed(2)}
+                          Rs. {prescribedGrandTotal.toFixed(2)}
                         </td>
                         <td />
                       </tr>
@@ -1863,7 +1863,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                   <strong className="font-semibold">Note:</strong> Pricing and totals shown here are for display and clinical estimation only; the backend sets the actual price upon consultation completion.
                 </span>
                 <span className="font-mono text-xs font-bold text-amber-900 shrink-0">
-                  Grand Total: ${prescribedGrandTotal.toFixed(2)}
+                  Grand Total: Rs. {prescribedGrandTotal.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -1950,7 +1950,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                       <div className="flex items-center space-x-3 shrink-0 ml-4">
                         <div className="text-right">
                           <span className="font-mono text-xs font-bold text-slate-900 block">
-                            ${Number(item.standard_unit_price || 0).toFixed(2)}
+                            Rs. {Number(item.standard_unit_price || 0).toFixed(2)}
                           </span>
                           <span className="text-[10px] text-slate-400 uppercase font-mono">
                             Standard Fee
@@ -2206,7 +2206,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                                         </div>
                                       </div>
                                       <span className="font-mono font-bold text-slate-700 text-[11px]">
-                                        ${Number(trt.billed_unit_price || trt.price || 0).toFixed(2)}
+                                        Rs. {Number(trt.billed_unit_price || trt.price || 0).toFixed(2)}
                                       </span>
                                     </div>
                                   ))
