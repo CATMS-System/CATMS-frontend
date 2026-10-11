@@ -362,3 +362,19 @@ test('Admin staff directory renders Add Staff Member button and flexible branch 
   assert.ok(drawerHtml.includes('value="Kandy"'));
 });
 
+test('Admin Executive Dashboard renders Revenue Collected and Outstanding Balance stat cards', async t => {
+  browser(t, {
+    name: 'System Admin',
+    email: 'admin@careflow.com',
+    roleCode: 'ROLE_ADMIN',
+    branch: 'Colombo Main'
+  }, '/admin/dashboard');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Executive Administration Dashboard'));
+  assert.ok(html.includes('Revenue Collected'));
+  assert.ok(html.includes('Outstanding Balance'));
+  assert.ok(html.includes('Total Patients'));
+  assert.ok(html.includes('Active Doctors'));
+  assert.ok(html.includes('Appointments Today'));
+});
+

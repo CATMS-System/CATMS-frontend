@@ -182,6 +182,30 @@ export default function AdminPanel({ subView, db, handlers }) {
     });
   }, [auditLogs, auditSearchQuery, auditActionFilter, auditDateFilter]);
 
+  const revenueCollected = useMemo(() => {
+    return (invoiceList || []).reduce((sum, inv) => {
+      const paid = Number(inv.patientBalance != null ? inv.patientBalance : (inv.Patient_Paid || 0));
+      const ins = Number(inv.insuranceCoverage != null ? inv.insuranceCoverage : (inv.Insurance_Covered || 0));
+      if (paid > 0 || ins > 0) return sum + paid + ins;
+      const tot = Number(inv.total != null ? inv.total : (inv.Invoice_Total || 0));
+      if (inv.status === 'Paid' || inv.Invoice_Status === 'Paid') return sum + tot;
+      if (inv.status === 'Partially Paid' || inv.status === 'Partially_Paid' || inv.Invoice_Status === 'Partially_Paid') return sum + (tot * 0.5);
+      return sum;
+    }, 0);
+  }, [invoiceList]);
+
+  const outstandingBalance = useMemo(() => {
+    return (invoiceList || []).reduce((sum, inv) => {
+      const tot = Number(inv.total != null ? inv.total : (inv.Invoice_Total || 0));
+      const paid = Number(inv.patientBalance != null ? inv.patientBalance : (inv.Patient_Paid || 0));
+      const ins = Number(inv.insuranceCoverage != null ? inv.insuranceCoverage : (inv.Insurance_Covered || 0));
+      const directOutstanding = inv.outstandingBalance != null ? Number(inv.outstandingBalance) : (inv.Outstanding_Balance != null ? Number(inv.Outstanding_Balance) : null);
+
+      const balance = directOutstanding != null ? directOutstanding : (tot - paid - ins);
+      return balance > 0 ? sum + balance : sum;
+    }, 0);
+  }, [invoiceList]);
+
   return (
     <div className="space-y-6">
       {/* 1. EXECUTIVE DASHBOARD */}
@@ -193,24 +217,28 @@ export default function AdminPanel({ subView, db, handlers }) {
           </div>
 
           {/* Metric Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Network Revenue</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Revenue Collected</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  Rs. {invoiceList.reduce((sum, inv) => {
-                    const paid = Number(inv.patientBalance != null ? inv.patientBalance : (inv.Patient_Paid || 0));
-                    const ins = Number(inv.insuranceCoverage != null ? inv.insuranceCoverage : (inv.Insurance_Covered || 0));
-                    if (paid > 0 || ins > 0) return sum + paid + ins;
-                    const tot = Number(inv.total != null ? inv.total : (inv.Invoice_Total || 0));
-                    if (inv.status === 'Paid' || inv.Invoice_Status === 'Paid') return sum + tot;
-                    if (inv.status === 'Partially Paid' || inv.status === 'Partially_Paid' || inv.Invoice_Status === 'Partially_Paid') return sum + (tot * 0.5);
-                    return sum;
-                  }, 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  Rs. {revenueCollected.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="p-3.5 bg-blue-50 text-blue-600 rounded-xl">
                 <Building className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+              <div>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Outstanding Balance</span>
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
+                  Rs. {outstandingBalance.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="p-3.5 bg-amber-50 text-amber-600 rounded-xl">
+                <AlertCircle className="h-6 w-6" />
               </div>
             </div>
 
