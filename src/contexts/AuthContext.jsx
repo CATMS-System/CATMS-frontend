@@ -2,17 +2,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/axios';
 import { getFrontendRoleCode } from '../utils/authRole.js';
 
-export const DEMO_LOGINS = [
-  { role: 'Admin', roleCode: 'ROLE_ADMIN', email: 'admin_alana', password: 'Password123!', name: 'Alana Smith [Admin]', branch: 'All Branches', branch_id: 1, Branch_ID: 1 },
-  { role: 'Branch Manager', roleCode: 'ROLE_BRANCH_MANAGER', email: 'mgr_vance', password: 'Password123!', name: 'Marcus Vance [Manager]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 4, Staff_ID: 4 },
-  { role: 'Receptionist', roleCode: 'ROLE_RECEPTIONIST', email: 'recept_shenaya', password: 'Password123!', name: 'Shenaya Perera [Recept]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 9, Staff_ID: 9 },
-  { role: 'Doctor', roleCode: 'ROLE_DOCTOR', email: 'dr_bennett', password: 'Password123!', name: 'Dr. Alexander Bennett [Doc]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, id: 'STF-001', doctor_id: 1, doctorId: 1, Doctor_ID: 1, staff_id: 1, Staff_ID: 1 },
-  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_patel', password: 'Password123!', name: 'Sophia Patel [Colombo Billing]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, staff_id: 5, Staff_ID: 5 },
-  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_kandy', password: 'Password123!', name: 'Kamal Perera [Kandy Billing]', branch: 'Kandy', branch_id: 2, Branch_ID: 2, staff_id: 31, Staff_ID: 31 },
-  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing_galle', password: 'Password123!', name: 'Nirosha Silva [Galle Billing]', branch: 'Galle', branch_id: 3, Branch_ID: 3, staff_id: 32, Staff_ID: 32 },
-  { role: 'Patient', roleCode: 'ROLE_PATIENT', email: 'pat_johndoe', password: 'Password123!', name: 'John Doe [Patient]', branch: 'Colombo Main', branch_id: 1, Branch_ID: 1, patientId: 'PAT-0001', patient_id: 1, Patient_ID: 1 }
-];
-
 export function normalizeUser(me, fallbackEmail = '') {
   const roleCode = getFrontendRoleCode(me.System_Role);
   const isDoctor = roleCode === 'ROLE_DOCTOR';
@@ -104,16 +93,9 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (!finalUser) {
-          const demo = DEMO_LOGINS.find(u => u.email.toLowerCase() === username.toLowerCase());
-          finalUser = demo || {
-            role: 'Staff',
-            roleCode: 'ROLE_RECEPTIONIST',
-            email: username,
-            name: username,
-            branch: 'Colombo Main',
-            branch_id: 1,
-            Branch_ID: 1
-          };
+          // without a profile we cannot tell the role, so do not log in
+          localStorage.removeItem('token');
+          throw new Error('Could not load your profile. Please try again.');
         }
 
         localStorage.setItem('catms_user', JSON.stringify(finalUser));
@@ -122,15 +104,6 @@ export const AuthProvider = ({ children }) => {
       }
       throw new Error('No access token returned');
     } catch (error) {
-      // Demo fallback if backend login fails
-      const demoUser = DEMO_LOGINS.find(
-        u => u.email.toLowerCase() === username.toLowerCase() && u.password === password
-      );
-      if (demoUser) {
-        localStorage.setItem('catms_user', JSON.stringify(demoUser));
-        setCurrentUser(demoUser);
-        return { success: true, user: demoUser, isDemo: true };
-      }
       throw error;
     }
   };
@@ -143,16 +116,6 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser(null);
   };
 
-  const quickSwitchRole = (roleCode) => {
-    const targetUser = DEMO_LOGINS.find(u => u.roleCode === roleCode);
-    if (targetUser) {
-      localStorage.setItem('catms_user', JSON.stringify(targetUser));
-      setCurrentUser(targetUser);
-      return targetUser;
-    }
-    return null;
-  };
-
   const value = {
     currentUser,
     user: currentUser,
@@ -161,7 +124,6 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
-    quickSwitchRole,
     setCurrentUser
   };
 
@@ -188,7 +150,6 @@ export const useAuth = () => {
       loading: false,
       login: async () => {},
       logout: () => {},
-      quickSwitchRole: () => null,
       setCurrentUser: () => {}
     };
   }
