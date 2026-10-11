@@ -1,34 +1,115 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Users, Building, AlertCircle, Calendar, Plus, MapPin, Key, RefreshCw, Check, ArrowLeftRight, UserX, UserCheck, ShieldCheck } from 'lucide-react';
+import api from '../api/axios';
 import ReportsPanel from './ReportsPanel';
+import AddStaffDrawer from './AddStaffDrawer';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function AdminPanel({ subView, db, handlers }) {
-  const { staffList, patientList, appointmentList, liveQueue, invoiceList, auditLogs, branches } = db;
-  const { setStaffList, setBranches, setAuditLogs, addAuditLog, triggerToast, navigateTo } = handlers;
+  const { t } = useLanguage();
+  const { staffList, patientList, appointmentList, liveQueue, invoiceList, auditLogs, branches, selectedBranch: initialSelectedBranch } = db;
+  const { setStaffList, setBranches, setAuditLogs, addAuditLog, triggerToast, navigateTo, setSelectedBranch: setGlobalSelectedBranch } = handlers;
+
+  // Selected branch scope state for dashboard
+  const [selectedBranch, setSelectedBranch] = useState(initialSelectedBranch || 'All Branches');
+
+  // Keep synced if global header dropdown changes db.selectedBranch
+  useEffect(() => {
+    if (db.selectedBranch && db.selectedBranch !== selectedBranch) {
+      setSelectedBranch(db.selectedBranch);
+    }
+  }, [db.selectedBranch]);
+
+  const handleBranchChange = (newBranch) => {
+    setSelectedBranch(newBranch);
+    if (typeof setGlobalSelectedBranch === 'function') {
+      setGlobalSelectedBranch(newBranch);
+    }
+  };
+
+  // Map selected branch string to numeric Branch_ID (null for network-wide)
+  const selectedBranchId = useMemo(() => {
+    if (!selectedBranch || selectedBranch === 'All Branches' || selectedBranch === 'All') {
+      return null;
+    }
+    const found = (branches || []).find(b =>
+      b.Branch_ID === selectedBranch ||
+      b.Branch_ID === Number(selectedBranch) ||
+      b.Branch_Name === selectedBranch ||
+      b.name === selectedBranch ||
+      (b.Branch_Name && b.Branch_Name.toLowerCase().includes(selectedBranch.toLowerCase())) ||
+      (selectedBranch && selectedBranch.toLowerCase().includes((b.Branch_Name || '').toLowerCase()))
+    );
+    if (found) return Number(found.Branch_ID);
+    const lower = selectedBranch.toLowerCase();
+    if (lower.includes('colombo')) return 1;
+    if (lower.includes('kandy')) return 2;
+    if (lower.includes('galle')) return 3;
+    const parsed = parseInt(selectedBranch, 10);
+    return !isNaN(parsed) ? parsed : null;
+  }, [selectedBranch, branches]);
+
+  // Branch matching helper for client-side filtering fallback
+  const matchesBranch = (itemBranchId, itemBranchName) => {
+    if (!selectedBranchId) return true;
+    if (itemBranchId != null && Number(itemBranchId) === selectedBranchId) return true;
+    if (itemBranchName) {
+      const name = String(itemBranchName).toLowerCase();
+      if (selectedBranchId === 1 && name.includes('colombo')) return true;
+      if (selectedBranchId === 2 && name.includes('kandy')) return true;
+      if (selectedBranchId === 3 && name.includes('galle')) return true;
+    }
+    return false;
+  };
+
+  // Live filtered dashboard data state
+  const [dashInvoices, setDashInvoices] = useState(null);
+  const [dashAppointments, setDashAppointments] = useState(null);
+  const [dashStaff, setDashStaff] = useState(null);
+
+  // Trigger re-fetch of filtered data whenever selected branch changes
+  useEffect(() => {
+    let isCurrent = true;
+    const params = selectedBranchId ? { branch_id: selectedBranchId } : {};
+
+    Promise.all([
+      api.get('/billing/invoices', { params }).catch(err => {
+        console.error("API Error fetching dashboard invoices:", err);
+        return null;
+      }),
+      api.get('/appointments', { params }).catch(err => {
+        console.error("API Error fetching dashboard appointments:", err);
+        return null;
+      }),
+      api.get('/staff', { params }).catch(err => {
+        console.error("API Error fetching dashboard staff:", err);
+        return null;
+      })
+    ]).then(([invRes, apptRes, staffRes]) => {
+      if (!isCurrent) return;
+      if (invRes && invRes.data) {
+        setDashInvoices(invRes.data);
+      }
+      if (apptRes && apptRes.data) {
+        setDashAppointments(apptRes.data);
+      }
+      if (staffRes && staffRes.data) {
+        setDashStaff(staffRes.data);
+      }
+    });
+
+    return () => { isCurrent = false; };
+  }, [selectedBranchId]);
 
   // Onboarding Drawer states
   const [showAddStaffDrawer, setShowAddStaffDrawer] = useState(false);
-  const [onboardingStep, setOnboardingStep] = useState(1);
-  const [onboardingData, setOnboardingData] = useState({
-    firstName: '',
-    lastName: '',
-    nic: '',
-    contact: '',
-    email: '',
-    role: 'RECEPTIONIST',
-    branch: 'Colombo Main',
-    license: '',
-    consultFee: '1500',
-    specialties: [],
-    username: '',
-    tempPassword: ''
-  });
 
   // Action states for selected staff
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [showEditStaffModal, setShowEditStaffModal] = useState(false);
   const [showTransferBranchModal, setShowTransferBranchModal] = useState(false);
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+  const [showAddBranchModal, setShowAddBranchModal] = useState(false);
   const [tempPassInput, setTempPassInput] = useState('');
   
   // Search and Filter states
@@ -39,141 +120,66 @@ export default function AdminPanel({ subView, db, handlers }) {
 
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [auditActionFilter, setAuditActionFilter] = useState('All');
+  const [auditDateFilter, setAuditDateFilter] = useState('');
   const [expandedAuditId, setExpandedAuditId] = useState(null);
 
-  // Specialties list for Step 3
-  const SPECIALTIES_OPTIONS = ['General Practice', 'Cardiology', 'Dermatology', 'Pediatrics', 'Neurology', 'Orthopedics', 'ENT'];
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // Handle step-by-step validation
-  const handleOnboardingNext = () => {
-    if (onboardingStep === 1) {
-      if (!onboardingData.firstName || !onboardingData.lastName || !onboardingData.nic || !onboardingData.contact || !onboardingData.email) {
-        alert('Please fill out all identity fields.');
-        return;
-      }
-      setOnboardingStep(2);
-    } else if (onboardingStep === 2) {
-      if (onboardingData.role === 'DOCTOR') {
-        setOnboardingStep(3);
-      } else {
-        // Skip Step 3, generate credentials automatically for step 4
-        setOnboardingData(prev => ({
-          ...prev,
-          username: `${prev.firstName.toLowerCase()}.${prev.lastName.toLowerCase()}`,
-          tempPassword: Math.random().toString(36).substring(2, 10).toUpperCase()
-        }));
-        setOnboardingStep(4);
-      }
-    } else if (onboardingStep === 3) {
-      if (!onboardingData.license || !onboardingData.consultFee) {
-        alert('Please provide license and consultation fee details.');
-        return;
-      }
-      setOnboardingData(prev => ({
-        ...prev,
-        username: `${prev.firstName.toLowerCase()}.${prev.lastName.toLowerCase()}`,
-        tempPassword: Math.random().toString(36).substring(2, 10).toUpperCase()
-      }));
-      setOnboardingStep(4);
+
+
+  const handleToggleStaffStatus = async (staff) => {
+    const nextStatus = staff.status === 'Active' ? 'On_Leave' : 'Active';
+    try {
+      const staffIdInt = staff.Staff_ID || staff.staffId || parseInt(staff.id.split('-')[1]);
+      await api.put(`/staff/${staffIdInt}`, { Employment_Status: nextStatus });
+
+      const updated = staffList.map(s => {
+        if (s.id === staff.id) return { ...s, status: nextStatus };
+        return s;
+      });
+      setStaffList(updated);
+      addAuditLog(
+        'UPDATE_STAFF',
+        `Toggled status of ${staff.name} to ${nextStatus}`,
+        JSON.stringify(staff),
+        JSON.stringify({ ...staff, status: nextStatus })
+      );
+      triggerToast(`${staff.name} is now ${nextStatus}`);
+    } catch (err) {
+      console.error("API Error updating status", err);
+      triggerToast(`Failed to update status for ${staff.name}`);
     }
   };
 
-  const handleOnboardingSubmit = (e) => {
-    e.preventDefault();
-    const newStaffId = `STF-${(staffList.length + 1).toString().padStart(3, '0')}`;
-    const newStaffMember = {
-      id: newStaffId,
-      name: `Dr. ${onboardingData.firstName} ${onboardingData.lastName}`,
-      role: onboardingData.role === 'DOCTOR' ? `${onboardingData.specialties[0] || 'Medical Specialist'}` : onboardingData.role.replace('_', ' '),
-      branch: onboardingData.branch,
-      status: 'Active',
-      details: {
-        firstName: onboardingData.firstName,
-        lastName: onboardingData.lastName,
-        nic: onboardingData.nic,
-        contact: onboardingData.contact,
-        email: onboardingData.email,
-        license: onboardingData.license,
-        consultFee: parseFloat(onboardingData.consultFee),
-        specialties: onboardingData.specialties,
-        username: onboardingData.username
-      }
-    };
-
-    const updatedStaff = [...staffList, newStaffMember];
-    setStaffList(updatedStaff);
-    addAuditLog(
-      'CREATE_STAFF',
-      `Onboarded staff member ${newStaffMember.name} (${newStaffId})`,
-      'null',
-      JSON.stringify(newStaffMember)
-    );
-
-    triggerToast(`Staff member ${newStaffMember.name} successfully created!`);
-    setShowAddStaffDrawer(false);
-    
-    // Reset state
-    setOnboardingStep(1);
-    setOnboardingData({
-      firstName: '',
-      lastName: '',
-      nic: '',
-      contact: '',
-      email: '',
-      role: 'RECEPTIONIST',
-      branch: 'Colombo Main',
-      license: '',
-      consultFee: '1500',
-      specialties: [],
-      username: '',
-      tempPassword: ''
-    });
-  };
-
-  const handleToggleSpecialty = (spec) => {
-    setOnboardingData(prev => {
-      const idx = prev.specialties.indexOf(spec);
-      if (idx > -1) {
-        return { ...prev, specialties: prev.specialties.filter(s => s !== spec) };
-      } else {
-        return { ...prev, specialties: [...prev.specialties, spec] };
-      }
-    });
-  };
-
-  const handleToggleStaffStatus = (staff) => {
-    const nextStatus = staff.status === 'Active' ? 'Inactive' : 'Active';
-    const updated = staffList.map(s => {
-      if (s.id === staff.id) return { ...s, status: nextStatus };
-      return s;
-    });
-    setStaffList(updated);
-    addAuditLog(
-      'UPDATE_STAFF',
-      `Toggled status of ${staff.name} to ${nextStatus}`,
-      JSON.stringify(staff),
-      JSON.stringify({ ...staff, status: nextStatus })
-    );
-    triggerToast(`${staff.name} is now ${nextStatus}`);
-  };
-
-  const handleTransferBranch = (e) => {
+  const handleTransferBranch = async (e) => {
     e.preventDefault();
     const newBranch = e.target.transferBranch.value;
     const oldBranch = selectedStaff.branch;
-    const updated = staffList.map(s => {
-      if (s.id === selectedStaff.id) return { ...s, branch: newBranch };
-      return s;
-    });
-    setStaffList(updated);
-    addAuditLog(
-      'UPDATE_STAFF',
-      `Transferred branch for ${selectedStaff.name} from ${oldBranch} to ${newBranch}`,
-      JSON.stringify(selectedStaff),
-      JSON.stringify({ ...selectedStaff, branch: newBranch })
-    );
-    triggerToast(`Transferred ${selectedStaff.name} to ${newBranch}`);
-    setShowTransferBranchModal(false);
+    
+    const branchObj = branches.find(b => b.Branch_Name === newBranch || b.name === newBranch);
+    const branchId = branchObj ? (branchObj.Branch_ID || 1) : 1;
+
+    try {
+      const staffIdInt = selectedStaff.Staff_ID || selectedStaff.staffId || parseInt(selectedStaff.id.split('-')[1]);
+      await api.put(`/staff/${staffIdInt}`, { Branch_ID: branchId });
+
+      const updated = staffList.map(s => {
+        if (s.id === selectedStaff.id) return { ...s, branch: newBranch };
+        return s;
+      });
+      setStaffList(updated);
+      addAuditLog(
+        'UPDATE_STAFF',
+        `Transferred branch for ${selectedStaff.name} from ${oldBranch} to ${newBranch}`,
+        JSON.stringify(selectedStaff),
+        JSON.stringify({ ...selectedStaff, branch: newBranch })
+      );
+      triggerToast(`Transferred ${selectedStaff.name} to ${newBranch}`);
+      setShowTransferBranchModal(false);
+    } catch (err) {
+      console.error("API Error transferring branch", err);
+      triggerToast(`Failed to transfer ${selectedStaff.name}`);
+    }
   };
 
   const handleForcePasswordReset = (e) => {
@@ -211,12 +217,50 @@ export default function AdminPanel({ subView, db, handlers }) {
     triggerToast(`Assigned manager for ${branchName}`);
   };
 
+  const handleAddBranch = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        Branch_Name: e.target.branchName.value,
+        Street_Address: e.target.address.value,
+        City: 'Colombo',
+        State_Province: 'Western',
+        Postal_Code: '00100',
+        Contact_Number: e.target.phone.value,
+        Email: `${e.target.branchName.value.toLowerCase().replace(/\s+/g, '')}@careflow.com`,
+        Manager_Staff_ID: null
+      };
+      
+      const response = await api.post('/branches', payload);
+      const b = response.data;
+      
+      const newBranch = {
+        name: b.Branch_Name,
+        address: b.Street_Address,
+        phone: b.Contact_Number,
+        Branch_ID: b.Branch_ID,
+        managerId: null,
+        managerName: 'Unassigned'
+      };
+      
+      setBranches([...branches, newBranch]);
+      addAuditLog('CONFIG_BRANCH', `Created new branch ${newBranch.name}`, 'null', JSON.stringify(newBranch));
+      triggerToast(`Branch ${newBranch.name} successfully created!`);
+      setShowAddBranchModal(false);
+    } catch (err) {
+      console.error("API Error creating branch", err);
+      triggerToast('Failed to create branch.');
+    }
+  };
+
   // Filtered lists
   const filteredStaff = useMemo(() => {
     return staffList.filter(s => {
       const matchSearch = s.name.toLowerCase().includes(staffSearchQuery.toLowerCase()) || s.id.toLowerCase().includes(staffSearchQuery.toLowerCase());
       const matchBranch = staffBranchFilter === 'All' || s.branch === staffBranchFilter;
-      const matchRole = staffRoleFilter === 'All' || s.role.toUpperCase().replace(' ', '_').includes(staffRoleFilter);
+      const matchRole = staffRoleFilter === 'All' || (staffRoleFilter === 'DOC'
+        ? (s.isDoctor || s.systemRole === 'Doctor' || (s.role && (s.role.toUpperCase().includes('DOC') || s.role.toUpperCase().includes('CARDIOLOG') || s.role.toUpperCase().includes('DERMATOLOG') || s.role.toUpperCase().includes('PRACTITIONER'))))
+        : s.role.toUpperCase().replace(' ', '_').includes(staffRoleFilter));
       const matchStatus = staffStatusFilter === 'All' || s.status === staffStatusFilter;
       return matchSearch && matchBranch && matchRole && matchStatus;
     });
@@ -226,31 +270,142 @@ export default function AdminPanel({ subView, db, handlers }) {
     return auditLogs.filter(log => {
       const matchSearch = log.details.toLowerCase().includes(auditSearchQuery.toLowerCase()) || log.userId.toLowerCase().includes(auditSearchQuery.toLowerCase());
       const matchAction = auditActionFilter === 'All' || log.action === auditActionFilter;
-      return matchSearch && matchAction;
+      const matchDate = !auditDateFilter || log.timestamp.startsWith(auditDateFilter);
+      return matchSearch && matchAction && matchDate;
     });
-  }, [auditLogs, auditSearchQuery, auditActionFilter]);
+  }, [auditLogs, auditSearchQuery, auditActionFilter, auditDateFilter]);
+
+  // Active datasets for dashboard cards: uses live re-fetched branch data, falling back to client-filtered state
+  const activeInvoices = useMemo(() => {
+    if (dashInvoices) return dashInvoices;
+    if (!selectedBranchId) return invoiceList || [];
+    return (invoiceList || []).filter(inv => matchesBranch(inv.Branch_ID, inv.branch));
+  }, [dashInvoices, invoiceList, selectedBranchId]);
+
+  const activeAppointments = useMemo(() => {
+    if (dashAppointments) return dashAppointments;
+    if (!selectedBranchId) return appointmentList || [];
+    return (appointmentList || []).filter(a => matchesBranch(a.Branch_ID, a.branch));
+  }, [dashAppointments, appointmentList, selectedBranchId]);
+
+  const activeStaff = useMemo(() => {
+    if (dashStaff) return dashStaff;
+    if (!selectedBranchId) return staffList || [];
+    return (staffList || []).filter(s => matchesBranch(s.Branch_ID, s.branch));
+  }, [dashStaff, staffList, selectedBranchId]);
+
+  const revenueCollected = useMemo(() => {
+    return (activeInvoices || []).reduce((sum, inv) => {
+      const paid = Number(inv.Patient_Paid != null ? inv.Patient_Paid : (inv.patientBalance != null ? inv.patientBalance : 0));
+      const ins = Number(inv.Insurance_Covered != null ? inv.Insurance_Covered : (inv.insuranceCoverage != null ? inv.insuranceCoverage : 0));
+      if (paid > 0 || ins > 0) return sum + paid + ins;
+      const tot = Number(inv.Invoice_Total != null ? inv.Invoice_Total : (inv.total != null ? inv.total : 0));
+      if (inv.Invoice_Status === 'Paid' || inv.status === 'Paid') return sum + tot;
+      if (inv.Invoice_Status === 'Partially_Paid' || inv.Invoice_Status === 'Partially Paid' || inv.status === 'Partially Paid' || inv.status === 'Partially_Paid') return sum + (tot * 0.5);
+      return sum;
+    }, 0);
+  }, [activeInvoices]);
+
+  const outstandingBalance = useMemo(() => {
+    return (activeInvoices || []).reduce((sum, inv) => {
+      const directOutstanding = inv.Outstanding_Balance != null ? Number(inv.Outstanding_Balance) : (inv.outstandingBalance != null ? Number(inv.outstandingBalance) : null);
+      if (directOutstanding != null) {
+        return directOutstanding > 0 ? sum + directOutstanding : sum;
+      }
+      const tot = Number(inv.Invoice_Total != null ? inv.Invoice_Total : (inv.total != null ? inv.total : 0));
+      const paid = Number(inv.Patient_Paid != null ? inv.Patient_Paid : (inv.patientBalance != null ? inv.patientBalance : 0));
+      const ins = Number(inv.Insurance_Covered != null ? inv.Insurance_Covered : (inv.insuranceCoverage != null ? inv.insuranceCoverage : 0));
+      const balance = tot - paid - ins;
+      return balance > 0 ? sum + balance : sum;
+    }, 0);
+  }, [activeInvoices]);
+
+  const totalPatientsCount = useMemo(() => {
+    if (!selectedBranchId) {
+      return db.totalPatients != null && db.totalPatients > 0 ? db.totalPatients : (patientList || []).length;
+    }
+    const patientIdSet = new Set();
+    (activeAppointments || []).forEach(a => {
+      const pid = a.Patient_ID || (a.patientId ? parseInt(String(a.patientId).replace(/\D/g, ''), 10) : null);
+      if (pid) patientIdSet.add(Number(pid));
+    });
+    (activeInvoices || []).forEach(inv => {
+      const pid = inv.Patient_ID || (inv.patientId ? parseInt(String(inv.patientId).replace(/\D/g, ''), 10) : null);
+      if (pid) patientIdSet.add(Number(pid));
+    });
+    return patientIdSet.size;
+  }, [selectedBranchId, db.totalPatients, patientList, activeAppointments, activeInvoices]);
+
+  const activeDoctorsCount = useMemo(() => {
+    return (activeStaff || []).filter(s => {
+      const isDoc = s.isDoctor || s.System_Role === 'Doctor' || s.systemRole === 'Doctor' ||
+        Boolean(s.Doctor_ID) ||
+        (s.Job_Title && (
+          s.Job_Title.toLowerCase().includes('doc') ||
+          s.Job_Title.toLowerCase().includes('cardiolog') ||
+          s.Job_Title.toLowerCase().includes('dermatolog') ||
+          s.Job_Title.toLowerCase().includes('practitioner') ||
+          s.Job_Title.toLowerCase().includes('physician') ||
+          s.Job_Title.toLowerCase().includes('surgeon') ||
+          s.Job_Title.toLowerCase().includes('specialist')
+        )) ||
+        (s.role && (
+          s.role.toLowerCase().includes('doc') ||
+          s.role.toLowerCase().includes('cardiolog') ||
+          s.role.toLowerCase().includes('dermatolog') ||
+          s.role.toLowerCase().includes('practitioner') ||
+          s.role.toLowerCase().includes('physician') ||
+          s.role.toLowerCase().includes('surgeon') ||
+          s.role.toLowerCase().includes('specialist')
+        ));
+      const isActive = (s.Employment_Status === 'Active' || s.status === 'Active');
+      return isDoc && isActive;
+    }).length;
+  }, [activeStaff]);
+
+  const appointmentsTodayCount = useMemo(() => {
+    return (activeAppointments || []).filter(a => {
+      const apptDate = a.Appointment_Date || a.date;
+      return apptDate === todayStr;
+    }).length;
+  }, [activeAppointments, todayStr]);
 
   return (
     <div className="space-y-6">
       {/* 1. EXECUTIVE DASHBOARD */}
       {subView === 'dashboard' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Executive Administration Dashboard</h1>
-            <p className="text-sm text-slate-500 mt-1">Multi-branch network analytics, live fulfillment monitoring, and operations command</p>
+          {/* Dashboard Header with Branch Scope Selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">{t('admin_dash_title', 'Executive Administration Dashboard')}</h1>
+              <p className="text-sm text-slate-500 mt-1">{t('admin_dash_subtitle', 'Multi-branch network analytics, live fulfillment monitoring, and operations command')}</p>
+            </div>
+            <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-xs shrink-0">
+              <Building className="h-4 w-4 text-slate-400" />
+              <label htmlFor="admin-branch-select" className="text-xs font-semibold text-slate-500">{t('branch_scope', 'Branch Scope:')}</label>
+              <select
+                id="admin-branch-select"
+                aria-label="Branch Scope"
+                className="border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg text-xs font-bold text-slate-800 py-1 px-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                value={selectedBranch}
+                onChange={e => handleBranchChange(e.target.value)}
+              >
+                <option value="All Branches">{t('all_branches_network_wide', 'All Branches (Network-Wide)')}</option>
+                <option value="Colombo Main">{t('colombo_main_clinic', 'Colombo Main Clinic')}</option>
+                <option value="Kandy">{t('kandy_central_clinic', 'Kandy Central Clinic')}</option>
+                <option value="Galle">{t('galle_coastal_clinic', 'Galle Coastal Clinic')}</option>
+              </select>
+            </div>
           </div>
 
           {/* Metric Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Network Revenue</span>
-                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  ${invoiceList.reduce((sum, inv) => {
-                    if (inv.status === 'Paid') return sum + inv.patientBalance + inv.insuranceCoverage;
-                    if (inv.status === 'Partially Paid') return sum + (inv.patientBalance * 0.5) + inv.insuranceCoverage;
-                    return sum;
-                  }, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_revenue_collected', 'Revenue Collected')}</span>
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-revenue-collected">
+                  Rs. {revenueCollected.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="p-3.5 bg-blue-50 text-blue-600 rounded-xl">
@@ -260,9 +415,21 @@ export default function AdminPanel({ subView, db, handlers }) {
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Total Patients</span>
-                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  {patientList.length}
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_outstanding_balance', 'Outstanding Balance')}</span>
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-outstanding-balance">
+                  Rs. {outstandingBalance.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="p-3.5 bg-amber-50 text-amber-600 rounded-xl">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+              <div>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_total_patients', 'Total Patients')}</span>
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-total-patients">
+                  {totalPatientsCount}
                 </span>
               </div>
               <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -272,9 +439,9 @@ export default function AdminPanel({ subView, db, handlers }) {
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Active Doctors</span>
-                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  {staffList.filter(s => (s.role.includes('Doc') || s.role === 'Cardiologist' || s.role === 'Dermatologist' || s.role === 'General Practitioner') && s.status === 'Active').length}
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_active_doctors', 'Active Doctors')}</span>
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-active-doctors">
+                  {activeDoctorsCount}
                 </span>
               </div>
               <div className="p-3.5 bg-sky-50 text-sky-600 rounded-xl">
@@ -284,9 +451,9 @@ export default function AdminPanel({ subView, db, handlers }) {
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Appointments Today</span>
-                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  {appointmentList.filter(a => a.date === '2026-08-23').length}
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_appointments_today', 'Appointments Today')}</span>
+                <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-appointments-today">
+                  {appointmentsTodayCount}
                 </span>
               </div>
               <div className="p-3.5 bg-purple-50 text-purple-600 rounded-xl">
@@ -297,19 +464,20 @@ export default function AdminPanel({ subView, db, handlers }) {
 
           {/* Branch Performance Grid */}
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-slate-900">Branch Performance Overview</h2>
+            <h2 className="text-lg font-bold text-slate-900">{t('branch_performance_overview', 'Branch Performance Overview')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {['Colombo Main', 'Kandy', 'Galle'].map(brName => {
-                const branchAppts = appointmentList.filter(a => a.branch === brName);
+              {(branches && branches.length > 0 ? branches : ['Colombo Main', 'Kandy', 'Galle'].map((name, i) => ({ Branch_ID: i + 1, Branch_Name: name }))).map(br => {
+                const brName = br.Branch_Name || br.name;
+                const branchAppts = appointmentList.filter(a => Number(a.Branch_ID) === Number(br.Branch_ID) || a.branch === brName || a.branch?.includes(br.name) || brName?.includes(a.branch));
                 const completed = branchAppts.filter(a => a.status === 'Completed').length;
                 const total = branchAppts.length || 1;
                 const fulfillment = Math.round((completed / total) * 100);
-                const walkins = branchAppts.filter(a => a.isWalkIn || a.status === 'Walk-In').length;
-                const offlineStaff = staffList.filter(s => s.branch === brName && s.status !== 'Active').length;
-                const onlineStaff = staffList.filter(s => s.branch === brName && s.status === 'Active').length;
+                const walkins = branchAppts.filter(a => a.isWalkIn || a.status === 'Walk-In' || a.status === 'Walk_In').length;
+                const offlineStaff = staffList.filter(s => (Number(s.Branch_ID) === Number(br.Branch_ID) || s.branch === brName || s.branch?.includes(br.name) || brName?.includes(s.branch)) && s.status !== 'Active').length;
+                const onlineStaff = staffList.filter(s => (Number(s.Branch_ID) === Number(br.Branch_ID) || s.branch === brName || s.branch?.includes(br.name) || brName?.includes(s.branch)) && s.status === 'Active').length;
 
                 return (
-                  <div key={brName} className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+                  <div key={br.Branch_ID || brName} className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
                     <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                       <div>
                         <h3 className="font-bold text-slate-900 text-md">{brName}</h3>
@@ -351,18 +519,15 @@ export default function AdminPanel({ subView, db, handlers }) {
         <div className="space-y-6 animate-fade-in">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Staff Directory & Identity Control</h1>
+              <h1 className="text-2xl font-bold text-slate-900">{t('staff_directory_title', 'Staff Directory & Identity Control')}</h1>
               <p className="text-sm text-slate-500 mt-1">Manage network accounts, assign roles, transfer branches, and audit profiles</p>
             </div>
             <button
-              onClick={() => {
-                setOnboardingStep(1);
-                setShowAddStaffDrawer(true);
-              }}
+              onClick={() => setShowAddStaffDrawer(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold flex items-center space-x-2 shadow-xs cursor-pointer"
             >
               <Plus className="h-4 w-4" />
-              <span>Add Staff Member</span>
+              <span>{t('add_staff_member', 'Add Staff Member')}</span>
             </button>
           </div>
 
@@ -489,9 +654,18 @@ export default function AdminPanel({ subView, db, handlers }) {
       {/* 3. CLINIC BRANCH CONFIGURATION */}
       {subView === 'branches' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Clinic Branch Settings & Governance</h1>
-            <p className="text-sm text-slate-500 mt-1">Configure facilities, direct phone lines, and assign operational Branch Managers</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Clinic Branch Settings & Governance</h1>
+              <p className="text-sm text-slate-500 mt-1">Configure facilities, direct phone lines, and assign operational Branch Managers</p>
+            </div>
+            <button
+              onClick={() => setShowAddBranchModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold flex items-center space-x-1.5 transition-colors shadow-sm cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Branch</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -555,12 +729,21 @@ export default function AdminPanel({ subView, db, handlers }) {
                 onChange={e => setAuditSearchQuery(e.target.value)}
               />
             </div>
+            <input
+              type="date"
+              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white"
+              value={auditDateFilter}
+              onChange={e => setAuditDateFilter(e.target.value)}
+            />
             <select
               className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white"
               value={auditActionFilter}
               onChange={e => setAuditActionFilter(e.target.value)}
             >
               <option value="All">All Actions</option>
+              <option value="INSERT">INSERT</option>
+              <option value="UPDATE">UPDATE</option>
+              <option value="DELETE">DELETE</option>
               <option value="CREATE_STAFF">CREATE_STAFF</option>
               <option value="UPDATE_STAFF">UPDATE_STAFF</option>
               <option value="CONFIG_BRANCH">CONFIG_BRANCH</option>
@@ -648,230 +831,18 @@ export default function AdminPanel({ subView, db, handlers }) {
           ==================================== */}
 
       {/* ADD STAFF DRAWER */}
-      {showAddStaffDrawer && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs"
-            onClick={() => setShowAddStaffDrawer(false)}
-          />
-          <div className="relative bg-white h-full w-full max-w-lg border-l border-slate-200 shadow-2xl p-8 overflow-y-auto animate-in slide-in-from-right duration-250 flex flex-col justify-between">
-            <div>
-              <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
-                <h2 className="text-lg font-bold text-slate-900">Add New Staff Member</h2>
-                <button onClick={() => setShowAddStaffDrawer(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
-              </div>
-
-              {/* Progress Steps */}
-              <div className="flex items-center justify-between mb-8 text-xs font-semibold text-slate-400">
-                <div className={`flex items-center space-x-1 ${onboardingStep >= 1 ? 'text-blue-600 font-bold' : ''}`}>
-                  <span className="h-5 w-5 rounded-full border border-current flex items-center justify-center">1</span>
-                  <span>Identity</span>
-                </div>
-                <div className="h-px bg-slate-200 flex-1 mx-2" />
-                <div className={`flex items-center space-x-1 ${onboardingStep >= 2 ? 'text-blue-600 font-bold' : ''}`}>
-                  <span className="h-5 w-5 rounded-full border border-current flex items-center justify-center">2</span>
-                  <span>Role</span>
-                </div>
-                {onboardingData.role === 'DOCTOR' && (
-                  <>
-                    <div className="h-px bg-slate-200 flex-1 mx-2" />
-                    <div className={`flex items-center space-x-1 ${onboardingStep >= 3 ? 'text-blue-600 font-bold' : ''}`}>
-                      <span className="h-5 w-5 rounded-full border border-current flex items-center justify-center">3</span>
-                      <span>Doctor Info</span>
-                    </div>
-                  </>
-                )}
-                <div className="h-px bg-slate-200 flex-1 mx-2" />
-                <div className={`flex items-center space-x-1 ${onboardingStep >= 4 ? 'text-blue-600 font-bold' : ''}`}>
-                  <span className="h-5 w-5 rounded-full border border-current flex items-center justify-center">4</span>
-                  <span>Credentials</span>
-                </div>
-              </div>
-
-              {/* Form Steps */}
-              <div className="space-y-4">
-                {onboardingStep === 1 && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">First Name</label>
-                        <input
-                          type="text"
-                          className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
-                          value={onboardingData.firstName}
-                          onChange={e => setOnboardingData({ ...onboardingData, firstName: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Last Name</label>
-                        <input
-                          type="text"
-                          className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
-                          value={onboardingData.lastName}
-                          onChange={e => setOnboardingData({ ...onboardingData, lastName: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">NIC / Passport Number</label>
-                      <input
-                        type="text"
-                        className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
-                        value={onboardingData.nic}
-                        placeholder="e.g. 850321234V or 19850321234"
-                        onChange={e => setOnboardingData({ ...onboardingData, nic: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Contact Phone</label>
-                      <input
-                        type="tel"
-                        className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
-                        value={onboardingData.contact}
-                        placeholder="e.g. +94 77 123 4567"
-                        onChange={e => setOnboardingData({ ...onboardingData, contact: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
-                        value={onboardingData.email}
-                        placeholder="e.g. name@careflow.com"
-                        onChange={e => setOnboardingData({ ...onboardingData, email: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {onboardingStep === 2 && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Assign Role</label>
-                      <select
-                        className="w-full border border-slate-350 rounded-lg px-3 py-2 bg-white text-sm"
-                        value={onboardingData.role}
-                        onChange={e => setOnboardingData({ ...onboardingData, role: e.target.value })}
-                      >
-                        <option value="RECEPTIONIST">Receptionist</option>
-                        <option value="DOCTOR">Doctor / Practitioner</option>
-                        <option value="BRANCH_MANAGER">Branch Manager</option>
-                        <option value="BILLING_STAFF">Billing & Finance Staff</option>
-                        <option value="ADMIN">System Administrator</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Assign Home Branch</label>
-                      <select
-                        className="w-full border border-slate-350 rounded-lg px-3 py-2 bg-white text-sm"
-                        value={onboardingData.branch}
-                        onChange={e => setOnboardingData({ ...onboardingData, branch: e.target.value })}
-                      >
-                        <option value="Colombo Main">Colombo Main</option>
-                        <option value="Kandy">Kandy</option>
-                        <option value="Galle">Galle</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {onboardingStep === 3 && onboardingData.role === 'DOCTOR' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">SLMC License Number</label>
-                      <input
-                        type="text"
-                        className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm font-mono"
-                        placeholder="e.g. SLMC-88321"
-                        value={onboardingData.license}
-                        onChange={e => setOnboardingData({ ...onboardingData, license: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Base Consultation Fee (LKR)</label>
-                      <input
-                        type="number"
-                        className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm font-mono"
-                        value={onboardingData.consultFee}
-                        onChange={e => setOnboardingData({ ...onboardingData, consultFee: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Specialties (Select All that Apply)</label>
-                      <div className="flex flex-wrap gap-2">
-                        {SPECIALTIES_OPTIONS.map(spec => {
-                          const isSelected = onboardingData.specialties.includes(spec);
-                          return (
-                            <button
-                              key={spec}
-                              type="button"
-                              onClick={() => handleToggleSpecialty(spec)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-                                isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-650 border-slate-200 hover:bg-slate-100'
-                              }`}
-                            >
-                              {spec}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {onboardingStep === 4 && (
-                  <div className="space-y-4">
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 font-mono text-xs">
-                      <div>
-                        <span className="text-slate-450 block uppercase text-[10px] font-bold">Recommended System Username</span>
-                        <strong className="text-slate-800 text-sm">{onboardingData.username}</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-450 block uppercase text-[10px] font-bold">Generated Temporary Password</span>
-                        <strong className="text-red-600 text-sm">{onboardingData.tempPassword}</strong>
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      * On submission, this temporary credential will be cached in the credentials pool. The user will be prompted to reset their password on first login.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="pt-6 border-t border-slate-150 flex justify-end space-x-3">
-              {onboardingStep > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setOnboardingStep(prev => prev - 1)}
-                  className="bg-white border border-slate-350 text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer"
-                >
-                  Back
-                </button>
-              )}
-              {onboardingStep < 4 && (
-                <button
-                  type="button"
-                  onClick={handleOnboardingNext}
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer"
-                >
-                  Continue
-                </button>
-              )}
-              {onboardingStep === 4 && (
-                <button
-                  onClick={handleOnboardingSubmit}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer"
-                >
-                  Onboard & Save Account
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <AddStaffDrawer
+        isOpen={showAddStaffDrawer}
+        onClose={() => setShowAddStaffDrawer(false)}
+        branches={branches}
+        lockedBranch={null}
+        currentUserRole={db.currentUser?.role || 'ADMIN'}
+        onStaffCreated={(newStaffMember) => {
+          setStaffList([...staffList, newStaffMember]);
+        }}
+        triggerToast={triggerToast}
+        addAuditLog={addAuditLog}
+      />
 
       {/* TRANSFER BRANCH MODAL */}
       {showTransferBranchModal && selectedStaff && (
@@ -947,6 +918,33 @@ export default function AdminPanel({ subView, db, handlers }) {
               >
                 Force Security Reset
               </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {/* ADD BRANCH MODAL */}
+      {showAddBranchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setShowAddBranchModal(false)} />
+          <form onSubmit={handleAddBranch} className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h3 className="font-bold text-slate-900 text-lg border-b border-slate-100 pb-3">Register New Clinic Branch</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Branch Name</label>
+                <input type="text" name="branchName" required className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm" placeholder="e.g. Kandy South" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Street Address</label>
+                <input type="text" name="address" required className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm" placeholder="e.g. 45 Peradeniya Road" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Contact Phone</label>
+                <input type="text" name="phone" required className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm" placeholder="e.g. +94 81 234 5678" />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+              <button type="button" onClick={() => setShowAddBranchModal(false)} className="bg-white border border-slate-350 text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer">Cancel</button>
+              <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer">Create Branch</button>
             </div>
           </form>
         </div>

@@ -1,9 +1,29 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Users, Building, Calendar, Clock, Search, Plus, Activity, FileText, 
-  DollarSign, TrendingUp, Download, LogOut, ClipboardList, AlertCircle, 
-  CheckCircle2, Lock, User, ShieldCheck, UserCheck, Menu, X, Keyboard
+import React, { useState, useEffect } from 'react';
+import {
+  Users, Building, Calendar, Clock, Search, Plus, Activity, FileText,
+  DollarSign, TrendingUp, Download, LogOut, ClipboardList, AlertCircle,
+  CheckCircle2, Lock, User, ShieldCheck, UserCheck, Menu, X, Keyboard, KeyRound
 } from 'lucide-react';
+import api from './api/axios.js';
+import { useAuth } from './contexts/AuthContext.jsx';
+import { getFrontendRoleCode } from './utils/authRole.js';
+
+export const ROLE_ALLOWED_PREFIXES = {
+  ROLE_ADMIN: ['/admin/', '/manager/', '/reception/', '/doctor/', '/billing/', '/portal/'],
+  ROLE_BRANCH_MANAGER: ['/manager/'],
+  ROLE_RECEPTIONIST: ['/reception/'],
+  ROLE_NURSE: ['/reception/', '/nurse/'],
+  ROLE_DOCTOR: ['/doctor/'],
+  ROLE_BILLING_STAFF: ['/billing/'],
+  ROLE_PATIENT: ['/portal/']
+};
+
+export function isPathAllowed(roleCode, path) {
+  if (!roleCode || !path) return false;
+  if (path === '/login' || path === '/') return true;
+  const prefixes = ROLE_ALLOWED_PREFIXES[roleCode] || [];
+  return prefixes.some(prefix => path.startsWith(prefix));
+}
 
 // Import Workspace Panels
 import AdminPanel from './components/AdminPanel';
@@ -13,6 +33,12 @@ import DoctorPanel from './components/DoctorPanel';
 import BillingPanel from './components/BillingPanel';
 import PatientPanel from './components/PatientPanel';
 import ReportsPanel from './components/ReportsPanel';
+import ChangePasswordModal from './components/ChangePasswordModal';
+import LanguageSelector from './components/LanguageSelector';
+import { useLanguage } from './contexts/LanguageContext';
+import { searchPatients } from './services/patientService';
+import { adaptPatientForPanels } from './utils/patientAdapter';
+import { formatPatientId, formatPatientName } from './utils/patientFormat';
 
 // ==========================================
 // INITIAL MOCK DATA CONFIGURATIONS
@@ -31,43 +57,9 @@ const INITIAL_STAFF = [
   { id: 'STF-005', name: 'Sophia Patel', role: 'Lead Billing Clerk', branch: 'Colombo Main', status: 'Active', details: { email: 'patel@careflow.com', contact: '+94 77 999 0000' } },
   { id: 'STF-006', name: 'Samantha Silva', role: 'Branch Manager', branch: 'Kandy', status: 'Active', details: { email: 'silva@careflow.com', contact: '+94 81 222 3333' } },
   { id: 'STF-007', name: 'Rohan De Silva', role: 'Branch Manager', branch: 'Galle', status: 'Active', details: { email: 'rohan@careflow.com', contact: '+94 91 333 4444' } },
-  { id: 'STF-008', name: 'Dr. Nimal Perera', role: 'Dermatologist', branch: 'Galle', status: 'Active', details: { email: 'nimal@careflow.com', contact: '+94 71 456 7890', license: 'SLMC-66321', consultFee: 2000, specialties: ['Dermatology'] } }
-];
-
-const INITIAL_PATIENTS = [
-  {
-    id: 'PAT-0001',
-    name: 'John Doe',
-    dob: '1985-05-12',
-    nic: '852140938V',
-    contact: '+94 77 123 4567',
-    address: '12 Flat, Galle Road, Colombo',
-    branch: 'Colombo Main',
-    insurance: { provider: 'Union Assurance', policyNumber: 'UA-88321-A', expDate: '2027-12-31' },
-    emergencyContacts: [{ name: 'Jane Doe', relation: 'Spouse', phone: '+94 77 123 4568' }]
-  },
-  {
-    id: 'PAT-0002',
-    name: 'Clara Oswald',
-    dob: '1992-11-23',
-    nic: '923281029V',
-    contact: '+94 77 987 6543',
-    address: '45 Lake Round, Kandy',
-    branch: 'Kandy',
-    insurance: { provider: 'Softlogic Life', policyNumber: 'SL-99321-B', expDate: '2026-06-30' },
-    emergencyContacts: [{ name: 'Danny Pink', relation: 'Friend', phone: '+94 77 987 6544' }]
-  },
-  {
-    id: 'PAT-0003',
-    name: 'David Miller',
-    dob: '1970-02-08',
-    nic: '700392109V',
-    contact: '+94 71 456 7890',
-    address: '78 Fort View, Galle',
-    branch: 'Galle',
-    insurance: { provider: 'Sri Lanka Insurance', policyNumber: 'SLIC-3341', expDate: '2025-08-23' },
-    emergencyContacts: [{ name: 'Susan Miller', relation: 'Wife', phone: '+94 71 456 7891' }]
-  }
+  { id: 'STF-008', name: 'Dr. Nimal Perera', role: 'Dermatologist', branch: 'Galle', status: 'Active', details: { email: 'nimal@careflow.com', contact: '+94 71 456 7890', license: 'SLMC-66321', consultFee: 2000, specialties: ['Dermatology'] } },
+  { id: 'STF-011', name: 'Kamal Perera', role: 'Billing Officer', branch: 'Kandy', status: 'Active', details: { email: 'kamal.perera@careflow.com', contact: '+94 81 223 9999' } },
+  { id: 'STF-012', name: 'Nirosha Silva', role: 'Billing Officer', branch: 'Galle', status: 'Active', details: { email: 'nirosha.silva@careflow.com', contact: '+94 91 222 8888' } }
 ];
 
 const INITIAL_APPOINTMENTS = [
@@ -78,9 +70,9 @@ const INITIAL_APPOINTMENTS = [
 ];
 
 const INITIAL_QUEUE = [
-  { queueNo: 1, patientId: 'PAT-0002', patientName: 'Clara Oswald', reason: 'Severe throat infection', assignedDoctor: 'Dr. Sarah Jenkins', doctorId: 'STF-002', estWaitTime: 15, room: 'Room 101', status: 'SCHEDULED' },
-  { queueNo: 2, patientId: 'PAT-0003', patientName: 'David Miller', reason: 'Eczema flare up', assignedDoctor: 'Dr. Nimal Perera', doctorId: 'STF-008', estWaitTime: 35, room: 'Consultation Room B', status: 'WALK_IN' },
-  { queueNo: 3, patientId: 'PAT-0001', patientName: 'John Doe', reason: 'Routine cardiovascular follow-up', assignedDoctor: 'Dr. Alexander Bennett', doctorId: 'STF-001', estWaitTime: 10, room: 'Room 105', status: 'SCHEDULED' }
+  { queueNo: 1, appointmentId: 'APP-0008', appointment_id: 8, Appointment_ID: 8, patientId: 'PAT-0002', patient_id: 2, Patient_ID: 2, patientName: 'Clara Oswald', reason: 'Recurrent severe throat infection and hoarseness', assignedDoctor: 'Dr. Alexander Bennett', doctorId: 'STF-001', doctor_id: 1, Doctor_ID: 1, estWaitTime: 15, room: 'Room 101', status: 'SCHEDULED' },
+  { queueNo: 2, appointmentId: 'APP-0010', appointment_id: 10, Appointment_ID: 10, patientId: 'PAT-0001', patient_id: 1, Patient_ID: 1, patientName: 'John Doe', reason: 'Hypertension evaluation and chest follow-up', assignedDoctor: 'Dr. Alexander Bennett', doctorId: 'STF-001', doctor_id: 1, Doctor_ID: 1, estWaitTime: 25, room: 'Room 105', status: 'SCHEDULED' },
+  { queueNo: 3, appointmentId: 'APP-0011', appointment_id: 11, Appointment_ID: 11, patientId: 'PAT-0004', patient_id: 4, Patient_ID: 4, patientName: 'Ananya Jayawardena', reason: 'General health checkup', assignedDoctor: 'Dr. Alexander Bennett', doctorId: 'STF-001', doctor_id: 1, Doctor_ID: 1, estWaitTime: 40, room: 'Room 102', status: 'SCHEDULED' }
 ];
 
 const INITIAL_INVOICES = [
@@ -112,30 +104,12 @@ const INITIAL_AUDITS = [
   { id: 'AUD-002', timestamp: '2026-08-23 10:20:00', userId: 'doctor@careflow.com', username: 'Dr. Alexander Bennett', branch: 'Colombo Main', action: 'UPDATE_APPOINTMENT', details: 'Completed consultation John Doe (PAT-0001)', before: '{"status":"Booked"}', after: '{"status":"Completed"}' }
 ];
 
-// Available demo users and their profiles (JWT payload simulations)
-const DEMO_LOGINS = [
-  { role: 'Admin', roleCode: 'ROLE_ADMIN', email: 'admin@careflow.com', password: 'admin123', name: 'Alana Smith [Admin]', branch: 'All Branches' },
-  { role: 'Branch Manager', roleCode: 'ROLE_BRANCH_MANAGER', email: 'manager@careflow.com', password: 'manager123', name: 'Marcus Vance [Manager]', branch: 'Colombo Main' },
-  { role: 'Receptionist', roleCode: 'ROLE_RECEPTIONIST', email: 'receptionist@careflow.com', password: 'recept123', name: 'Shenaya Perera [Recept]', branch: 'Colombo Main' },
-  { role: 'Doctor', roleCode: 'ROLE_DOCTOR', email: 'doctor@careflow.com', password: 'doc123', name: 'Dr. Alexander Bennett [Doc]', branch: 'Colombo Main', id: 'STF-001' },
-  { role: 'Billing Staff', roleCode: 'ROLE_BILLING_STAFF', email: 'billing@careflow.com', password: 'bill123', name: 'Dilhani Fernando [Billing]', branch: 'Colombo Main' },
-  { role: 'Patient', roleCode: 'ROLE_PATIENT', email: 'patient@careflow.com', password: 'pat123', name: 'John Doe [Patient]', patientId: 'PAT-0001' }
-];
-
 export default function App() {
   // ==========================================
-  // PERSISTED STATES
+  // AUTH CONTEXT & I18N
   // ==========================================
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('catms_user');
-    try {
-      const parsed = saved ? JSON.parse(saved) : null;
-      if (parsed && parsed.name && parsed.roleCode) {
-        return parsed;
-      }
-    } catch (e) {}
-    return null;
-  });
+  const { currentUser, isHydrated, login, logout } = useAuth();
+  const { t } = useLanguage();
 
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
@@ -149,10 +123,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_STAFF;
   });
 
-  const [patientList, setPatientList] = useState(() => {
-    const saved = localStorage.getItem('catms_patients');
-    return saved ? JSON.parse(saved) : INITIAL_PATIENTS;
-  });
+  const [patientList, setPatientList] = useState([]);
+  const [patientsVersion, setPatientsVersion] = useState(0);
+  const [totalPatients, setTotalPatients] = useState(0);
 
   const [appointmentList, setAppointmentList] = useState(() => {
     const saved = localStorage.getItem('catms_appointments');
@@ -179,6 +152,115 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_AUDITS;
   });
 
+  // Fetch real data from backend API
+  useEffect(() => {
+    if (currentUser) {
+      api.get('/branches').then(res => {
+        if (res.data && res.data.length > 0) setBranches(res.data);
+      }).catch(err => console.error("API Error (Branches):", err));
+
+      api.get('/staff').then(res => {
+        if (res.data && res.data.length > 0) {
+          // Map backend staff schema to frontend format
+          const mapped = res.data.map(s => {
+            const isDoc = s.System_Role === 'Doctor' ||
+              Boolean(s.Doctor_ID) ||
+              (s.Job_Title && (
+                s.Job_Title.toLowerCase().includes('doc') ||
+                s.Job_Title.toLowerCase().includes('cardiolog') ||
+                s.Job_Title.toLowerCase().includes('dermatolog') ||
+                s.Job_Title.toLowerCase().includes('practitioner')
+              ));
+            return {
+              id: `STF-${s.Staff_ID}`,
+              Staff_ID: s.Staff_ID,
+              staffId: s.Staff_ID,
+              Account_ID: s.Account_ID,
+              name: `${s.First_Name} ${s.Last_Name}`,
+              role: s.Job_Title,
+              branch: branches.find(b => b.Branch_ID === s.Branch_ID)?.Branch_Name || 'Colombo Main Clinic',
+              Branch_ID: s.Branch_ID,
+              status: s.Employment_Status,
+              systemRole: s.System_Role,
+              isDoctor: isDoc,
+              license: s.License_Number,
+              details: { email: s.Email, contact: s.Contact_Number }
+            };
+          });
+          setStaffList(mapped);
+        }
+      }).catch(err => console.error("API Error (Staff):", err));
+
+      api.get('/appointments').then(res => {
+        if (res.data && res.data.length > 0) {
+          const mappedAppts = res.data.map(a => ({
+            id: `APP-${a.Appointment_ID}`,
+            Appointment_ID: a.Appointment_ID,
+            date: a.Appointment_Date,
+            time: a.Start_Time ? a.Start_Time.slice(0, 5) : '09:00',
+            doctorId: `STF-${a.Doctor_ID}`,
+            Doctor_ID: a.Doctor_ID,
+            doctorName: a.Doctor_Name ? `Dr. ${a.Doctor_Name}` : `Doctor #${a.Doctor_ID}`,
+            patientId: `PAT-${a.Patient_ID}`,
+            Patient_ID: a.Patient_ID,
+            patientName: a.Patient_Name || `Patient #${a.Patient_ID}`,
+            branch: a.Branch_Name || 'Colombo Main Clinic',
+            Branch_ID: a.Branch_ID,
+            status: a.Status,
+            reason: a.Reason_For_Visit,
+            isWalkIn: a.Appointment_Type === 'Walk_In'
+          }));
+          setAppointmentList(mappedAppts);
+        }
+      }).catch(err => console.error("API Error (Appointments):", err));
+
+      api.get('/billing/invoices').then(res => {
+        if (res.data && res.data.length > 0) {
+          const mappedInvoices = res.data.map(inv => ({
+            id: `INV-${inv.Invoice_ID}`,
+            Invoice_ID: inv.Invoice_ID,
+            invoiceId: inv.Invoice_ID,
+            appointmentId: `APP-${inv.Appointment_ID}`,
+            patientName: inv.Patient_Name,
+            patientId: inv.Patient_ID ? `PAT-${inv.Patient_ID}` : undefined,
+            Patient_ID: inv.Patient_ID,
+            doctorFee: Number(inv.Billed_Consultation_Fee || 0),
+            treatmentsSubtotal: Number(inv.Total_Treatments_Fee || 0),
+            patientBalance: Number(inv.Patient_Paid || 0),
+            outstandingBalance: Number(inv.Outstanding_Balance || 0),
+            insuranceCoverage: Number(inv.Insurance_Covered || 0),
+            total: Number(inv.Invoice_Total != null ? inv.Invoice_Total : (Number(inv.Billed_Consultation_Fee || 0) + Number(inv.Total_Treatments_Fee || 0))),
+            status: inv.Invoice_Status,
+            Invoice_Status: inv.Invoice_Status,
+            branch: inv.Branch_Name || 'Colombo Main Clinic',
+            Branch_ID: inv.Branch_ID,
+            date: inv.Invoice_Date
+          }));
+          setInvoiceList(mappedInvoices);
+        }
+      }).catch(err => console.error("API Error (Invoices):", err));
+
+      if (currentUser.roleCode === 'ROLE_ADMIN') {
+        api.get('/audit-logs').then(res => {
+          if (res.data && res.data.length > 0) {
+            const mapped = res.data.map(log => ({
+              id: `AUD-${log.Audit_ID}`,
+              timestamp: log.Timestamp,
+              userId: log.Account_ID.toString(),
+              username: log.Performed_By || `Account ${log.Account_ID}`,
+              branch: log.Affected_Branch || 'All Branches',
+              action: log.Action_Type,
+              details: `Table: ${log.Table_Name}, Record: ${log.Record_ID}`,
+              before: log.Old_Value ? JSON.stringify(log.Old_Value) : 'null',
+              after: log.New_Value ? JSON.stringify(log.New_Value) : 'null'
+            }));
+            setAuditLogs(mapped);
+          }
+        }).catch(err => console.error("API Error (Audit):", err));
+      }
+    }
+  }, [currentUser]);
+
   // Global UX settings
   const [selectedBranch, setSelectedBranch] = useState('All Branches');
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
@@ -187,6 +269,7 @@ export default function App() {
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // Save states to localStorage
   useEffect(() => {
@@ -195,9 +278,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('catms_staff', JSON.stringify(staffList));
   }, [staffList]);
-  useEffect(() => {
-    localStorage.setItem('catms_patients', JSON.stringify(patientList));
-  }, [patientList]);
   useEffect(() => {
     localStorage.setItem('catms_appointments', JSON.stringify(appointmentList));
   }, [appointmentList]);
@@ -213,6 +293,29 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('catms_audits', JSON.stringify(auditLogs));
   }, [auditLogs]);
+
+  // load patients from the backend for the panels that still read patientList
+  useEffect(() => {
+    if (!currentUser) return;
+    let isCurrent = true;
+    searchPatients('', 1, 50)
+      .then(res => {
+        if (!isCurrent) return;
+        setTotalPatients(res.total != null ? res.total : (res.items || []).length);
+        setPatientList((res.items || []).map(adaptPatientForPanels));
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setPatientList([]);
+          setTotalPatients(0);
+        }
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [currentUser, patientsVersion]);
+
+  const reloadPatients = () => setPatientsVersion(v => v + 1);
 
   // ==========================================
   // SPA ROUTING MANAGEMENT
@@ -244,18 +347,21 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Wait for hydration before running route checks to prevent redirect loops
+    if (!isHydrated) return;
+
     // If not logged in, enforce /login
     if (!currentUser) {
       if (currentPath !== '/login') {
         navigateTo('/login');
       }
     } else {
-      // If at login or root, redirect to role home
-      if (currentPath === '/login' || currentPath === '/') {
+      // If at login, root, or unauthorized path, redirect to role default path
+      if (currentPath === '/login' || currentPath === '/' || !isPathAllowed(currentUser.roleCode, currentPath)) {
         navigateTo(getRoleDefaultPath(currentUser.roleCode));
       }
     }
-  }, [currentUser, currentPath]);
+  }, [currentUser, currentPath, isHydrated]);
 
   // ==========================================
   // GLOBAL HOTKEYS & UTILITIES
@@ -294,90 +400,110 @@ export default function App() {
   // Switch default branch lock when user changes
   useEffect(() => {
     if (currentUser) {
-      setSelectedBranch(currentUser.branch || 'All Branches');
+      // admins start on the whole network, everyone else on their own branch
+      setSelectedBranch(currentUser.roleCode === 'ROLE_ADMIN' ? 'All Branches' : (currentUser.branch || 'All Branches'));
     }
   }, [currentUser]);
 
-  // Global search filtering
-  const searchResults = useMemo(() => {
-    if (!globalSearchQuery) return [];
-    const query = globalSearchQuery.toLowerCase();
-    return patientList.filter(p =>
-      p.name.toLowerCase().includes(query) ||
-      p.id.toLowerCase().includes(query) ||
-      p.contact.toLowerCase().includes(query) ||
-      p.nic.toLowerCase().includes(query)
-    );
-  }, [patientList, globalSearchQuery]);
+  // global search asks the backend after a short pause
+  const [searchResults, setSearchResults] = useState([]);
+
+  useEffect(() => {
+    if (!globalSearchQuery) {
+      setSearchResults([]);
+      return;
+    }
+    let isCurrent = true;
+    const timer = setTimeout(() => {
+      searchPatients(globalSearchQuery, 1, 8)
+        .then(res => isCurrent && setSearchResults(res.items || []))
+        .catch(() => isCurrent && setSearchResults([]));
+    }, 300);
+    return () => {
+      isCurrent = false;
+      clearTimeout(timer);
+    };
+  }, [globalSearchQuery]);
 
   // ==========================================
   // AUTHENTICATION HANDLERS
   // ==========================================
-  const handleSignIn = (e) => {
+  const handleSignIn = async (e) => {
     e.preventDefault();
-    const user = DEMO_LOGINS.find(u => u.email.toLowerCase() === emailInput.toLowerCase() && u.password === passwordInput);
-    if (user) {
-      localStorage.setItem('catms_user', JSON.stringify(user));
-      setCurrentUser(user);
-      setAuthError('');
-      setEmailInput('');
-      setPasswordInput('');
-      triggerToast(`Authenticated successfully as ${user.role}!`);
-      navigateTo(getRoleDefaultPath(user.roleCode));
-    } else {
-      setAuthError('Invalid credentials. Check email or password.');
+    try {
+      const result = await login(emailInput, passwordInput);
+      if (result?.success) {
+        setAuthError('');
+        setEmailInput('');
+        setPasswordInput('');
+        triggerToast(result.isDemo ? t('auth_demo_success', `Authenticated as ${result.user.role} (Demo mode)!`, { role: result.user.role }) : t('auth_success', 'Authenticated successfully!'));
+        navigateTo(getRoleDefaultPath(result.user.roleCode));
+      }
+    } catch (error) {
+      console.error("Login failed:", error);
+      setAuthError(t('invalid_credentials', 'Invalid credentials. Check username or password.'));
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('catms_user');
-    setCurrentUser(null);
-    triggerToast('Session invalidated. Redirecting...');
+    logout();
+    triggerToast(t('session_invalidated', 'Session invalidated. Redirecting...'));
     navigateTo('/login');
   };
 
-  // Developer rapid role swapper (claim bypass switcher)
-  const handleQuickSwitchRole = (roleCode) => {
-    const targetUser = DEMO_LOGINS.find(u => u.roleCode === roleCode);
-    if (targetUser) {
-      localStorage.setItem('catms_user', JSON.stringify(targetUser));
-      setCurrentUser(targetUser);
-      triggerToast(`Bypassed to role: ${targetUser.role}`);
-      navigateTo(getRoleDefaultPath(targetUser.roleCode));
-    }
-  };
 
   // State bundle pack
-  const db = { staffList, patientList, appointmentList, liveQueue, invoiceList, auditLogs, branches, currentUser, selectedBranch, medicalHistories };
-  const handlers = { setStaffList, setPatientList, setAppointmentList, setLiveQueue, setInvoiceList, setMedicalHistories, setAuditLogs, setBranches, addAuditLog, triggerToast, navigateTo };
+  const db = { staffList, patientList, totalPatients, appointmentList, liveQueue, invoiceList, auditLogs, branches, currentUser, selectedBranch, medicalHistories };
+  const handlers = { setStaffList, setAppointmentList, setLiveQueue, setInvoiceList, setMedicalHistories, setAuditLogs, setBranches, addAuditLog, triggerToast, navigateTo, reloadPatients, setSelectedBranch };
 
   // ==========================================
   // RENDER COORDINATOR
   // ==========================================
-  
+
   // 1. AUTH PORTAL (Logged out view)
+  // Background style: Raw clinic waiting room photo
+  const LOGIN_BG_STYLE = {
+    backgroundImage: "url('/clinic-bg.png')",
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  };
+
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+      <div
+        className="min-h-screen login-bg flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative"
+        style={LOGIN_BG_STYLE}
+      >
+        {/* Top-right language selector on login portal */}
+        <div className="absolute top-6 right-6 z-30">
+          <LanguageSelector variant="portal" />
+        </div>
+
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
           <div className="flex justify-center items-center space-x-2.5">
             <div className="p-2.5 bg-blue-600 rounded-2xl text-white shadow-lg animate-pulse">
               <Activity className="h-6 w-6" />
             </div>
             <span className="text-3xl font-extrabold tracking-tight text-slate-900">
-              CareFlow <span className="text-blue-600">OS</span>
+              CareFlow <span className="text-blue-600">CATMS</span>
             </span>
           </div>
           <h2 className="mt-4 text-sm font-medium text-slate-500 uppercase tracking-widest">
-            Clinic Appointment & Treatment Management System
+            {t('system_subtitle', 'CLINIC APPOINTMENT & TREATMENT MANAGEMENT SYSTEM')}
           </h2>
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white py-8 px-4 border border-slate-200 shadow-2xl rounded-2xl sm:px-10 space-y-6">
-            <h3 className="text-lg font-bold text-slate-900 text-center border-b border-slate-100 pb-3">
-              Staff Portal Authentication
-            </h3>
+            <div className="text-center border-b border-slate-100 pb-3">
+              <h3 className="text-xl font-bold text-slate-900">
+                {t('welcome_back', 'Welcome Back')}
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {t('sign_in_subtitle', 'Sign in to access your account')}
+              </p>
+            </div>
 
             {authError && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl flex items-center space-x-2 text-xs">
@@ -386,20 +512,20 @@ export default function App() {
               </div>
             )}
 
-            <form className="space-y-4" onSubmit={handleSignIn}>
+            <form className="space-y-4" onSubmit={handleSignIn} noValidate>
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Email Address / Username
+                  {t('email_or_username', 'Email Address / Username')}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                     <User className="h-4 w-4" />
                   </span>
                   <input
-                    type="email"
+                    type="text"
                     required
                     className="w-full pl-9 pr-3 py-2 border border-slate-350 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                    placeholder="name@careflow.com"
+                    placeholder={t('username_placeholder', 'username or name@careflow.com')}
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                   />
@@ -408,7 +534,7 @@ export default function App() {
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Secure Password
+                  {t('password', 'Password')}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
@@ -429,30 +555,11 @@ export default function App() {
                 type="submit"
                 className="w-full flex justify-center py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-xs"
               >
-                Sign In to System
+                {t('sign_in_button', 'Sign In to System')}
               </button>
             </form>
 
-            <div className="pt-6 border-t border-slate-200">
-              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 text-center">
-                Demo Accounts Quick-Login Selector
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {DEMO_LOGINS.map((demo) => (
-                  <button
-                    key={demo.role}
-                    onClick={() => {
-                      setEmailInput(demo.email);
-                      setPasswordInput(demo.password);
-                    }}
-                    className="p-2.5 border border-slate-200 rounded-xl text-left hover:bg-slate-50 hover:border-slate-300 transition-all text-xs cursor-pointer shadow-2xs"
-                  >
-                    <span className="font-bold text-slate-900 block">{demo.role}</span>
-                    <span className="text-slate-400 truncate block font-mono text-[9px]">{demo.email}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+
           </div>
         </div>
       </div>
@@ -462,7 +569,7 @@ export default function App() {
   // 2. MAIN APP SHELL (Logged in views)
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex text-slate-900">
-      
+
       {/* Toast Alert Banner */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4.5 py-3.5 rounded-xl shadow-2xl border border-slate-800 flex items-center space-x-2.5 text-xs animate-bounce font-medium">
@@ -488,48 +595,43 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/admin/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/admin/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Building className="h-4.5 w-4.5" />
-                  <span>Executive Dashboard</span>
+                  <span>{t('nav_executive_dashboard', 'Executive Dashboard')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/staff')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/admin/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Users className="h-4.5 w-4.5" />
-                  <span>Staff Directory</span>
+                  <span>{t('nav_staff_directory', 'Staff Directory')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/branches')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/admin/branches' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/branches' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Building className="h-4.5 w-4.5" />
-                  <span>Clinic Branches</span>
+                  <span>{t('nav_clinic_branches', 'Clinic Branches')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/audit-logs')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/admin/audit-logs' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/audit-logs' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <ClipboardList className="h-4.5 w-4.5" />
-                  <span>Security Audit Logs</span>
+                  <span>{t('nav_security_audit_logs', 'Security Audit Logs')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/reports')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/admin/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <TrendingUp className="h-4.5 w-4.5" />
-                  <span>Reports Suite</span>
+                  <span>{t('nav_reports_suite', 'Reports Suite')}</span>
                 </button>
               </>
             )}
@@ -538,39 +640,35 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/manager/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/manager/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Building className="h-4.5 w-4.5" />
-                  <span>Branch Operations</span>
+                  <span>{t('nav_branch_operations', 'Branch Operations')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/manager/roster')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/manager/roster' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/roster' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Calendar className="h-4.5 w-4.5" />
-                  <span>Doctor Roster Planner</span>
+                  <span>{t('nav_doctor_roster_planner', 'Doctor Roster Planner')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/manager/staff')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/manager/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Users className="h-4.5 w-4.5" />
-                  <span>Local Staff Directory</span>
+                  <span>{t('nav_local_staff_directory', 'Local Staff Directory')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/manager/reports')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/manager/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <TrendingUp className="h-4.5 w-4.5" />
-                  <span>Branch Reports</span>
+                  <span>{t('nav_branch_reports', 'Branch Reports')}</span>
                 </button>
               </>
             )}
@@ -579,39 +677,35 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/reception/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/reception/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <ClipboardList className="h-4.5 w-4.5" />
-                  <span>Triage Workbench</span>
+                  <span>{t('nav_triage_workbench', 'Triage Workbench')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/reception/patients')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/reception/patients' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/patients' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Users className="h-4.5 w-4.5" />
-                  <span>Patient Registry</span>
+                  <span>{t('nav_patient_registry', 'Patient Registry')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/reception/appointments')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/reception/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Calendar className="h-4.5 w-4.5" />
-                  <span>Schedules Calendar</span>
+                  <span>{t('nav_schedules_calendar', 'Schedules Calendar')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/reception/walkin')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/reception/walkin' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/walkin' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Clock className="h-4.5 w-4.5" />
-                  <span>Walk-in Intake</span>
+                  <span>{t('nav_walkin_intake', 'Walk-in Intake')}</span>
                 </button>
               </>
             )}
@@ -620,12 +714,19 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/doctor/workbench')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath.startsWith('/doctor/') ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/doctor/workbench' || currentPath.startsWith('/doctor/consultation') ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Activity className="h-4.5 w-4.5" />
-                  <span>Consult Workbench</span>
+                  <span>{t('nav_consult_workbench', 'Consult Workbench')}</span>
+                </button>
+                <button
+                  onClick={() => navigateTo('/doctor/appointments')}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/doctor/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
+                >
+                  <Calendar className="h-4.5 w-4.5" />
+                  <span>{t('nav_upcoming_bookings', 'Upcoming Bookings')}</span>
                 </button>
               </>
             )}
@@ -634,39 +735,35 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/billing/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/billing/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <DollarSign className="h-4.5 w-4.5" />
-                  <span>Billing Desk</span>
+                  <span>{t('nav_billing_desk', 'Billing Desk')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/billing/invoices')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/billing/invoices' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/invoices' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <FileText className="h-4.5 w-4.5" />
-                  <span>Invoice Ledger</span>
+                  <span>{t('nav_invoice_ledger', 'Invoice Ledger')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/billing/claims')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/billing/claims' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/claims' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <ShieldCheck className="h-4.5 w-4.5" />
-                  <span>Insurance Claims</span>
+                  <span>{t('nav_insurance_claims', 'Insurance Claims')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/billing/reports')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/billing/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <TrendingUp className="h-4.5 w-4.5" />
-                  <span>Finance Reports</span>
+                  <span>{t('nav_finance_reports', 'Finance Reports')}</span>
                 </button>
               </>
             )}
@@ -675,69 +772,56 @@ export default function App() {
               <>
                 <button
                   onClick={() => navigateTo('/portal/home')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/portal/home' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/home' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Building className="h-4.5 w-4.5" />
-                  <span>Home Dashboard</span>
+                  <span>{t('nav_home_dashboard', 'Home Dashboard')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/portal/book')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/portal/book' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/book' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <Calendar className="h-4.5 w-4.5" />
-                  <span>Self Booking Wizard</span>
+                  <span>{t('nav_self_booking_wizard', 'Self Booking Wizard')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/portal/medical-history')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/portal/medical-history' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/medical-history' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <FileText className="h-4.5 w-4.5" />
-                  <span>My Consultations</span>
+                  <span>{t('nav_my_consultations', 'My Consultations')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/portal/billing')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    currentPath === '/portal/billing' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                  }`}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/billing' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+                    }`}
                 >
                   <DollarSign className="h-4.5 w-4.5" />
-                  <span>My Receipts</span>
+                  <span>{t('nav_my_receipts', 'My Receipts')}</span>
                 </button>
               </>
             )}
           </nav>
         </div>
 
-        {/* System log details */}
-        <div className="p-4 border-t border-slate-900 bg-slate-950/50 space-y-4">
-          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">
-            Role Bypasses (Bypass Switcher)
+        {/* User Session Info */}
+        <div className="p-4 border-t border-slate-900 bg-slate-950/50">
+          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            {t('active_session', 'Active Session')}
           </div>
-          <div className="grid grid-cols-2 gap-1 text-[9px] font-semibold">
-            {DEMO_LOGINS.map(demo => (
-              <button
-                key={demo.role}
-                onClick={() => handleQuickSwitchRole(demo.roleCode)}
-                className={`py-1 border rounded text-center transition-all cursor-pointer ${
-                  currentUser.roleCode === demo.roleCode ? 'bg-blue-600 border-blue-600 text-white shadow-xs' : 'bg-transparent border-slate-800 text-slate-450 hover:bg-slate-900 hover:text-white'
-                }`}
-              >
-                {demo.role.split(' ')[0]}
-              </button>
-            ))}
+          <div className="text-xs font-semibold text-slate-300 mt-1 flex items-center space-x-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
+            <span>{currentUser.roleCode.replace('ROLE_', '')}</span>
           </div>
         </div>
       </aside>
 
       {/* Main Workspace Frame */}
       <div className="pl-64 flex-1 flex flex-col min-w-0">
-        
+
         {/* Global Top Header Bar */}
         <header className="bg-white border-b border-slate-200 h-16 px-8 flex justify-between items-center shrink-0 z-20 shadow-xs">
           <div className="flex items-center space-x-4">
@@ -755,31 +839,34 @@ export default function App() {
                     value={selectedBranch}
                     onChange={e => setSelectedBranch(e.target.value)}
                   >
-                    <option value="All Branches">All Branches</option>
-                    <option value="Colombo Main">Colombo Main</option>
-                    <option value="Kandy">Kandy</option>
-                    <option value="Galle">Galle</option>
+                    <option value="All Branches">{t('all_branches', 'All Branches')}</option>
+                    <option value="Colombo Main">{t('colombo_main', 'Colombo Main')}</option>
+                    <option value="Kandy">{t('kandy', 'Kandy')}</option>
+                    <option value="Galle">{t('galle', 'Galle')}</option>
                   </select>
                 </div>
               ) : (
                 <span className="text-xs font-semibold text-slate-500 flex items-center space-x-1">
                   <Building className="h-4 w-4 text-slate-400" />
-                  <span>Branch: <strong>{currentUser.branch || 'None'}</strong> [Locked]</span>
+                  <span>{t('branch', 'Branch')}: <strong>{currentUser.branch || 'None'}</strong> [Locked]</span>
                 </span>
               )}
             </div>
           </div>
 
-          {/* Center search indicator button */}
-          <div className="flex items-center space-x-4">
+          {/* Center search & actions cluster */}
+          <div className="flex items-center space-x-3.5">
             <button
               onClick={() => setGlobalSearchOpen(true)}
               className="hidden md:flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-1.5 text-xs text-slate-450 hover:bg-slate-100 hover:border-slate-300 transition-all font-medium cursor-pointer"
             >
               <Search className="h-3.5 w-3.5" />
-              <span>Search Patient Code / Name...</span>
+              <span>{t('search_placeholder', 'Search Patient Code / Name...')}</span>
               <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-mono shadow-2xs">Ctrl + K</kbd>
             </button>
+
+            {/* Language Selector Dropdown in Top Bar */}
+            <LanguageSelector />
 
             {/* User Profile & Badge */}
             <div className="h-5 w-px bg-slate-200" />
@@ -797,11 +884,20 @@ export default function App() {
                 <span className="text-[10px] text-slate-400 block font-mono mt-0.5">{currentUser.email}</span>
               </div>
 
+              {/* Change Password button */}
+              <button
+                onClick={() => setShowChangePasswordModal(true)}
+                className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-xl transition-all cursor-pointer"
+                title={t('change_password', 'Change Password')}
+              >
+                <KeyRound className="h-4.5 w-4.5" />
+              </button>
+
               {/* Logout button */}
               <button
                 onClick={handleLogout}
                 className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition-all cursor-pointer"
-                title="Instant Logout"
+                title={t('instant_logout', 'Instant Logout')}
               >
                 <LogOut className="h-4.5 w-4.5" />
               </button>
@@ -814,7 +910,29 @@ export default function App() {
           {(() => {
             // Simple path routing mapping
             const path = currentPath;
-            
+
+            // Enforce role-versus-path workspace guard
+            if (!isPathAllowed(currentUser.roleCode, path)) {
+              return (
+                <div className="bg-white border border-red-200 rounded-xl p-10 text-center text-slate-700 shadow-xs">
+                  <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+                  <h3 className="font-bold text-slate-900 text-lg">{t('access_denied', 'Access Denied')}</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {t('access_denied_desc', `Your account role (${currentUser.roleCode.replace('ROLE_', '')}) does not have permission to access ${path}.`, {
+                      role: currentUser.roleCode.replace('ROLE_', ''),
+                      path
+                    })}
+                  </p>
+                  <button
+                    onClick={() => navigateTo(getRoleDefaultPath(currentUser.roleCode))}
+                    className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    {t('return_to_workspace', 'Return to My Workspace')}
+                  </button>
+                </div>
+              );
+            }
+
             if (path.startsWith('/admin/')) {
               const subView = path.replace('/admin/', '');
               return <AdminPanel subView={subView} db={db} handlers={handlers} />;
@@ -858,13 +976,13 @@ export default function App() {
       {/* ==========================================
           GLOBAL OVERLAY MODALS
           ========================================== */}
-      
+
       {/* GLOBAL PATIENT SEARCH MODAL (Ctrl+K) */}
       {globalSearchOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setGlobalSearchOpen(false)} />
           <div className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-            
+
             {/* Search Input bar */}
             <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 relative flex items-center">
               <Search className="h-5 w-5 text-slate-400 mr-3" />
@@ -888,7 +1006,7 @@ export default function App() {
             <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 p-4 space-y-2">
               {searchResults.map(p => (
                 <div
-                  key={p.id}
+                  key={p.patient_id}
                   onClick={() => {
                     // Navigate depending on user role
                     if (currentUser.roleCode === 'ROLE_RECEPTIONIST') {
@@ -897,18 +1015,18 @@ export default function App() {
                       navigateTo('/doctor/workbench');
                     }
                     setGlobalSearchOpen(false);
-                    triggerToast(`Selected patient ${p.name}`);
+                    triggerToast(`Selected patient ${formatPatientName(p.first_name, p.last_name)}`);
                   }}
                   className="p-3 border border-slate-200 hover:border-blue-500 rounded-xl bg-slate-50/50 hover:bg-white transition-all cursor-pointer text-left"
                 >
                   <div className="flex justify-between items-center font-sans text-xs">
-                    <span className="font-bold text-slate-900 text-sm">{p.name}</span>
-                    <span className="font-mono text-slate-450">{p.id}</span>
+                    <span className="font-bold text-slate-900 text-sm">{formatPatientName(p.first_name, p.last_name)}</span>
+                    <span className="font-mono text-slate-450">{formatPatientId(p.patient_id)}</span>
                   </div>
                   <div className="flex justify-between items-center text-[10px] text-slate-450 mt-2 font-mono">
                     <span>NIC: {p.nic}</span>
-                    <span>Contact: {p.contact}</span>
-                    <span>Branch: {p.branch}</span>
+                    <span>Contact: {p.contact_number}</span>
+                    <span>Registered: {p.registration_date}</span>
                   </div>
                 </div>
               ))}
@@ -927,6 +1045,13 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+        triggerToast={triggerToast}
+      />
     </div>
   );
 }

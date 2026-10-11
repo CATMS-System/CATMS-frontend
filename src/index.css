@@ -57,3 +57,12 @@
   backdrop-filter: blur(12px);
   border: 1px solid rgba(241, 245, 249, 0.7);
 }
+
+/* Login screen background - raw clinic waiting room photo */
+.login-bg {
+  background-color: #f8fafc;
+  background-image: url('/clinic-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

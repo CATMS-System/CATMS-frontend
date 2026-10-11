@@ -1,597 +1,2239 @@
-import React, { useState, useMemo } from 'react';
-import { Clock, Activity, FileText, CheckCircle, Search, Plus, Minus, User, ShieldAlert, ArrowRight, CornerDownRight } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope, AlertCircle, Search, Filter, Layers, Tag, Plus, Minus, Trash2, ClipboardList, Loader2, CheckCircle2, History, X, ChevronDown, ChevronUp, RefreshCw, CalendarDays } from 'lucide-react';
+import { useDoctorQueue } from '../hooks/useDoctorQueue';
+import { getCatalogue, getCategories } from '../api/treatmentApi';
+import { createConsultation, getPatientHistory, getConsultation } from '../api/consultationApi';
+import { getAppointments, getAppointmentById } from '../services/appointmentService';
+import { useLanguage } from '../contexts/LanguageContext';
 
-export default function DoctorPanel({ subView, paramId, db, handlers }) {
-  const { liveQueue, patientList, staffList, medicalHistories, appointmentList, invoiceList } = db;
-  const { setLiveQueue, setMedicalHistories, setInvoiceList, setAppointmentList, triggerToast, addAuditLog, navigateTo } = handlers;
+export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
+  const { t } = useLanguage();
+  const currentDoctorId = db?.currentUser?.doctor_id ?? db?.currentUser?.doctorId ?? db?.currentUser?.id ?? 'STF-001';
+  const currentDoctorName = db?.currentUser?.name || 'Dr. Alexander Bennett';
+  // TODO: branch_id should come from auth context once Member 1's auth work lands
+  const currentBranchId = db?.currentUser?.branch_id || db?.currentUser?.branchId || 1;
 
-  const currentDoctorId = db.currentUser.id || 'STF-001';
-  const currentDoctorName = db.currentUser.name || 'Dr. Alexander Bennett';
+  // Numeric doctor id resolution for appointment queries
+  const numericDoctorId = useMemo(() => {
+    if (db?.currentUser?.Doctor_ID) return Number(db.currentUser.Doctor_ID);
+    if (db?.currentUser?.doctor_id && !isNaN(Number(db.currentUser.doctor_id))) return Number(db.currentUser.doctor_id);
+    if (db?.currentUser?.doctorId && !isNaN(Number(db.currentUser.doctorId))) return Number(db.currentUser.doctorId);
+    if (db?.currentUser?.staff_id && !isNaN(Number(db.currentUser.staff_id))) return Number(db.currentUser.staff_id);
+    const parsed = parseInt(String(db?.currentUser?.id || '').replace(/\D/g, ''), 10);
+    return !isNaN(parsed) && parsed > 0 ? parsed : 1;
+  }, [db?.currentUser]);
 
-  // Find active appointment for consultation
-  const activeApptId = paramId;
-  const activeAppt = useMemo(() => {
-    if (!activeApptId) return null;
-    return appointmentList.find(a => a.id === activeApptId);
-  }, [appointmentList, activeApptId]);
+  // Wire doctor's daily appointment queue through isolated hook
+  const { queue, loading, updateQueueStatus, refreshQueue } = useDoctorQueue(
+    currentDoctorId,
+    currentBranchId,
+    db?.liveQueue
+  );
 
-  const activePatient = useMemo(() => {
-    if (!activeAppt) return null;
-    return patientList.find(p => p.id === activeAppt.patientId);
-  }, [patientList, activeAppt]);
+  // Doctor upcoming appointments state & queries
+  const [doctorAppointments, setDoctorAppointments] = useState([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState(null);
 
-  // Vitals inputs
-  const [vitals, setVitals] = useState({
-    bp: '120/80',
-    pulse: '72',
-    temp: '98.6',
-    weight: '70'
-  });
-  const [complaint, setComplaint] = useState('');
-  const [diagnosis, setDiagnosis] = useState('');
-  const [lifestyleAdvice, setLifestyleAdvice] = useState('');
+  // Filter state for upcoming bookings
+  const [dateFilter, setDateFilter] = useState('upcoming');
+  const [customDate, setCustomDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
+  const [searchFilter, setSearchFilter] = useState('');
 
-  // Selected treatments for active consult
-  const [prescribedItems, setPrescribedItems] = useState([
-    { code: 'TRT-001', name: 'General Consultation Fee', category: 'Consultations', price: 1500, qty: 1, instructions: 'Standard clinical checkup fee' }
-  ]);
-  const [searchCatalogueQuery, setSearchCatalogueQuery] = useState('');
-  const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
+  const fetchDoctorAppointments = useCallback(async () => {
+    setLoadingAppointments(true);
+    setAppointmentsError(null);
+    try {
+      const data = await getAppointments({ doctor_id: numericDoctorId });
+      setDoctorAppointments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch doctor appointments:', err);
+      setAppointmentsError(err?.message || 'Failed to load doctor appointments');
+      setDoctorAppointments([]);
+    } finally {
+      setLoadingAppointments(false);
+    }
+  }, [numericDoctorId]);
 
-  // Doctor local queue (only their assigned appointments/triage queue)
-  const doctorQueue = useMemo(() => {
-    return liveQueue.filter(q => q.doctorId === currentDoctorId || q.assignedDoctor === currentDoctorName);
-  }, [liveQueue, currentDoctorId, currentDoctorName]);
+  useEffect(() => {
+    fetchDoctorAppointments();
+  }, [fetchDoctorAppointments]);
 
-  // Standard treatment catalogue
-  const CATALOGUE = [
-    { code: 'TRT-001', name: 'General Consultation Fee', category: 'Consultations', price: 1500 },
-    { code: 'TRT-002', name: 'ECG / Electrocardiogram', category: 'Lab Tests', price: 5000 },
-    { code: 'TRT-003', name: 'Blood Sugar Rapid Test', category: 'Lab Tests', price: 600 },
-    { code: 'TRT-004', name: 'Chest X-Ray Digital', category: 'Radiology', price: 8000 },
-    { code: 'TRT-005', name: 'Nebulizer Therapy Session', category: 'Procedures', price: 2500 },
-    { code: 'TRT-006', name: 'Stitch / Laceration Care', category: 'Procedures', price: 4000 },
-    { code: 'TRT-007', name: 'IV Saline Infusion 500ml', category: 'Procedures', price: 3000 }
-  ];
+  // Resolve real backend status for queue items
+  const resolveQueueItemStatus = useCallback((q) => {
+    if (!q) return 'SCHEDULED';
+    const qApptId = String(q.Appointment_ID || q.appointment_id || q.appointmentId || q.id || '').trim();
+    const qApptNum = qApptId.replace(/\D/g, '');
 
-  const filteredCatalogue = useMemo(() => {
-    if (!searchCatalogueQuery) return CATALOGUE;
-    return CATALOGUE.filter(c => c.name.toLowerCase().includes(searchCatalogueQuery.toLowerCase()));
-  }, [searchCatalogueQuery]);
-
-  const handleCallPatient = (queueItem) => {
-    // Transition status to IN_PROGRESS
-    const updatedQueue = liveQueue.map(q => {
-      if (q.patientId === queueItem.patientId) {
-        return { ...q, status: 'IN_PROGRESS' };
+    // 1. Check real doctor appointments fetched from backend
+    if (doctorAppointments && doctorAppointments.length > 0) {
+      const match = doctorAppointments.find((a) => {
+        const aApptId = String(a.Appointment_ID || a.appointment_id || a.id || '').trim();
+        const aApptNum = aApptId.replace(/\D/g, '');
+        if (qApptNum && aApptNum && qApptNum === aApptNum) return true;
+        if (qApptId && aApptId && qApptId.toLowerCase() === aApptId.toLowerCase()) return true;
+        return false;
+      });
+      if (match?.Status) {
+        return match.Status;
       }
-      return q;
-    });
-    setLiveQueue(updatedQueue);
+    }
 
-    // Find appointment ID to redirect to
-    const appt = appointmentList.find(a => a.patientId === queueItem.patientId && a.date === '2026-08-23' && a.doctorId === currentDoctorId);
-    const apptId = appt ? appt.id : 'APP-1002'; // fallback
+    // 2. Check global appointmentList
+    if (db?.appointmentList && db.appointmentList.length > 0) {
+      const match = db.appointmentList.find((a) => {
+        const aApptId = String(a.Appointment_ID || a.appointment_id || a.id || '').trim();
+        const aApptNum = aApptId.replace(/\D/g, '');
+        if (qApptNum && aApptNum && qApptNum === aApptNum) return true;
+        if (qApptId && aApptId && qApptId.toLowerCase() === aApptId.toLowerCase()) return true;
+        return false;
+      });
+      if (match?.Status || match?.status) {
+        return match.Status || match.status;
+      }
+    }
 
-    // Set appointment status to in_progress
-    const updatedAppts = appointmentList.map(a => {
-      if (a.id === apptId) return { ...a, status: 'In-Progress' };
-      return a;
-    });
-    setAppointmentList(updatedAppts);
+    // 3. Fallback to queue item's own status
+    return q.Status || q.status || 'SCHEDULED';
+  }, [doctorAppointments, db?.appointmentList]);
 
-    addAuditLog(
-      'UPDATE_APPOINTMENT',
-      `Called patient ${queueItem.patientName} into consultation room`,
-      'null',
-      JSON.stringify(queueItem)
-    );
+  const isQueueItemCompleted = useCallback((q) => {
+    const status = resolveQueueItemStatus(q);
+    const s = String(status || '').toLowerCase();
+    if (['completed', 'finalized'].includes(s)) return true;
+    const ownStatus = String(q?.status || q?.Status || '').toLowerCase();
+    return ['completed', 'finalized'].includes(ownStatus);
+  }, [resolveQueueItemStatus]);
 
-    triggerToast(`Calling ${queueItem.patientName} to console.`);
-    navigateTo(`/doctor/consultation/${apptId}`);
-  };
+  // Auto-sync completed appointments to queue status so state is consistent
+  useEffect(() => {
+    if (queue && queue.length > 0) {
+      queue.forEach((item) => {
+        if (isQueueItemCompleted(item) && item.status !== 'Completed' && item.Status !== 'Completed') {
+          updateQueueStatus(item.Appointment_ID || item.appointmentId || item.patientId, 'Completed');
+        }
+      });
+    }
+  }, [queue, isQueueItemCompleted, updateQueueStatus]);
 
-  const handleAddTreatment = (item) => {
-    const exists = prescribedItems.find(p => p.code === item.code);
-    if (exists) {
-      setPrescribedItems(prescribedItems.map(p => p.code === item.code ? { ...p, qty: p.qty + 1 } : p));
+  // Filter state for live triage queue
+  const [queueFilter, setQueueFilter] = useState('all'); // 'all' | 'waiting' | 'completed'
+
+  const queueWaitingCount = useMemo(() => {
+    return queue.filter((q) => !isQueueItemCompleted(q)).length;
+  }, [queue, isQueueItemCompleted]);
+
+  const queueCompletedCount = useMemo(() => {
+    return queue.filter((q) => isQueueItemCompleted(q)).length;
+  }, [queue, isQueueItemCompleted]);
+
+  const filteredQueue = useMemo(() => {
+    if (queueFilter === 'waiting') {
+      return queue.filter((q) => !isQueueItemCompleted(q));
+    }
+    if (queueFilter === 'completed') {
+      return queue.filter((q) => isQueueItemCompleted(q));
+    }
+    return queue;
+  }, [queue, queueFilter, isQueueItemCompleted]);
+
+  // Tab navigation between live queue and upcoming schedule
+  const [activeTab, setActiveTab] = useState(subView === 'appointments' ? 'appointments' : 'queue');
+
+  useEffect(() => {
+    if (subView === 'appointments') {
+      setActiveTab('appointments');
+    } else if (subView === 'workbench') {
+      setActiveTab('queue');
+    }
+  }, [subView]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'appointments') {
+      if (handlers?.navigateTo) handlers.navigateTo('/doctor/appointments');
     } else {
-      setPrescribedItems([...prescribedItems, { ...item, qty: 1, instructions: '' }]);
+      if (handlers?.navigateTo) handlers.navigateTo('/doctor/workbench');
     }
   };
 
-  const handleRemoveTreatment = (code) => {
-    setPrescribedItems(prescribedItems.filter(p => p.code !== code));
-  };
+  // Date boundary calculations
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const tomorrowStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+  const weekAheadStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  }, []);
 
-  const handleUpdateQty = (code, delta) => {
-    setPrescribedItems(prescribedItems.map(p => {
-      if (p.code === code) {
-        const nQty = p.qty + delta;
-        return { ...p, qty: nQty > 0 ? nQty : 1 };
+  // Filtered upcoming appointments
+  const filteredAppointments = useMemo(() => {
+    return doctorAppointments.filter((appt) => {
+      const apptDate = appt.Appointment_Date;
+      if (dateFilter === 'upcoming') {
+        if (apptDate < todayStr) return false;
+      } else if (dateFilter === 'today') {
+        if (apptDate !== todayStr) return false;
+      } else if (dateFilter === 'tomorrow') {
+        if (apptDate !== tomorrowStr) return false;
+      } else if (dateFilter === 'week') {
+        if (apptDate < todayStr || apptDate > weekAheadStr) return false;
+      } else if (dateFilter === 'custom' && customDate) {
+        if (apptDate !== customDate) return false;
       }
-      return p;
-    }));
+
+      if (statusFilter === 'active') {
+        if (!['Scheduled', 'Confirmed', 'In_Progress'].includes(appt.Status)) return false;
+      } else if (statusFilter !== 'ALL') {
+        if (appt.Status !== statusFilter) return false;
+      }
+
+      if (searchFilter.trim()) {
+        const q = searchFilter.toLowerCase();
+        const matchName = (appt.Patient_Name || '').toLowerCase().includes(q);
+        const matchId = String(appt.Patient_ID || '').toLowerCase().includes(q);
+        const matchReason = (appt.Reason_For_Visit || '').toLowerCase().includes(q);
+        if (!matchName && !matchId && !matchReason) return false;
+      }
+
+      return true;
+    });
+  }, [doctorAppointments, dateFilter, customDate, statusFilter, searchFilter, todayStr, tomorrowStr, weekAheadStr]);
+
+  // Summary statistics for appointments
+  const upcomingCount = useMemo(() => {
+    return doctorAppointments.filter((a) => a.Appointment_Date >= todayStr && ['Scheduled', 'Confirmed', 'In_Progress'].includes(a.Status)).length;
+  }, [doctorAppointments, todayStr]);
+
+  const confirmedCount = useMemo(() => {
+    return doctorAppointments.filter((a) => a.Appointment_Date >= todayStr && a.Status === 'Confirmed').length;
+  }, [doctorAppointments, todayStr]);
+
+  const scheduledCount = useMemo(() => {
+    return doctorAppointments.filter((a) => a.Appointment_Date >= todayStr && a.Status === 'Scheduled').length;
+  }, [doctorAppointments, todayStr]);
+
+  const completedAppointmentsCount = useMemo(() => {
+    return doctorAppointments.filter((a) => a.Status === 'Completed').length;
+  }, [doctorAppointments]);
+
+  // Parse appointment_id and patient_id from route / URL
+  const { activeAppointmentId, activePatientId } = useMemo(() => {
+    let apptId = null;
+    let patId = null;
+
+    if (paramId) {
+      const cleanParam = paramId.split('?')[0];
+      const parts = cleanParam.split('/');
+      apptId = parts[0] || null;
+      if (parts.length > 1) {
+        patId = parts[1];
+      }
+
+      if (paramId.includes('?')) {
+        const queryPart = paramId.split('?')[1];
+        const params = new URLSearchParams(queryPart);
+        if (!patId && params.get('patient_id')) {
+          patId = params.get('patient_id');
+        }
+        if (!apptId && params.get('appointment_id')) {
+          apptId = params.get('appointment_id');
+        }
+      }
+    }
+
+    if (typeof window !== 'undefined' && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('patient_id')) {
+        patId = params.get('patient_id');
+      }
+      if (params.get('appointment_id')) {
+        apptId = params.get('appointment_id');
+      }
+    }
+
+    return {
+      activeAppointmentId: apptId,
+      activePatientId: patId,
+    };
+  }, [paramId]);
+
+  // Real-time backend appointment fetch by ID for active consultation console
+  const [fetchedAppt, setFetchedAppt] = useState(null);
+
+  useEffect(() => {
+    if (!activeAppointmentId) {
+      setFetchedAppt(null);
+      return;
+    }
+    const cleanId = String(activeAppointmentId).replace(/\D/g, '');
+    const numId = cleanId ? parseInt(cleanId, 10) : null;
+    if (!numId || numId >= 1000) return;
+
+    let isCurrent = true;
+    getAppointmentById(numId)
+      .then((data) => {
+        if (isCurrent && data) {
+          setFetchedAppt(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not fetch appointment by ID from API:', err);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [activeAppointmentId]);
+
+  // Resolve active appointment and patient data from API and db
+  const activeAppt = useMemo(() => {
+    if (!activeAppointmentId) return null;
+    const cleanId = String(activeAppointmentId).replace(/\D/g, '');
+    const numId = cleanId ? parseInt(cleanId, 10) : null;
+
+    if (fetchedAppt) {
+      return {
+        ...fetchedAppt,
+        id: fetchedAppt.Appointment_ID || activeAppointmentId,
+        appointment_id: fetchedAppt.Appointment_ID,
+        Appointment_ID: fetchedAppt.Appointment_ID,
+        patientId: fetchedAppt.Patient_ID ? `PAT-${String(fetchedAppt.Patient_ID).padStart(4, '0')}` : activePatientId,
+        patient_id: fetchedAppt.Patient_ID,
+        Patient_ID: fetchedAppt.Patient_ID,
+        date: fetchedAppt.Appointment_Date,
+        time: fetchedAppt.Start_Time ? String(fetchedAppt.Start_Time).slice(0, 5) : '10:00 AM',
+        reason: fetchedAppt.Reason_For_Visit || 'Clinical consultation',
+        status: fetchedAppt.Status || 'In-Progress',
+      };
+    }
+
+    const fromDocList = doctorAppointments.find(
+      (a) =>
+        String(a.Appointment_ID) === String(activeAppointmentId) ||
+        (numId && a.Appointment_ID === numId)
+    );
+    if (fromDocList) {
+      return {
+        ...fromDocList,
+        id: fromDocList.Appointment_ID,
+        appointment_id: fromDocList.Appointment_ID,
+        Appointment_ID: fromDocList.Appointment_ID,
+        patientId: fromDocList.Patient_ID ? `PAT-${String(fromDocList.Patient_ID).padStart(4, '0')}` : activePatientId,
+        patient_id: fromDocList.Patient_ID,
+        Patient_ID: fromDocList.Patient_ID,
+        date: fromDocList.Appointment_Date,
+        time: fromDocList.Start_Time ? String(fromDocList.Start_Time).slice(0, 5) : '10:00 AM',
+        reason: fromDocList.Reason_For_Visit || 'Clinical consultation',
+        status: fromDocList.Status || 'In-Progress',
+      };
+    }
+
+    const fromDb = db?.appointmentList?.find(
+      (a) =>
+        String(a.id) === String(activeAppointmentId) ||
+        String(a.appointment_id) === String(activeAppointmentId) ||
+        String(a.Appointment_ID) === String(activeAppointmentId) ||
+        (numId && (a.Appointment_ID === numId || a.appointment_id === numId || parseInt(String(a.id).replace(/\D/g, ''), 10) === numId))
+    );
+    if (fromDb) return fromDb;
+
+    return {
+      id: activeAppointmentId,
+      Appointment_ID: numId || undefined,
+      appointment_id: numId || undefined,
+      date: new Date().toISOString().split('T')[0],
+      time: '10:00 AM',
+      reason: 'Clinical consultation',
+      status: 'In-Progress',
+    };
+  }, [fetchedAppt, doctorAppointments, db?.appointmentList, activeAppointmentId, activePatientId]);
+
+  const activePatient = useMemo(() => {
+    const pId = activePatientId || activeAppt?.patientId || activeAppt?.patient_id || activeAppt?.Patient_ID;
+    if (!pId) return null;
+    const cleanPId = parseInt(String(pId).replace(/\D/g, ''), 10);
+
+    const fromDb = db?.patientList?.find(
+      (p) =>
+        String(p.id) === String(pId) ||
+        String(p.patient_id) === String(pId) ||
+        String(p.Patient_ID) === String(pId) ||
+        (cleanPId && (p.patient_id === cleanPId || p.Patient_ID === cleanPId || parseInt(String(p.id).replace(/\D/g, ''), 10) === cleanPId))
+    );
+    if (fromDb) return fromDb;
+
+    if (activeAppt?.Patient_Name) {
+      return {
+        id: pId,
+        patient_id: cleanPId || 1,
+        name: activeAppt.Patient_Name,
+        dob: '1990-01-01',
+        gender: 'Not specified',
+        nic: '900000000V',
+        phone: activeAppt.Patient_Phone || '',
+        insurance: { provider: 'Standard Health' },
+      };
+    }
+
+    return {
+      id: pId,
+      patient_id: cleanPId || 1,
+      name: 'Patient ' + pId,
+      dob: '1990-01-01',
+      gender: 'Not specified',
+      nic: '900000000V',
+      insurance: { provider: 'Standard Health' },
+    };
+  }, [db?.patientList, activePatientId, activeAppt]);
+
+  // Calculate age from date of birth
+  const patientAge = useMemo(() => {
+    if (!activePatient?.dob) return 'N/A';
+    const birthYear = new Date(activePatient.dob).getFullYear();
+    const currentYear = new Date().getFullYear();
+    const calculated = currentYear - birthYear;
+    return calculated > 0 && !isNaN(calculated) ? `${calculated} yrs` : 'N/A';
+  }, [activePatient?.dob]);
+
+  // Check if active consultation appointment is already finalized
+  const isAlreadyCompleted = useMemo(() => {
+    const s = String(activeAppt?.status || activeAppt?.Status || '').toLowerCase();
+    return s === 'completed';
+  }, [activeAppt]);
+
+  // Synchronize queue state if active consultation is already completed
+  useEffect(() => {
+    if (isAlreadyCompleted && (activeAppointmentId || activePatientId)) {
+      if (activeAppointmentId) updateQueueStatus(activeAppointmentId, 'Completed');
+      if (activePatientId) updateQueueStatus(activePatientId, 'Completed');
+      if (handlers?.setLiveQueue) {
+        handlers.setLiveQueue((prev) =>
+          (prev || []).map((q) => {
+            const match =
+              String(q.Appointment_ID || q.appointment_id || q.appointmentId || q.id) === String(activeAppointmentId) ||
+              String(q.Patient_ID || q.patient_id || q.patientId) === String(activePatientId);
+            return match ? { ...q, status: 'Completed', Status: 'Completed' } : q;
+          })
+        );
+      }
+    }
+  }, [isAlreadyCompleted, activeAppointmentId, activePatientId, updateQueueStatus, handlers?.setLiveQueue]);
+
+  // Vitals inputs state
+  const [vitals, setVitals] = useState({
+    bp: '',
+    hr: '',
+    temp: '',
+    spo2: '',
+    weight: '',
+  });
+
+  // Clinical diagnosis and notes state
+  const [diagnosis, setDiagnosis] = useState('');
+  const [clinicalNotes, setClinicalNotes] = useState('');
+  const [doctorNotes, setDoctorNotes] = useState('');
+  const [followUpDate, setFollowUpDate] = useState('');
+
+  // Inline field validation state
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
+  // Field validator helper
+  const validateField = (field, value) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (field === 'diagnosis') {
+        if (!value || !value.trim()) {
+          next.diagnosis = 'Clinical diagnosis is required and cannot be empty.';
+        } else {
+          delete next.diagnosis;
+        }
+      }
+      if (field === 'followUpDate') {
+        if (value && value < todayStr) {
+          next.followUpDate = 'Follow-up date cannot be in the past.';
+        } else {
+          delete next.followUpDate;
+        }
+      }
+      return next;
+    });
   };
 
-  const handleUpdateInstructions = (code, val) => {
-    setPrescribedItems(prescribedItems.map(p => p.code === code ? { ...p, instructions: val } : p));
+  // Today's minimum date string for follow-up validation
+  const minDate = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  // Catalogue browser state
+  const [catalogue, setCatalogue] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [catalogueSearch, setCatalogueSearch] = useState('');
+  const [loadingCatalogue, setLoadingCatalogue] = useState(false);
+
+  // Fetch treatment categories on mount
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCategories = async () => {
+      try {
+        const data = await getCategories();
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setCategories(data);
+        }
+      } catch (err) {
+        // Silently fallback if backend not running
+      }
+    };
+    fetchCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Fetch treatment catalogue with search and category filter using getCatalogue API function
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCatalogue = async () => {
+      setLoadingCatalogue(true);
+      try {
+        const params = {};
+        if (catalogueSearch.trim()) params.search = catalogueSearch.trim();
+        if (selectedCategory) params.category_id = Number(selectedCategory);
+        const data = await getCatalogue(params);
+        if (isMounted && Array.isArray(data)) {
+          setCatalogue(data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          // show an empty list instead of made-up treatments when the catalogue cannot load
+          setCatalogue([]);
+        }
+      } finally {
+        if (isMounted) setLoadingCatalogue(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(fetchCatalogue, 250);
+    return () => {
+      isMounted = false;
+      clearTimeout(debounceTimer);
+    };
+  }, [catalogueSearch, selectedCategory]);
+
+  // Prescribed treatments state (Step F11)
+  const [prescribedItems, setPrescribedItems] = useState([]);
+
+  // Add treatment from catalogue browser
+  const handleAddTreatment = (item) => {
+    setPrescribedItems((prev) => {
+      const existingIndex = prev.findIndex(
+        (p) =>
+          (p.treatment_id && p.treatment_id === item.treatment_id) ||
+          p.service_code === item.service_code
+      );
+      if (existingIndex >= 0) {
+        return prev.map((p, idx) =>
+          idx === existingIndex ? { ...p, quantity: p.quantity + 1 } : p
+        );
+      }
+      return [
+        ...prev,
+        {
+          treatment_id: item.treatment_id,
+          service_code: item.service_code,
+          treatment_name: item.treatment_name,
+          standard_unit_price: Number(item.standard_unit_price || 0),
+          category_name: item.category_name,
+          quantity: 1,
+          instructions: '',
+        },
+      ];
+    });
   };
 
-  const handleCompleteConsultation = (e) => {
-    e.preventDefault();
-    if (!complaint || !diagnosis) {
-      alert('Please fill out Chief Complaint and Diagnosis fields.');
+  // Remove treatment from prescribing table
+  const handleRemoveTreatment = (indexToRemove) => {
+    setPrescribedItems((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  // Update treatment quantity selector
+  const handleUpdateQuantity = (index, delta) => {
+    setPrescribedItems((prev) =>
+      prev.map((p, idx) => {
+        if (idx === index) {
+          const newQty = Math.max(1, p.quantity + delta);
+          return { ...p, quantity: newQty };
+        }
+        return p;
+      })
+    );
+  };
+
+  // Update treatment dosage instructions
+  const handleUpdateInstructions = (index, text) => {
+    setPrescribedItems((prev) =>
+      prev.map((p, idx) => (idx === index ? { ...p, instructions: text } : p))
+    );
+  };
+
+  // Running grand total for prescribed treatments (Step F12 - display only)
+  const prescribedGrandTotal = useMemo(() => {
+    return prescribedItems.reduce((acc, item) => {
+      const price = Number(item.standard_unit_price || 0);
+      const qty = Number(item.quantity || 1);
+      return acc + price * qty;
+    }, 0);
+  }, [prescribedItems]);
+
+  // Loading state for consultation submission (Step F13)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Success and error feedback toast state (Step F14)
+  const [toastState, setToastState] = useState(null);
+
+  // Patient consultation history drawer state (Step F15)
+  const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
+  const [patientHistory, setPatientHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [expandedConsultations, setExpandedConsultations] = useState([]);
+  const [consultationDetails, setConsultationDetails] = useState({});
+  const [loadingDetails, setLoadingDetails] = useState({});
+
+  // Fetch chronological patient consultation history when drawer opens
+  useEffect(() => {
+    if (!showHistoryDrawer) return;
+    let isMounted = true;
+
+    const fetchHistory = async () => {
+      const pId = activePatientId || activePatient?.id;
+      const numPId =
+        typeof pId === 'number'
+          ? pId
+          : parseInt(String(pId).replace(/\D/g, ''), 10);
+      if (!numPId) return;
+
+      setLoadingHistory(true);
+      try {
+        const data = await getPatientHistory(numPId);
+        if (isMounted) {
+          setPatientHistory(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        if (isMounted) {
+          // Graceful local history fallback
+          const localHist = db?.medicalHistories?.find(
+            (h) => h.patientId === (activePatientId || activePatient?.id)
+          );
+          if (localHist?.visits) {
+            setPatientHistory(
+              localHist.visits.map((v, i) => ({
+                consultation_id: i + 1,
+                consultation_date: v.date,
+                diagnosis: v.diagnosis,
+                doctor_name: v.doctor,
+                follow_up_date: v.follow_up_date || null,
+                item_count: v.treatments?.length || 0,
+                items: v.treatments || [],
+              }))
+            );
+          } else {
+            setPatientHistory([]);
+          }
+        }
+      } finally {
+        if (isMounted) setLoadingHistory(false);
+      }
+    };
+
+    fetchHistory();
+    return () => {
+      isMounted = false;
+    };
+  }, [showHistoryDrawer, activePatientId, activePatient, db?.medicalHistories]);
+
+  // Toggle expandable prescribed items for a consultation in the history timeline
+  const toggleExpandConsultation = async (consultId) => {
+    const isExpanded = expandedConsultations.includes(consultId);
+    if (isExpanded) {
+      setExpandedConsultations((prev) => prev.filter((id) => id !== consultId));
+    } else {
+      setExpandedConsultations((prev) => [...prev, consultId]);
+      if (!consultationDetails[consultId]) {
+        setLoadingDetails((prev) => ({ ...prev, [consultId]: true }));
+        try {
+          const detail = await getConsultation(consultId);
+          setConsultationDetails((prev) => ({
+            ...prev,
+            [consultId]: detail?.items || [],
+          }));
+        } catch {
+          const histItem = patientHistory.find((h) => h.consultation_id === consultId);
+          setConsultationDetails((prev) => ({
+            ...prev,
+            [consultId]: histItem?.items || [],
+          }));
+        } finally {
+          setLoadingDetails((prev) => ({ ...prev, [consultId]: false }));
+        }
+      }
+    }
+  };
+
+  // Complete consultation and send to billing via createConsultation API
+  const handleCompleteVisit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+
+    // Prevent submitting if already completed
+    if (isAlreadyCompleted) {
+      const infoMsg = 'This consultation has already been completed and sent to billing.';
+      handlers?.triggerToast?.(infoMsg);
+      setToastState({
+        type: 'success',
+        message: infoMsg,
+      });
       return;
     }
 
-    // 1. Update medical histories
-    const newVisit = {
-      date: '2026-08-23',
-      doctor: currentDoctorName,
-      diagnosis,
-      vitals: `BP: ${vitals.bp} mmHg, HR: ${vitals.pulse} bpm, Temp: ${vitals.temp} F, Weight: ${vitals.weight} kg`,
-      treatments: prescribedItems.map(t => ({ name: t.name, qty: t.qty, price: t.price, instructions: t.instructions }))
-    };
-
-    const patientHist = medicalHistories.find(h => h.patientId === activePatient.id);
-    let updatedHistory;
-    if (patientHist) {
-      updatedHistory = medicalHistories.map(h => {
-        if (h.patientId === activePatient.id) {
-          return { ...h, visits: [newVisit, ...h.visits] };
-        }
-        return h;
+    // Inline validation check with prominent toast and smooth auto-scroll to missing diagnosis
+    if (!diagnosis || !diagnosis.trim()) {
+      setTouched((prev) => ({ ...prev, diagnosis: true }));
+      validateField('diagnosis', '');
+      const valMsg = 'Clinical diagnosis is required before completing the visit.';
+      handlers?.triggerToast?.(valMsg);
+      setToastState({
+        type: 'error',
+        message: valMsg,
       });
-    } else {
-      updatedHistory = [...medicalHistories, { patientId: activePatient.id, visits: [newVisit] }];
+      const textarea = document.querySelector('textarea[placeholder*="diagnosis"]');
+      if (textarea) {
+        textarea.focus();
+        textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
     }
-    setMedicalHistories(updatedHistory);
 
-    // 2. Generate billing invoice
-    const docFee = parseFloat(staffList.find(s => s.id === currentDoctorId)?.details?.consultFee || '1500');
-    const treatmentsTotal = prescribedItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    const subtotal = docFee + treatmentsTotal;
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (followUpDate && followUpDate < todayStr) {
+      setTouched((prev) => ({ ...prev, followUpDate: true }));
+      validateField('followUpDate', followUpDate);
+      const dateMsg = 'Follow-up date cannot be in the past.';
+      handlers?.triggerToast?.(dateMsg);
+      setToastState({
+        type: 'error',
+        message: dateMsg,
+      });
+      return;
+    }
 
-    // Estimate insurance coverage
-    const hasInsurance = activePatient.insurance?.provider && activePatient.insurance?.provider !== 'None / Cash';
-    const insCover = hasInsurance ? Math.min(treatmentsTotal * 0.8, 10000) : 0;
-    const balance = subtotal - insCover;
+    // use the real appointment id, never fall back to a made-up one
+    const rawApptId =
+      activeAppt?.Appointment_ID ||
+      activeAppt?.appointment_id ||
+      activeAppointmentId;
+    const resolvedApptId = Number(String(rawApptId ?? '').replace(/\D/g, ''));
+    if (!resolvedApptId) {
+      const idMsg = 'This appointment has no valid ID. Refresh the queue and try again.';
+      handlers?.triggerToast?.(idMsg);
+      setToastState({ type: 'error', message: idMsg });
+      return;
+    }
 
-    const newInvoiceId = `INV-${(invoiceList.length + 10001).toString()}`;
-    const newInvoice = {
-      invoiceId: newInvoiceId,
-      patientId: activePatient.id,
-      patientName: activePatient.name,
-      date: '2026-08-23',
-      items: prescribedItems.map(t => ({ name: t.name, qty: t.qty, price: t.price })),
-      doctorFee: docFee,
-      treatmentsSubtotal: treatmentsTotal,
-      insuranceCoverage: insCover,
-      patientBalance: balance,
-      status: 'Pending',
-      claimStatus: hasInsurance ? 'PENDING' : 'N/A'
-    };
+    setIsSubmitting(true);
+    try {
+      const itemsPayload = prescribedItems.map((item) => ({
+        treatment_id: Number(item.treatment_id),
+        quantity: Number(item.quantity) || 1,
+        instructions: item.instructions || undefined,
+      }));
 
-    setInvoiceList([newInvoice, ...invoiceList]);
+      const vitalsPayload = {
+        bp: vitals.bp || undefined,
+        heart_rate: vitals.hr ? parseInt(vitals.hr, 10) || undefined : undefined,
+        temperature: vitals.temp ? parseFloat(vitals.temp) || undefined : undefined,
+        spo2: vitals.spo2 ? parseInt(vitals.spo2, 10) || undefined : undefined,
+        weight: vitals.weight ? parseFloat(vitals.weight) || undefined : undefined,
+      };
 
-    // 3. Mark appointment COMPLETED and remove from liveQueue
-    const updatedAppts = appointmentList.map(a => {
-      if (a.id === activeApptId) return { ...a, status: 'Completed' };
-      return a;
-    });
-    setAppointmentList(updatedAppts);
+      const payload = {
+        appointment_id: resolvedApptId,
+        diagnosis: diagnosis.trim(),
+        clinical_notes: clinicalNotes.trim() || undefined,
+        doctor_notes: doctorNotes.trim() || undefined,
+        follow_up_date: followUpDate || undefined,
+        vitals: vitalsPayload,
+        items: itemsPayload,
+      };
 
-    const updatedQueue = liveQueue.filter(q => q.patientId !== activePatient.id);
-    setLiveQueue(updatedQueue);
+      const result = await createConsultation(payload);
+      const invoiceId = result?.invoice_id || result?.invoiceId || 'INV-Generated';
+      const successMsg = `Consultation completed successfully! Invoice #${invoiceId} generated and routed to billing.`;
 
-    addAuditLog(
-      'UPDATE_APPOINTMENT',
-      `Completed consultation and issued invoice ${newInvoiceId} for ${activePatient.name}`,
-      JSON.stringify(activeAppt),
-      JSON.stringify({ ...activeAppt, status: 'Completed' })
-    );
+      // Success feedback (Step F14)
+      handlers?.triggerToast?.(successMsg);
+      setToastState({
+        type: 'success',
+        message: successMsg,
+        invoiceId,
+      });
 
-    triggerToast(`Consultation completed! Invoice generated.`);
-    navigateTo('/doctor/workbench');
-    
-    // Reset forms
-    setComplaint('');
-    setDiagnosis('');
-    setLifestyleAdvice('');
-    setPrescribedItems([
-      { code: 'TRT-001', name: 'General Consultation Fee', category: 'Consultations', price: 1500, qty: 1, instructions: 'Standard clinical checkup fee' }
-    ]);
+      if (activePatientId) {
+        updateQueueStatus(activePatientId, 'Completed');
+      }
+      if (resolvedApptId) {
+        updateQueueStatus(resolvedApptId, 'Completed');
+      }
+      if (handlers?.setLiveQueue) {
+        handlers.setLiveQueue((prev) =>
+          (prev || []).map((q) => {
+            const match =
+              String(q.Appointment_ID || q.appointment_id || q.appointmentId || q.id) === String(resolvedApptId) ||
+              String(q.Patient_ID || q.patient_id || q.patientId) === String(activePatientId);
+            return match ? { ...q, status: 'Completed', Status: 'Completed' } : q;
+          })
+        );
+      }
+
+      if (handlers?.setAppointmentList) {
+        handlers.setAppointmentList((prev) =>
+          (prev || []).map((a) =>
+            String(a.id) === String(resolvedApptId) ||
+            String(a.id) === String(activeAppointmentId) ||
+            String(a.Appointment_ID) === String(resolvedApptId) ||
+            String(a.appointment_id) === String(resolvedApptId)
+              ? { ...a, status: 'Completed', Status: 'Completed' }
+              : a
+          )
+        );
+      }
+
+      if (handlers?.setInvoiceList) {
+        const docFee = Number(activeAppt?.doctorFee || activeAppt?.consultation_fee || 2000);
+        const treatmentsTotal = prescribedItems.reduce(
+          (acc, it) => acc + (Number(it.unit_price || it.price || 0) * (Number(it.quantity) || 1)),
+          0
+        );
+        const newInvoice = {
+          invoiceId: typeof invoiceId === 'number' ? `INV-${invoiceId}` : String(invoiceId),
+          patientId: activePatientId || activeAppt?.patientId || 'PAT-0001',
+          patientName: activeAppt?.patientName || activePatient?.name || 'Patient',
+          date: new Date().toISOString().split('T')[0],
+          appointmentId: activeAppointmentId || resolvedApptId,
+          items: prescribedItems.map((p) => ({
+            name: p.treatment_name || p.name || 'Treatment',
+            qty: Number(p.quantity) || 1,
+            price: Number(p.unit_price || p.price || 0),
+          })),
+          doctorFee: docFee,
+          treatmentsSubtotal: treatmentsTotal,
+          insuranceCoverage: 0,
+          patientBalance: docFee + treatmentsTotal,
+          status: 'Unpaid',
+          claimStatus: 'PENDING',
+          paymentMethod: '',
+        };
+        handlers.setInvoiceList((prev) => [newInvoice, ...(prev || [])]);
+      }
+
+      fetchDoctorAppointments();
+      if (refreshQueue) {
+        refreshQueue();
+      }
+
+      // Navigate back to workbench queue on success
+      setTimeout(() => {
+        if (handlers?.navigateTo) {
+          handlers.navigateTo('/doctor/workbench');
+        } else {
+          window.history.pushState(null, '', '/doctor/workbench');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+      }, 1200);
+    } catch (err) {
+      // Safely extract error message (handles FastAPI string or validation array)
+      let errorMsg = 'Failed to complete consultation. Please check required fields and try again.';
+      const detail = err?.response?.data?.detail;
+      if (typeof detail === 'string') {
+        errorMsg = detail;
+      } else if (Array.isArray(detail)) {
+        errorMsg = detail
+          .map((d) => (typeof d === 'string' ? d : d.msg || JSON.stringify(d)))
+          .join(', ');
+      } else if (err?.message) {
+        errorMsg = err.message;
+      }
+
+      // If already completed in backend (HTTP 409)
+      const isAlreadyFinalized =
+        err?.response?.status === 409 ||
+        errorMsg.toLowerCase().includes('already exists') ||
+        errorMsg.toLowerCase().includes('status \'completed\'') ||
+        errorMsg.toLowerCase().includes('status "completed"');
+
+      if (isAlreadyFinalized) {
+        const completedMsg = 'This consultation was already completed and sent to the billing desk.';
+        handlers?.triggerToast?.(completedMsg);
+        setToastState({
+          type: 'success',
+          message: completedMsg,
+        });
+
+        if (activePatientId) {
+          updateQueueStatus(activePatientId, 'Completed');
+        }
+        if (resolvedApptId) {
+          updateQueueStatus(resolvedApptId, 'Completed');
+        }
+        if (handlers?.setLiveQueue) {
+          handlers.setLiveQueue((prev) =>
+            (prev || []).map((q) => {
+              const match =
+                String(q.Appointment_ID || q.appointment_id || q.appointmentId || q.id) === String(resolvedApptId) ||
+                String(q.Patient_ID || q.patient_id || q.patientId) === String(activePatientId);
+              return match ? { ...q, status: 'Completed', Status: 'Completed' } : q;
+            })
+          );
+        }
+        if (handlers?.setAppointmentList) {
+          handlers.setAppointmentList((prev) =>
+            (prev || []).map((a) =>
+              String(a.id) === String(resolvedApptId) ||
+              String(a.id) === String(activeAppointmentId) ||
+              String(a.Appointment_ID) === String(resolvedApptId) ||
+              String(a.appointment_id) === String(resolvedApptId)
+                ? { ...a, status: 'Completed', Status: 'Completed' }
+                : a
+            )
+          );
+        }
+        setTimeout(() => {
+          if (handlers?.navigateTo) {
+            handlers.navigateTo('/doctor/workbench');
+          }
+        }, 1500);
+        return;
+      }
+
+      handlers?.triggerToast?.(`Error: ${errorMsg}`);
+      setToastState({
+        type: 'error',
+        message: errorMsg,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  // Get active patient history log
-  const activePatientHistory = useMemo(() => {
-    if (!activePatient) return null;
-    return medicalHistories.find(h => h.patientId === activePatient.id);
-  }, [medicalHistories, activePatient]);
+  // Navigate to consultation room route, passing appointment_id and patient_id
+  const handleSelectPatient = (queueItem) => {
+    const rawApptId =
+      queueItem.Appointment_ID ||
+      queueItem.appointment_id ||
+      queueItem.appointmentId ||
+      queueItem.id;
+
+    const rawPatientId =
+      queueItem.Patient_ID ||
+      queueItem.patient_id ||
+      queueItem.patientId;
+
+    let resolvedApptId = rawApptId;
+    if (!resolvedApptId && rawPatientId && db?.appointmentList) {
+      const match = db.appointmentList.find(
+        (a) =>
+          (String(a.patientId) === String(rawPatientId) ||
+           String(a.patient_id) === String(rawPatientId) ||
+           String(a.Patient_ID) === String(rawPatientId)) &&
+          a.status !== 'Completed'
+      );
+      if (match) {
+        resolvedApptId = match.Appointment_ID || match.appointment_id || match.id;
+      }
+    }
+
+    if (!resolvedApptId) {
+      handlers?.triggerToast?.('This queue entry has no appointment yet. Book it at reception first.');
+      return;
+    }
+    const apptId = resolvedApptId;
+    const patientId = rawPatientId || 'PAT-0001';
+
+    const isCompleted = isQueueItemCompleted(queueItem);
+
+    // Only update queue status to IN_PROGRESS if not already finalized
+    if (!isCompleted) {
+      updateQueueStatus(apptId || patientId, 'IN_PROGRESS');
+    }
+
+    const targetRoute = `/doctor/consultation/${apptId}?patient_id=${patientId}`;
+    if (handlers?.navigateTo) {
+      handlers.navigateTo(targetRoute);
+    } else {
+      window.history.pushState(null, '', targetRoute);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* 1. DOCTOR WORKBENCH (QUEUE SUMMARY) */}
-      {subView === 'workbench' && (
+      {/* 1. DOCTOR WORKBENCH & UPCOMING APPOINTMENTS */}
+      {(subView === 'workbench' || subView === 'appointments') && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Clinician Triage Workbench</h1>
-            <p className="text-sm text-slate-500 mt-1">Manage waiting room queues, recall diagnostics, and open active clinical consoles</p>
-          </div>
-
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
-              <h2 className="font-bold text-slate-900 text-md">Daily Consultation Queue</h2>
-              <span className="bg-blue-50 text-blue-800 border border-blue-100 rounded-full px-2.5 py-0.5 text-xs font-semibold font-mono">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">{t('doctor_workbench_title', 'Clinician Triage Workbench')}</h1>
+              <p className="text-sm text-slate-500 mt-1">
+                Manage waiting room queues, recall diagnostics, review upcoming schedules, and open active clinical consoles
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <span className="bg-blue-50 text-blue-800 border border-blue-100 rounded-full px-3 py-1 text-xs font-semibold font-mono">
                 Attending: {currentDoctorName}
               </span>
             </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    <th className="px-6 py-3 text-center">Position</th>
-                    <th className="px-6 py-3">Patient Code & Name</th>
-                    <th className="px-6 py-3">Reason for Visit</th>
-                    <th className="px-6 py-3">Status Tag</th>
-                    <th className="px-6 py-3 text-right">Consultation Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-650">
-                  {doctorQueue.map((q, idx) => (
-                    <tr key={q.queueNo} className="hover:bg-slate-50/50">
-                      <td className="px-6 py-4 text-center font-mono font-bold text-slate-900">#{idx + 1}</td>
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900">{q.patientName}</div>
-                        <span className="text-xs text-slate-400 font-mono">{q.patientId}</span>
-                      </td>
-                      <td className="px-6 py-4 font-medium">{q.reason}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
-                          q.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700 border-blue-150 animate-pulse' :
-                          q.status === 'WALK_IN' ? 'bg-amber-50 text-amber-700 border-amber-150' : 'bg-emerald-50 text-emerald-700 border-emerald-150'
-                        }`}>
-                          {q.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {q.status === 'IN_PROGRESS' ? (
-                          <button
-                            onClick={() => {
-                              const appt = appointmentList.find(a => a.patientId === q.patientId && a.date === '2026-08-23' && a.doctorId === currentDoctorId);
-                              navigateTo(`/doctor/consultation/${appt ? appt.id : 'APP-1002'}`);
-                            }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-1.5 px-3 rounded-lg flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
-                          >
-                            <span>Resume Console</span>
-                            <ArrowRight className="h-3.5 w-3.5" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleCallPatient(q)}
-                            className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
-                          >
-                            <span>Call Patient</span>
-                            <CornerDownRight className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {doctorQueue.length === 0 && (
-                    <tr>
-                      <td colSpan="5" className="px-6 py-10 text-center text-slate-400">
-                        No triage patients in your queue today. Refresh to monitor check-ins.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
           </div>
+
+          {/* Navigation Tabs */}
+          <div className="flex border-b border-slate-200 space-x-2">
+            <button
+              type="button"
+              onClick={() => handleTabChange('queue')}
+              className={`flex items-center space-x-2 pb-3 px-4 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
+                activeTab === 'queue'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Activity className="h-4 w-4" />
+              <span>Today's Live Queue</span>
+              <span className="bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded-full font-mono">
+                {queue.length}
+              </span>
+              {queueCompletedCount > 0 && (
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
+                  {queueCompletedCount} done
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange('appointments')}
+              className={`flex items-center space-x-2 pb-3 px-4 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
+                activeTab === 'appointments'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Calendar className="h-4 w-4" />
+              <span>Upcoming Appointments</span>
+              <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-mono font-bold">
+                {upcomingCount}
+              </span>
+            </button>
+          </div>
+
+          {/* TAB 1: DAILY LIVE TRIAGE QUEUE */}
+          {activeTab === 'queue' && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="font-bold text-slate-900 text-md">Daily Consultation Queue</h2>
+                  <div className="flex items-center space-x-1 bg-slate-200/70 p-1 rounded-lg text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setQueueFilter('all')}
+                      className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                        queueFilter === 'all'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      All ({queue.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQueueFilter('waiting')}
+                      className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                        queueFilter === 'waiting'
+                          ? 'bg-white text-blue-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Waiting ({queueWaitingCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQueueFilter('completed')}
+                      className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                        queueFilter === 'completed'
+                          ? 'bg-white text-emerald-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Completed ({queueCompletedCount})
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (refreshQueue) refreshQueue();
+                      fetchDoctorAppointments();
+                    }}
+                    disabled={loading}
+                    className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                    title="Refresh queue"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  </button>
+                  <span className="bg-blue-50 text-blue-800 border border-blue-100 rounded-full px-2.5 py-0.5 text-xs font-semibold font-mono">
+                    Attending: {currentDoctorName}
+                  </span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                      <th className="px-6 py-3 text-center">Position</th>
+                      <th className="px-6 py-3">Patient Code & Name</th>
+                      <th className="px-6 py-3">Reason for Visit</th>
+                      <th className="px-6 py-3">Status Tag</th>
+                      <th className="px-6 py-3 text-right">Consultation Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-650">
+                    {loading ? (
+                      <tr>
+                        <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
+                          Loading daily consultation queue...
+                        </td>
+                      </tr>
+                    ) : filteredQueue.length > 0 ? (
+                      filteredQueue.map((q, idx) => {
+                        const isCompleted = isQueueItemCompleted(q);
+                        const resolvedStatus = resolveQueueItemStatus(q);
+                        return (
+                          <tr
+                            key={q.queueNo || q.appointmentId || idx}
+                            onClick={() => handleSelectPatient(q)}
+                            className={`transition-colors cursor-pointer ${
+                              isCompleted ? 'bg-emerald-50/20 hover:bg-emerald-50/40' : 'hover:bg-slate-50/70'
+                            }`}
+                          >
+                            <td className="px-6 py-4 text-center font-mono font-bold text-slate-900">
+                              #{idx + 1}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-slate-900">{q.patientName || q.patient_name}</div>
+                              <span className="text-xs text-slate-400 font-mono">
+                                {q.patientId || q.patient_id}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 font-medium">{q.reason || 'Routine Checkup'}</td>
+                            <td className="px-6 py-4">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
+                                  isCompleted
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : resolvedStatus === 'IN_PROGRESS' || resolvedStatus === 'In_Progress'
+                                    ? 'bg-blue-50 text-blue-700 border-blue-150 animate-pulse'
+                                    : resolvedStatus === 'WALK_IN' || resolvedStatus === 'Walk_In'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-150'
+                                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                                }`}
+                              >
+                                {isCompleted ? 'Completed' : (resolvedStatus || 'SCHEDULED')}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              {isCompleted ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectPatient(q);
+                                  }}
+                                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-2xs transition-colors"
+                                  title="View finalized consultation record"
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                  <span>View Completed</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectPatient(q);
+                                  }}
+                                  className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
+                                >
+                                  <span>{resolvedStatus === 'IN_PROGRESS' || resolvedStatus === 'In_Progress' ? 'Resume Console' : 'Call Patient'}</span>
+                                  <CornerDownRight className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="5" className="px-6 py-10 text-center text-slate-400">
+                          {queueFilter === 'completed'
+                            ? 'No consultations completed yet today.'
+                            : queueFilter === 'waiting'
+                            ? 'No waiting triage patients in your queue right now.'
+                            : 'No triage patients in your queue today. Refresh to monitor check-ins.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: UPCOMING APPOINTMENTS SCHEDULE */}
+          {activeTab === 'appointments' && (
+            <div className="space-y-6">
+              {/* Metrics Overview Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                  <div className="h-11 w-11 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Upcoming Bookings</span>
+                    <div className="text-xl font-bold text-slate-900 font-mono mt-0.5">{upcomingCount}</div>
+                    <span className="text-[11px] text-slate-400">Future scheduled visits</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                  <div className="h-11 w-11 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Confirmed</span>
+                    <div className="text-xl font-bold text-emerald-700 font-mono mt-0.5">{confirmedCount}</div>
+                    <span className="text-[11px] text-slate-400">Confirmed upcoming</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                  <div className="h-11 w-11 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Completed</span>
+                    <div className="text-xl font-bold text-emerald-700 font-mono mt-0.5">{completedAppointmentsCount}</div>
+                    <span className="text-[11px] text-slate-400">Finished consultations</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                  <div className="h-11 w-11 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Today's Live Queue</span>
+                    <div className="text-xl font-bold text-indigo-700 font-mono mt-0.5">{queueWaitingCount}</div>
+                    <span className="text-[11px] text-slate-400">{queueCompletedCount} completed today</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter and Control Bar */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap gap-3 items-center justify-between">
+                <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                  {/* Search Input */}
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search patient, ID, or reason..."
+                      value={searchFilter}
+                      onChange={(e) => setSearchFilter(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Date Scope Filter */}
+                  <div className="flex items-center space-x-1.5">
+                    <CalendarDays className="h-4 w-4 text-slate-400 shrink-0" />
+                    <select
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="upcoming">Upcoming (Default)</option>
+                      <option value="today">Today Only</option>
+                      <option value="tomorrow">Tomorrow</option>
+                      <option value="week">Next 7 Days</option>
+                      <option value="all">All Dates</option>
+                      <option value="custom">Custom Date...</option>
+                    </select>
+                  </div>
+
+                  {/* Custom Date Input */}
+                  {dateFilter === 'custom' && (
+                    <input
+                      type="date"
+                      value={customDate}
+                      onChange={(e) => setCustomDate(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700"
+                    />
+                  )}
+
+                  {/* Status Filter */}
+                  <div className="flex items-center space-x-1.5">
+                    <Filter className="h-4 w-4 text-slate-400 shrink-0" />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="ALL">All Statuses</option>
+                      <option value="active">Active (Scheduled & Confirmed)</option>
+                      <option value="Completed">Completed ({completedAppointmentsCount})</option>
+                      <option value="Scheduled">Scheduled</option>
+                      <option value="Confirmed">Confirmed</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Refresh Button */}
+                <button
+                  type="button"
+                  onClick={fetchDoctorAppointments}
+                  disabled={loadingAppointments}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer transition-colors"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingAppointments ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              {/* Upcoming Bookings Table */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
+                  <h2 className="font-bold text-slate-900 text-md">Upcoming Booked Consultations</h2>
+                  <span className="text-xs text-slate-500 font-mono">
+                    Showing {filteredAppointments.length} booking{filteredAppointments.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                        <th className="px-6 py-3">Date & Time</th>
+                        <th className="px-6 py-3">Patient Details</th>
+                        <th className="px-6 py-3">Reason for Visit</th>
+                        <th className="px-6 py-3">Type & Branch</th>
+                        <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3 text-right">Consultation Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-650">
+                      {loadingAppointments ? (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
+                            <div className="inline-flex items-center space-x-2">
+                              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                              <span>Loading upcoming appointments...</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : appointmentsError ? (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-8 text-center text-red-500">
+                            {appointmentsError}
+                          </td>
+                        </tr>
+                      ) : filteredAppointments.length > 0 ? (
+                        filteredAppointments.map((appt) => {
+                          const isToday = appt.Appointment_Date === todayStr;
+                          const isFuture = appt.Appointment_Date > todayStr;
+                          return (
+                            <tr
+                              key={appt.Appointment_ID}
+                              className="hover:bg-slate-50/70 transition-colors"
+                            >
+                              <td className="px-6 py-4">
+                                <div className="font-bold text-slate-900">
+                                  {appt.Appointment_Date}
+                                </div>
+                                <div className="text-xs text-slate-500 flex items-center space-x-1 mt-0.5 font-mono">
+                                  <Clock className="h-3 w-3 text-slate-400" />
+                                  <span>{appt.Start_Time ? String(appt.Start_Time).slice(0, 5) : 'Scheduled'}</span>
+                                  <span>({appt.Duration_Minutes || 30}m)</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="font-bold text-slate-900">{appt.Patient_Name || `Patient #${appt.Patient_ID}`}</div>
+                                <div className="text-xs text-slate-400 font-mono">
+                                  ID: {appt.Patient_ID} {appt.Patient_Phone ? `| ${appt.Patient_Phone}` : ''}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 font-medium text-slate-700">
+                                {appt.Reason_For_Visit || 'Routine Checkup'}
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-xs font-semibold text-slate-800">
+                                  {appt.Branch_Name || 'Clinic Branch'}
+                                </div>
+                                <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                                  appt.Appointment_Type === 'Walk_In'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                }`}>
+                                  {appt.Appointment_Type || 'Scheduled'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
+                                    appt.Status === 'Completed'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : appt.Status === 'Confirmed'
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : appt.Status === 'Scheduled'
+                                      ? 'bg-sky-50 text-sky-700 border-sky-200'
+                                      : appt.Status === 'In_Progress'
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                                      : 'bg-red-50 text-red-700 border-red-200'
+                                  }`}
+                                >
+                                  {appt.Status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                {appt.Status === 'Completed' ? (
+                                  <span className="inline-flex items-center space-x-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold ml-auto shadow-2xs">
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                    <span>Completed</span>
+                                  </span>
+                                ) : isToday ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectPatient(appt)}
+                                    className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
+                                  >
+                                    <span>Call Patient</span>
+                                    <CornerDownRight className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : isFuture ? (
+                                  <span className="inline-flex items-center space-x-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg font-medium">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>Upcoming</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-400 font-mono">
+                                    Past Record
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-10 text-center text-slate-400">
+                            No upcoming appointments found matching your selected filters.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 2. ACTIVE CLINICAL CONSULTATION CONSOLE */}
-      {subView === 'consultation' && activePatient && (
+      {/* 2. CONSULTATION ROOM ROUTE */}
+      {subView === 'consultation' && (
         <div className="space-y-6 animate-fade-in">
-          {/* Clinical Banner */}
+          {/* Completed Consultation Notice Banner */}
+          {isAlreadyCompleted && (
+            <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-emerald-900 shadow-xs">
+              <div className="flex items-center space-x-3">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                <div>
+                  <h4 className="font-bold text-sm">Consultation Already Completed & Billed</h4>
+                  <p className="text-xs text-emerald-700 mt-0.5">
+                    This clinical consultation has already been finalized and routed to the billing desk.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  handlers?.navigateTo ? handlers.navigateTo('/doctor/workbench') : window.history.back()
+                }
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shrink-0 transition-colors cursor-pointer"
+              >
+                Return to Workbench
+              </button>
+            </div>
+          )}
+
+          {/* Patient Header (Name, Age, Appointment info) */}
           <div className="bg-slate-900 rounded-xl p-6 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
             <div className="flex items-center space-x-4">
               <div className="h-14 w-14 bg-white/10 text-white rounded-full flex items-center justify-center font-bold text-xl border border-white/20">
-                {activePatient.name.charAt(0)}
+                {activePatient?.name?.charAt(0) || 'P'}
               </div>
               <div>
-                <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold font-mono">In Consultation</span>
-                <h2 className="text-xl font-bold mt-0.5">{activePatient.name}</h2>
+                <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold font-mono">
+                  In Consultation
+                </span>
+                <h2 className="text-xl font-bold mt-0.5">{activePatient?.name || 'Selected Patient'}</h2>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/70 font-mono mt-1">
-                  <span>Code: {activePatient.id}</span>
+                  <span>Patient ID: {activePatient?.id || activePatientId || 'N/A'}</span>
                   <span>|</span>
-                  <span>DOB: {activePatient.dob}</span>
+                  <span>Age: {patientAge}</span>
                   <span>|</span>
-                  <span>Gender: {activePatient.gender}</span>
+                  <span>DOB: {activePatient?.dob || 'N/A'}</span>
                   <span>|</span>
-                  <span>NIC: {activePatient.nic}</span>
+                  <span>Gender: {activePatient?.gender || 'N/A'}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-4 text-xs font-mono">
+            <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
               <div className="bg-white/10 border border-white/20 rounded-xl p-3">
-                <span className="block text-white/50 text-[9px] uppercase tracking-wider mb-0.5 font-bold">Insurance Checking</span>
-                <strong className="text-white text-xs">{activePatient.insurance?.provider || 'None'}</strong>
+                <span className="block text-white/50 text-[9px] uppercase tracking-wider mb-0.5 font-bold">
+                  Appointment Details
+                </span>
+                <strong className="text-white text-xs block">
+                  #{activeAppt?.id || activeAppointmentId || 'N/A'} ({activeAppt?.time || 'Scheduled'})
+                </strong>
+                <span className="text-[10px] text-white/70 truncate max-w-xs block">
+                  Reason: {activeAppt?.reason || 'General checkup'}
+                </span>
               </div>
+
               <button
+                type="button"
                 onClick={() => setShowHistoryDrawer(true)}
-                className="bg-blue-600 hover:bg-blue-700 border border-blue-500 rounded-xl px-4 py-3 font-semibold transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs"
+                className="bg-blue-600 hover:bg-blue-700 border border-blue-500 rounded-xl px-4 py-3 font-semibold transition-all flex items-center space-x-1.5 cursor-pointer text-white shadow-xs"
               >
-                <FileText className="h-4 w-4" />
-                <span>Longitudinal History</span>
+                <History className="h-4 w-4" />
+                <span>Patient History</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handlers?.navigateTo ? handlers.navigateTo('/doctor/workbench') : window.history.back()
+                }
+                className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl px-4 py-3 font-semibold transition-all flex items-center space-x-1.5 cursor-pointer"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Return to Queue</span>
               </button>
             </div>
           </div>
 
-          <form onSubmit={handleCompleteConsultation} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              {/* Vitals & Complaint */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
-                <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3 flex items-center">
-                  <Activity className="h-4.5 w-4.5 text-blue-600 mr-1.5 animate-pulse" />
-                  Clinical Findings & Observations
-                </h3>
+          {/* Consultation Form: Vitals + Diagnosis + Notes */}
+          <div className="space-y-6">
+            {/* Vitals Input Fields */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+              <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3 flex items-center">
+                <Activity className="h-4.5 w-4.5 text-blue-600 mr-1.5 animate-pulse" />
+                Patient Vitals
+              </h3>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Blood Pressure (mmHg)</label>
-                    <input
-                      type="text"
-                      className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
-                      value={vitals.bp}
-                      onChange={e => setVitals({ ...vitals, bp: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Heart Rate (bpm)</label>
-                    <input
-                      type="text"
-                      className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
-                      value={vitals.pulse}
-                      onChange={e => setVitals({ ...vitals, pulse: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Temperature (F)</label>
-                    <input
-                      type="text"
-                      className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
-                      value={vitals.temp}
-                      onChange={e => setVitals({ ...vitals, temp: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Weight (kg)</label>
-                    <input
-                      type="text"
-                      className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
-                      value={vitals.weight}
-                      onChange={e => setVitals({ ...vitals, weight: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Chief Complaint / Symptoms</label>
-                    <textarea
-                      required
-                      className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
-                      rows="2"
-                      placeholder="Enter patient symptoms and complaints..."
-                      value={complaint}
-                      onChange={e => setComplaint(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Formal Clinical Diagnosis</label>
-                    <textarea
-                      required
-                      className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800"
-                      rows="3"
-                      placeholder="Write formal diagnoses and medical summary notes..."
-                      value={diagnosis}
-                      onChange={e => setDiagnosis(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Lifestyle Advice & Remarks</label>
-                    <textarea
-                      className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
-                      rows="2"
-                      placeholder="Lifestyle recommendations, drug dosage advisories, next visit check..."
-                      value={lifestyleAdvice}
-                      onChange={e => setLifestyleAdvice(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Prescriptions & Catalogue */}
-            <div className="space-y-6">
-              {/* Prescribed catalogue */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <h3 className="font-bold text-slate-900 text-md">Treatment & Billings Selector</h3>
-                  <span className="text-xs font-mono font-bold text-blue-600">
-                    Subtotal: ${prescribedItems.reduce((sum, item) => sum + (item.price * item.qty), 0).toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                    <Search className="h-4 w-4" />
-                  </span>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                    Blood Pressure (mmHg)
+                  </label>
                   <input
                     type="text"
-                    placeholder="Search standard treatments..."
-                    className="w-full border border-slate-350 rounded-lg pl-9 pr-3 py-1.5 text-xs bg-slate-50"
-                    value={searchCatalogueQuery}
-                    onChange={e => setSearchCatalogueQuery(e.target.value)}
+                    placeholder="e.g. 120/80"
+                    className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                    value={vitals.bp}
+                    onChange={(e) => setVitals({ ...vitals, bp: e.target.value })}
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto border border-slate-150 p-2 rounded-lg bg-slate-50/50">
-                  {filteredCatalogue.map(c => (
-                    <button
-                      key={c.code}
-                      type="button"
-                      onClick={() => handleAddTreatment(c)}
-                      className="px-2 py-1 bg-white border border-slate-200 hover:border-blue-500 text-[10px] rounded-lg font-medium cursor-pointer transition-colors text-left flex items-center"
-                    >
-                      + {c.name} (${c.price})
-                    </button>
-                  ))}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                    Heart Rate (bpm)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 72"
+                    className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                    value={vitals.hr}
+                    onChange={(e) => setVitals({ ...vitals, hr: e.target.value })}
+                  />
                 </div>
 
-                <div className="space-y-3 pt-2 max-h-64 overflow-y-auto divide-y divide-slate-100">
-                  {prescribedItems.map(item => (
-                    <div key={item.code} className="space-y-1.5 pt-2 text-xs">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <strong className="block text-slate-900 text-xs">{item.name}</strong>
-                          <span className="text-[10px] text-slate-400 font-mono">${item.price} each</span>
-                        </div>
-                        {item.code !== 'TRT-001' && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTreatment(item.code)}
-                            className="text-red-500 hover:text-red-700 font-bold"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded p-0.5">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQty(item.code, -1)}
-                            className="px-1 hover:bg-slate-200 rounded cursor-pointer text-[10px] font-bold"
-                          >
-                            -
-                          </button>
-                          <span className="px-1 font-mono font-bold text-[10px]">{item.qty}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQty(item.code, 1)}
-                            className="px-1 hover:bg-slate-200 rounded cursor-pointer text-[10px] font-bold"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="Dosage instruction (e.g. 1tds p.c.)"
-                          className="border border-slate-350 rounded px-2 py-1 text-[10px] flex-1 mx-3"
-                          value={item.instructions}
-                          onChange={e => handleUpdateInstructions(item.code, e.target.value)}
-                        />
-                        <span className="font-mono font-bold text-slate-800 text-xs w-16 text-right">
-                          ${(item.price * item.qty).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                    Temperature (°F)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 98.6"
+                    className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                    value={vitals.temp}
+                    onChange={(e) => setVitals({ ...vitals, temp: e.target.value })}
+                  />
                 </div>
 
-                <div className="border-t border-slate-100 pt-4">
-                  <button
-                    type="submit"
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-2.5 text-sm font-semibold transition-colors cursor-pointer shadow-xs"
-                  >
-                    Complete & Route to Billing Desk
-                  </button>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                    SpO2 (%)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 98"
+                    className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                    value={vitals.spo2}
+                    onChange={(e) => setVitals({ ...vitals, spo2: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                    Weight (kg)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 70"
+                    className="w-full border border-slate-350 rounded-lg px-2.5 py-1.5 font-mono text-sm"
+                    value={vitals.weight}
+                    onChange={(e) => setVitals({ ...vitals, weight: e.target.value })}
+                  />
                 </div>
               </div>
             </div>
-          </form>
-        </div>
-      )}
 
-      {/* LONGITUDINAL MEDICAL HISTORY DRAWER */}
-      {showHistoryDrawer && activePatient && (
-        <div className="fixed inset-0 z-50 flex justify-end animate-fade-in">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setShowHistoryDrawer(false)} />
-          <div className="relative bg-white h-full w-full max-w-lg border-l border-slate-200 shadow-2xl p-8 overflow-y-auto animate-slide-in-right flex flex-col justify-between">
-            <div>
-              <div className="flex justify-between items-center border-b border-slate-200 pb-4 mb-6">
-                <h3 className="text-lg font-bold text-slate-950">Patient Longitudinal History</h3>
-                <button onClick={() => setShowHistoryDrawer(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold cursor-pointer">✕</button>
-              </div>
+            {/* Diagnosis & Notes Fields */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5 shadow-xs">
+              <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3 flex items-center">
+                <Stethoscope className="h-4.5 w-4.5 text-blue-600 mr-1.5" />
+                Clinical Diagnosis & Consultation Notes
+              </h3>
 
-              <div className="space-y-6">
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono text-slate-600">
-                  <span className="block text-slate-450 uppercase mb-1">Details Summary</span>
-                  <strong className="text-slate-900 text-sm">{activePatient.name}</strong>
-                  <span className="block mt-0.5">DOB: {activePatient.dob} | Contact: {activePatient.contact}</span>
-                  <span className="block text-blue-650">Insurance provider: {activePatient.insurance?.provider || 'None / Cash'}</span>
+              <div className="space-y-4">
+                {/* Diagnosis (Required) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase">
+                      Clinical Diagnosis <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-red-500 font-semibold uppercase tracking-wider">Required</span>
+                  </div>
+                  <textarea
+                    required
+                    rows="3"
+                    placeholder="Enter formal clinical diagnosis (e.g. Acute bacterial bronchitis, Essential hypertension)..."
+                    className={`w-full border rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                      errors.diagnosis
+                        ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/20 text-slate-900'
+                        : 'border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-900'
+                    }`}
+                    value={diagnosis}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDiagnosis(val);
+                      if (touched.diagnosis) {
+                        validateField('diagnosis', val);
+                      }
+                    }}
+                    onBlur={() => {
+                      setTouched((prev) => ({ ...prev, diagnosis: true }));
+                      validateField('diagnosis', diagnosis);
+                    }}
+                  />
+                  {errors.diagnosis && (
+                    <p className="text-xs text-red-600 mt-1.5 flex items-center space-x-1 font-medium animate-fade-in">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{errors.diagnosis}</span>
+                    </p>
+                  )}
                 </div>
 
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Historical Timeline Log</h4>
-                <div className="relative border-l border-slate-200 ml-2.5 pl-6 space-y-6">
-                  {activePatientHistory?.visits.map((v, idx) => (
-                    <div key={idx} className="relative">
-                      {/* Dot */}
-                      <div className="absolute -left-9.5 top-1 h-6 w-6 bg-blue-50 border border-blue-500 rounded-full flex items-center justify-center">
-                        <Activity className="h-3 w-3 text-blue-600" />
-                      </div>
+                {/* Clinical Notes */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                    Clinical Notes
+                  </label>
+                  <textarea
+                    rows="3"
+                    placeholder="Chief complaints, symptoms presentation, physical findings, and medical observations..."
+                    className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm text-slate-800"
+                    value={clinicalNotes}
+                    onChange={(e) => setClinicalNotes(e.target.value)}
+                  />
+                </div>
 
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex justify-between text-xs text-slate-450 font-mono">
-                          <span>{v.date}</span>
-                          <span className="font-semibold text-slate-600">{v.doctor}</span>
-                        </div>
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs">
-                          <div className="mb-1">
-                            <span className="text-[10px] text-slate-400 font-semibold block uppercase">Vitals</span>
-                            <strong className="text-slate-700">{v.vitals}</strong>
-                          </div>
-                          <div className="mb-2">
-                            <span className="text-[10px] text-slate-400 font-semibold block uppercase">Diagnosis Notes</span>
-                            <p className="text-slate-600 font-medium">{v.diagnosis}</p>
-                          </div>
-                          <div className="border-t border-slate-200 pt-2">
-                            <span className="text-[10px] text-slate-450 font-semibold block uppercase mb-1">Prescribed Treatments</span>
-                            {v.treatments.map((t, index) => (
-                              <div key={index} className="flex justify-between text-[10px] text-slate-500 font-mono">
-                                <span>{t.name} (x{t.qty}) {t.instructions ? `- "${t.instructions}"` : ''}</span>
-                                <span>${(t.price * t.qty).toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                {/* Doctor Notes */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                    Doctor Notes (Confidential Remarks)
+                  </label>
+                  <textarea
+                    rows="2"
+                    placeholder="Internal clinician remarks, differential diagnoses, or specialist follow-up observations..."
+                    className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm text-slate-800 bg-slate-50/50"
+                    value={doctorNotes}
+                    onChange={(e) => setDoctorNotes(e.target.value)}
+                  />
+                </div>
 
-                  {(!activePatientHistory || activePatientHistory.visits.length === 0) && (
-                    <div className="text-center text-slate-400 py-10 text-xs">
-                      No previous medical history consults found across branches.
-                    </div>
+                {/* Follow-Up Date */}
+                <div className="max-w-xs">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1 flex items-center space-x-1">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                    <span>Follow-Up Date</span>
+                  </label>
+                  <input
+                    type="date"
+                    min={minDate}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm font-mono transition-colors ${
+                      errors.followUpDate
+                        ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/20 text-slate-900'
+                        : 'border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-800'
+                    }`}
+                    value={followUpDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFollowUpDate(val);
+                      validateField('followUpDate', val);
+                    }}
+                    onBlur={() => {
+                      setTouched((prev) => ({ ...prev, followUpDate: true }));
+                      validateField('followUpDate', followUpDate);
+                    }}
+                  />
+                  {errors.followUpDate && (
+                    <p className="text-xs text-red-600 mt-1.5 flex items-center space-x-1 font-medium animate-fade-in">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{errors.followUpDate}</span>
+                    </p>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="pt-6 border-t border-slate-100 flex justify-end">
+            {/* Prescribing Table (Step F11 & F12) */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-md flex items-center">
+                    <ClipboardList className="h-4.5 w-4.5 text-blue-600 mr-1.5" />
+                    Prescribed Treatments & Items
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Itemized treatments, procedures, and medications prescribed for this consultation
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-full font-mono">
+                    {prescribedItems.length} {prescribedItems.length === 1 ? 'item' : 'items'}
+                  </span>
+                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold px-3 py-1 rounded-full font-mono">
+                    Estimated Total: Rs. {prescribedGrandTotal.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                      <th className="px-4 py-2.5 w-12 text-center">#</th>
+                      <th className="px-4 py-2.5">Treatment Item</th>
+                      <th className="px-4 py-2.5 w-24 text-right">Unit Price</th>
+                      <th className="px-4 py-2.5 w-36 text-center">Quantity</th>
+                      <th className="px-4 py-2.5">Instructions / Dosage</th>
+                      <th className="px-4 py-2.5 w-28 text-right">Line Total</th>
+                      <th className="px-4 py-2.5 w-16 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {prescribedItems.length > 0 ? (
+                      prescribedItems.map((item, idx) => (
+                        <tr key={item.treatment_id || item.service_code || idx} className="hover:bg-slate-50/50">
+                          <td className="px-4 py-3 text-center font-mono font-bold text-slate-400">
+                            {idx + 1}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-900">{item.treatment_name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono flex items-center space-x-1.5">
+                              <span>{item.service_code}</span>
+                              <span>•</span>
+                              <span>{item.category_name || 'General'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-slate-600 font-medium">
+                            Rs. {Number(item.standard_unit_price || 0).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <div className="inline-flex items-center space-x-1.5 bg-slate-50 border border-slate-250 rounded-lg p-1">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantity(idx, -1)}
+                                className="p-1 hover:bg-slate-200 rounded text-slate-600 transition-colors cursor-pointer"
+                                title="Decrease quantity"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="w-8 text-center font-mono font-bold text-slate-900 text-xs">
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantity(idx, 1)}
+                                className="p-1 hover:bg-slate-200 rounded text-slate-600 transition-colors cursor-pointer"
+                                title="Increase quantity"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <input
+                              type="text"
+                              placeholder="e.g. 1 tab TDS after meals for 5 days..."
+                              className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-2.5 py-1.5 text-xs text-slate-800"
+                              value={item.instructions}
+                              onChange={(e) => handleUpdateInstructions(idx, e.target.value)}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                            Rs. {(Number(item.standard_unit_price || 0) * Number(item.quantity || 1)).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTreatment(idx)}
+                              className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Remove treatment"
+                            >
+                              <Trash2 className="h-4 w-4 mx-auto" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="7" className="px-4 py-8 text-center text-slate-400">
+                          No treatments prescribed yet. Select treatments from the catalogue browser below to add them to this prescription.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  {prescribedItems.length > 0 && (
+                    <tfoot className="bg-slate-50/80 border-t-2 border-slate-200">
+                      <tr>
+                        <td colSpan="5" className="px-4 py-3 text-right font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                          Prescription Grand Total (Est.):
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-slate-950 text-sm">
+                          Rs. {prescribedGrandTotal.toFixed(2)}
+                        </td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+
+              {/* Display pricing note (backend determines actual price) */}
+              <div className="bg-amber-50/70 border border-amber-200/70 rounded-lg px-3.5 py-2 text-[11px] text-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <span>
+                  <strong className="font-semibold">Note:</strong> Pricing and totals shown here are for display and clinical estimation only; the backend sets the actual price upon consultation completion.
+                </span>
+                <span className="font-mono text-xs font-bold text-amber-900 shrink-0">
+                  Grand Total: Rs. {prescribedGrandTotal.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {/* Treatment Catalogue Browser (Step F10) */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-md flex items-center">
+                    <Layers className="h-4.5 w-4.5 text-blue-600 mr-1.5" />
+                    Treatment Catalogue Browser
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Filter by category and search active clinical treatments and procedures
+                  </p>
+                </div>
+                <span className="text-xs font-mono font-medium text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                  {catalogue.length} items available
+                </span>
+              </div>
+
+              {/* Category Filter and Search Bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2 relative">
+                  <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search treatments by name or service code (e.g. ECG, X-Ray)..."
+                    className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg pl-9 pr-3 py-2 text-xs bg-slate-50/50"
+                    value={catalogueSearch}
+                    onChange={(e) => setCatalogueSearch(e.target.value)}
+                  />
+                </div>
+
+                <div className="relative">
+                  <Filter className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <select
+                    className="w-full border border-slate-350 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg pl-8 pr-3 py-2 text-xs bg-slate-50/50 text-slate-700 cursor-pointer"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                  >
+                    <option value="">All Categories</option>
+                    {categories.map((cat) => (
+                      <option key={cat.category_id} value={cat.category_id}>
+                        {cat.category_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Catalogue Results List with Prescribe button */}
+              <div className="border border-slate-150 rounded-lg divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                {loadingCatalogue ? (
+                  <div className="p-6 text-center text-xs text-slate-400">
+                    Loading treatment catalogue from API...
+                  </div>
+                ) : catalogue.length > 0 ? (
+                  catalogue.map((item) => (
+                    <div
+                      key={item.treatment_id || item.service_code}
+                      className="p-3.5 flex items-center justify-between hover:bg-slate-50/80 transition-colors"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center space-x-2">
+                          <span className="bg-slate-100 text-slate-700 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-slate-200">
+                            {item.service_code}
+                          </span>
+                          <strong className="text-xs text-slate-900 font-semibold">
+                            {item.treatment_name}
+                          </strong>
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center space-x-2">
+                          <span className="font-medium text-slate-500">{item.category_name || 'Standard Service'}</span>
+                          {item.description && (
+                            <>
+                              <span>•</span>
+                              <span className="truncate max-w-sm">{item.description}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 shrink-0 ml-4">
+                        <div className="text-right">
+                          <span className="font-mono text-xs font-bold text-slate-900 block">
+                            Rs. {Number(item.standard_unit_price || 0).toFixed(2)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 uppercase font-mono">
+                            Standard Fee
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAddTreatment(item)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1 cursor-pointer transition-colors shadow-xs"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Prescribe</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    No treatment items match the current search or category filter.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Complete Visit Action Button (Step F13) */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xs">
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm">Complete Clinical Session</h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Save clinical findings, prescribe itemized treatments, and route invoice to billing desk
+                </p>
+              </div>
+
+              {isAlreadyCompleted ? (
+                <div className="flex items-center space-x-3">
+                  <span className="inline-flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-xs border border-emerald-200">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span>Consultation Completed</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handlers?.navigateTo ? handlers.navigateTo('/doctor/workbench') : window.history.back()
+                    }
+                    className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors"
+                  >
+                    Return to Queue
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCompleteVisit}
+                  disabled={isSubmitting}
+                  className={`px-6 py-3 rounded-xl font-bold text-sm text-white transition-all shadow-md flex items-center space-x-2 cursor-pointer ${
+                    isSubmitting
+                      ? 'bg-emerald-400 cursor-not-allowed opacity-80'
+                      : 'bg-emerald-600 hover:bg-emerald-700 active:scale-98'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Submitting Consultation...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Complete Visit & Send to Billing</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Feedback Notification (Step F14) */}
+      {toastState && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 max-w-md p-4 rounded-xl shadow-2xl border flex items-start space-x-3 animate-fade-in ${
+            toastState.type === 'success'
+              ? 'bg-slate-900 text-white border-emerald-500 shadow-emerald-950/20'
+              : 'bg-slate-900 text-white border-red-500 shadow-red-950/20'
+          }`}
+        >
+          {toastState.type === 'success' ? (
+            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1 text-xs">
+            <div className="font-bold text-sm text-white">
+              {toastState.type === 'success' ? 'Consultation Completed' : 'Consultation Error'}
+            </div>
+            <div className="mt-0.5 text-slate-300">{toastState.message}</div>
+            {toastState.invoiceId && (
+              <div className="mt-2 inline-flex items-center space-x-1.5 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 font-mono text-[11px] px-2 py-0.5 rounded">
+                <span>Invoice Issued:</span>
+                <span className="font-bold">#{toastState.invoiceId}</span>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setToastState(null)}
+            className="text-slate-400 hover:text-white text-xs font-bold ml-2 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Patient Consultation History Drawer (Step F15) */}
+      {showHistoryDrawer && (
+        <div className="fixed inset-0 z-50 overflow-hidden animate-fade-in">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-slate-950/50 backdrop-blur-xs transition-opacity cursor-pointer"
+            onClick={() => setShowHistoryDrawer(false)}
+          />
+
+          <div className="fixed inset-y-0 right-0 max-w-lg w-full bg-white shadow-2xl flex flex-col z-50">
+            {/* Drawer Header */}
+            <div className="p-6 bg-slate-900 text-white flex justify-between items-start border-b border-slate-800">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-blue-600/30 text-blue-400 rounded-xl border border-blue-500/30">
+                  <History className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Patient Consultation History</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {activePatient?.name || 'Selected Patient'} ({activePatient?.id || activePatientId || 'N/A'})
+                  </p>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => setShowHistoryDrawer(false)}
-                className="bg-slate-900 hover:bg-slate-800 text-white rounded-lg px-4 py-2 text-sm font-semibold transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close drawer"
               >
-                Close Slide-out
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Drawer Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {loadingHistory ? (
+                <div className="py-16 text-center space-y-3">
+                  <Loader2 className="h-8 w-8 text-blue-600 animate-spin mx-auto" />
+                  <p className="text-xs text-slate-500 font-medium">
+                    Loading clinical consultation history timeline...
+                  </p>
+                </div>
+              ) : patientHistory.length === 0 ? (
+                <div className="py-16 text-center space-y-3 bg-slate-50 border border-slate-200 rounded-xl p-8">
+                  <FileText className="h-10 w-10 text-slate-300 mx-auto" />
+                  <h4 className="text-sm font-bold text-slate-800">No Past Consultations Found</h4>
+                  <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                    There are no prior recorded clinical consultations for this patient in the system.
+                  </p>
+                </div>
+              ) : (
+                <div className="relative border-l-2 border-blue-200 ml-4 pl-6 space-y-6">
+                  {patientHistory.map((item) => {
+                    const isExpanded = expandedConsultations.includes(item.consultation_id);
+                    const items = consultationDetails[item.consultation_id];
+                    const isLoadingItemDetail = loadingDetails[item.consultation_id];
+
+                    return (
+                      <div key={item.consultation_id} className="relative group">
+                        {/* Timeline node */}
+                        <div className="absolute -left-[31px] top-1.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-blue-600 shadow-xs" />
+
+                        {/* Consultation Card */}
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs hover:border-blue-300 transition-all space-y-3">
+                          {/* Card header: Date & Attending Doctor */}
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center space-x-1.5 text-xs text-blue-700 font-bold font-mono">
+                                <Calendar className="h-3.5 w-3.5 text-blue-500" />
+                                <span>{item.consultation_date}</span>
+                              </div>
+                              <div className="text-xs text-slate-600 font-medium mt-0.5 flex items-center space-x-1">
+                                <Stethoscope className="h-3 w-3 text-slate-400" />
+                                <span>Attending: {item.doctor_name}</span>
+                              </div>
+                            </div>
+                            <span className="bg-slate-100 text-slate-700 text-[10px] font-mono px-2 py-0.5 rounded-md border border-slate-200 font-semibold">
+                              #{item.consultation_id}
+                            </span>
+                          </div>
+
+                          {/* Diagnosis */}
+                          <div className="bg-slate-50 border border-slate-150 rounded-lg p-2.5">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                              Clinical Diagnosis
+                            </span>
+                            <p className="text-xs font-semibold text-slate-800">
+                              {item.diagnosis}
+                            </p>
+                          </div>
+
+                          {/* Follow-up date if available */}
+                          {item.follow_up_date && (
+                            <div className="text-[11px] text-slate-500 flex items-center space-x-1.5">
+                              <span className="font-semibold text-slate-600">Follow-up:</span>
+                              <span className="font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] border border-blue-150">
+                                {item.follow_up_date}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Expandable Prescribed Items Section */}
+                          <div className="border-t border-slate-100 pt-2.5">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandConsultation(item.consultation_id)}
+                              className="w-full flex items-center justify-between text-xs text-blue-600 hover:text-blue-800 font-semibold transition-colors cursor-pointer"
+                            >
+                              <span>
+                                Prescribed Items ({item.item_count || item.items?.length || 0})
+                              </span>
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </button>
+
+                            {isExpanded && (
+                              <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-2 animate-fade-in">
+                                {isLoadingItemDetail ? (
+                                  <div className="text-center py-2 text-xs text-slate-400 flex items-center justify-center space-x-1.5">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                                    <span>Loading prescribed treatments...</span>
+                                  </div>
+                                ) : items && items.length > 0 ? (
+                                  items.map((trt, idx) => (
+                                    <div
+                                      key={trt.prescription_item_id || idx}
+                                      className="bg-slate-50 rounded-lg p-2 text-xs border border-slate-150 flex justify-between items-start"
+                                    >
+                                      <div>
+                                        <div className="font-semibold text-slate-900">
+                                          {trt.treatment_name || trt.name}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 font-mono">
+                                          Qty: {trt.quantity || trt.qty || 1}
+                                          {trt.instructions && ` • ${trt.instructions}`}
+                                        </div>
+                                      </div>
+                                      <span className="font-mono font-bold text-slate-700 text-[11px]">
+                                        Rs. {Number(trt.billed_unit_price || trt.price || 0).toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-[11px] text-slate-400 italic py-1">
+                                    No itemized treatments prescribed for this visit.
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowHistoryDrawer(false)}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Close History
               </button>
             </div>
           </div>
