@@ -23,8 +23,9 @@ const reports = [
     columns: [
       ['Branch_ID', 'Branch ID'], ['Branch_Name', 'Branch Location'],
       ['Appointment_Date', 'Appointment Date'], ['Total_Appointments', 'Total Appointments'],
-      ['Completed_Appointments', 'Completed Appointments'],
-      ['Cancelled_Appointments', 'Cancelled Appointments'], ['No_Show_Appointments', 'No-Shows']
+      ['Scheduled_Appointments', 'Scheduled Appointments'], ['Completed_Appointments', 'Completed Appointments'],
+      ['Cancelled_Appointments', 'Cancelled Appointments'], ['No_Show_Appointments', 'No-Shows'],
+      ['Walk_In_Appointments', 'Walk-Ins']
     ]
   },
   {
