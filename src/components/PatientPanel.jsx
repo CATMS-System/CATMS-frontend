@@ -537,7 +537,7 @@ export default function PatientPanel({ subView, db, handlers }) {
               </div>
 
               <div className="space-y-2">
-                <span className="text-3xl font-bold font-mono text-slate-900 block">${outstandingDues.toFixed(2)}</span>
+                <span className="text-3xl font-bold font-mono text-slate-900 block">Rs. {outstandingDues.toFixed(2)}</span>
                 <p className="text-xs text-slate-500">Unsettled copay amounts and outpatient lab test balance dues.</p>
               </div>
 
@@ -703,7 +703,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                           <span className="text-xs text-slate-500 block mt-1">Branch: {doc.branch || bookingForm.branch}</span>
                         </div>
                         <div className="text-right">
-                          <span className="text-xs font-bold text-emerald-600 font-mono block">Fee: ${doc.consultFee || 2500}</span>
+                          <span className="text-xs font-bold text-emerald-600 font-mono block">Fee: Rs. {doc.consultFee || 2500}</span>
                           <span className="text-[10px] text-slate-400 font-mono">Slot: 30 mins</span>
                         </div>
                       </div>
@@ -940,7 +940,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                           {v.treatments.map((t, index) => (
                             <div key={index} className="flex justify-between text-[10px] text-slate-500">
                               <span>{t.name} (x{t.qty})</span>
-                              <span>${(t.price * t.qty).toFixed(2)}</span>
+                              <span>Rs. {(t.price * t.qty).toFixed(2)}</span>
                             </div>
                           ))}
                         </div>
@@ -985,8 +985,8 @@ export default function PatientPanel({ subView, db, handlers }) {
                   <tr key={inv.invoiceId} className="hover:bg-slate-50/50">
                     <td className="px-6 py-4 font-bold text-slate-700">{inv.invoiceId}</td>
                     <td className="px-6 py-4">{inv.date}</td>
-                    <td className="px-6 py-4 text-right text-emerald-600 font-bold">${inv.insuranceCoverage.toFixed(2)}</td>
-                    <td className="px-6 py-4 text-right text-blue-650 font-bold">${inv.patientBalance.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-right text-emerald-600 font-bold">Rs. {inv.insuranceCoverage.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-right text-blue-650 font-bold">Rs. {inv.patientBalance.toFixed(2)}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase font-sans ${
                         inv.status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
