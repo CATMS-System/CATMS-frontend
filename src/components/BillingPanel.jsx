@@ -20,8 +20,10 @@ import {
   submitInsuranceClaim,
   updateClaimStatus
 } from '../api/billingApi';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function BillingPanel({ subView, db, handlers }) {
+  const { t } = useLanguage();
   const {
     invoiceList,
     appointmentList
@@ -655,7 +657,7 @@ export default function BillingPanel({ subView, db, handlers }) {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">
-                Billing Desk Dashboard
+                {t('billing_desk_title', 'Billing Desk Dashboard')}
               </h1>
 
               <p className="text-sm text-slate-500 mt-1">
@@ -671,7 +673,7 @@ export default function BillingPanel({ subView, db, handlers }) {
               className="px-3.5 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
             >
               <RefreshCw className={`h-4 w-4 ${invoicesLoading ? 'animate-spin' : ''}`} />
-              {invoicesLoading ? 'Refreshing Data...' : 'Refresh Invoices'}
+              {invoicesLoading ? t('loading', 'Refreshing Data...') : t('refresh', 'Refresh Invoices')}
             </button>
           </div>
 
@@ -680,7 +682,7 @@ export default function BillingPanel({ subView, db, handlers }) {
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
-                  Total Billed
+                  {t('total', 'Total Billed')}
                 </span>
 
                 <span className="text-xl font-bold text-slate-900 mt-1 block font-mono">
@@ -696,7 +698,7 @@ export default function BillingPanel({ subView, db, handlers }) {
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
-                  Payments Collected
+                  {t('stat_revenue_collected', 'Payments Collected')}
                 </span>
 
                 <span className="text-xl font-bold text-emerald-600 mt-1 block font-mono">
@@ -712,7 +714,7 @@ export default function BillingPanel({ subView, db, handlers }) {
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
-                  Outstanding Balance
+                  {t('stat_outstanding_balance', 'Outstanding Balance')}
                 </span>
 
                 <span className="text-xl font-bold text-red-500 mt-1 block font-mono">

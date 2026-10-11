@@ -34,6 +34,8 @@ import BillingPanel from './components/BillingPanel';
 import PatientPanel from './components/PatientPanel';
 import ReportsPanel from './components/ReportsPanel';
 import ChangePasswordModal from './components/ChangePasswordModal';
+import LanguageSelector from './components/LanguageSelector';
+import { useLanguage } from './contexts/LanguageContext';
 import { searchPatients } from './services/patientService';
 import { adaptPatientForPanels } from './utils/patientAdapter';
 import { formatPatientId, formatPatientName } from './utils/patientFormat';
@@ -104,9 +106,10 @@ const INITIAL_AUDITS = [
 
 export default function App() {
   // ==========================================
-  // AUTH CONTEXT
+  // AUTH CONTEXT & I18N
   // ==========================================
   const { currentUser, isHydrated, login, logout } = useAuth();
+  const { t } = useLanguage();
 
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
@@ -432,18 +435,18 @@ export default function App() {
         setAuthError('');
         setEmailInput('');
         setPasswordInput('');
-        triggerToast(result.isDemo ? `Authenticated as ${result.user.role} (Demo mode)!` : 'Authenticated successfully!');
+        triggerToast(result.isDemo ? t('auth_demo_success', `Authenticated as ${result.user.role} (Demo mode)!`, { role: result.user.role }) : t('auth_success', 'Authenticated successfully!'));
         navigateTo(getRoleDefaultPath(result.user.roleCode));
       }
     } catch (error) {
       console.error("Login failed:", error);
-      setAuthError('Invalid credentials. Check username or password.');
+      setAuthError(t('invalid_credentials', 'Invalid credentials. Check username or password.'));
     }
   };
 
   const handleLogout = () => {
     logout();
-    triggerToast('Session invalidated. Redirecting...');
+    triggerToast(t('session_invalidated', 'Session invalidated. Redirecting...'));
     navigateTo('/login');
   };
 
@@ -468,9 +471,14 @@ export default function App() {
   if (!currentUser) {
     return (
       <div
-        className="min-h-screen login-bg flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans"
+        className="min-h-screen login-bg flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative"
         style={LOGIN_BG_STYLE}
       >
+        {/* Top-right language selector on login portal */}
+        <div className="absolute top-6 right-6 z-30">
+          <LanguageSelector variant="portal" />
+        </div>
+
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
           <div className="flex justify-center items-center space-x-2.5">
             <div className="p-2.5 bg-blue-600 rounded-2xl text-white shadow-lg animate-pulse">
@@ -481,7 +489,7 @@ export default function App() {
             </span>
           </div>
           <h2 className="mt-4 text-sm font-medium text-slate-500 uppercase tracking-widest">
-            CLINIC APPOINTMENT & TREATMENT MANAGEMENT SYSTEM
+            {t('system_subtitle', 'CLINIC APPOINTMENT & TREATMENT MANAGEMENT SYSTEM')}
           </h2>
         </div>
 
@@ -489,10 +497,10 @@ export default function App() {
           <div className="bg-white py-8 px-4 border border-slate-200 shadow-2xl rounded-2xl sm:px-10 space-y-6">
             <div className="text-center border-b border-slate-100 pb-3">
               <h3 className="text-xl font-bold text-slate-900">
-                Welcome Back
+                {t('welcome_back', 'Welcome Back')}
               </h3>
               <p className="mt-1 text-xs text-slate-500">
-                Sign in to access your account
+                {t('sign_in_subtitle', 'Sign in to access your account')}
               </p>
             </div>
 
@@ -506,7 +514,7 @@ export default function App() {
             <form className="space-y-4" onSubmit={handleSignIn} noValidate>
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Email Address / Username
+                  {t('email_or_username', 'Email Address / Username')}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
@@ -516,7 +524,7 @@ export default function App() {
                     type="text"
                     required
                     className="w-full pl-9 pr-3 py-2 border border-slate-350 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                    placeholder="username or name@careflow.com"
+                    placeholder={t('username_placeholder', 'username or name@careflow.com')}
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                   />
@@ -525,7 +533,7 @@ export default function App() {
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Password
+                  {t('password', 'Password')}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
@@ -546,7 +554,7 @@ export default function App() {
                 type="submit"
                 className="w-full flex justify-center py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-xs"
               >
-                Sign In to System
+                {t('sign_in_button', 'Sign In to System')}
               </button>
             </form>
 
@@ -590,7 +598,7 @@ export default function App() {
                     }`}
                 >
                   <Building className="h-4.5 w-4.5" />
-                  <span>Executive Dashboard</span>
+                  <span>{t('nav_executive_dashboard', 'Executive Dashboard')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/staff')}
@@ -598,7 +606,7 @@ export default function App() {
                     }`}
                 >
                   <Users className="h-4.5 w-4.5" />
-                  <span>Staff Directory</span>
+                  <span>{t('nav_staff_directory', 'Staff Directory')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/branches')}
@@ -606,7 +614,7 @@ export default function App() {
                     }`}
                 >
                   <Building className="h-4.5 w-4.5" />
-                  <span>Clinic Branches</span>
+                  <span>{t('nav_clinic_branches', 'Clinic Branches')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/audit-logs')}
@@ -614,7 +622,7 @@ export default function App() {
                     }`}
                 >
                   <ClipboardList className="h-4.5 w-4.5" />
-                  <span>Security Audit Logs</span>
+                  <span>{t('nav_security_audit_logs', 'Security Audit Logs')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/admin/reports')}
@@ -622,7 +630,7 @@ export default function App() {
                     }`}
                 >
                   <TrendingUp className="h-4.5 w-4.5" />
-                  <span>Reports Suite</span>
+                  <span>{t('nav_reports_suite', 'Reports Suite')}</span>
                 </button>
               </>
             )}
@@ -635,7 +643,7 @@ export default function App() {
                     }`}
                 >
                   <Building className="h-4.5 w-4.5" />
-                  <span>Branch Operations</span>
+                  <span>{t('nav_branch_operations', 'Branch Operations')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/manager/roster')}
@@ -643,7 +651,7 @@ export default function App() {
                     }`}
                 >
                   <Calendar className="h-4.5 w-4.5" />
-                  <span>Doctor Roster Planner</span>
+                  <span>{t('nav_doctor_roster_planner', 'Doctor Roster Planner')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/manager/staff')}
@@ -651,7 +659,7 @@ export default function App() {
                     }`}
                 >
                   <Users className="h-4.5 w-4.5" />
-                  <span>Local Staff Directory</span>
+                  <span>{t('nav_local_staff_directory', 'Local Staff Directory')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/manager/reports')}
@@ -659,7 +667,7 @@ export default function App() {
                     }`}
                 >
                   <TrendingUp className="h-4.5 w-4.5" />
-                  <span>Branch Reports</span>
+                  <span>{t('nav_branch_reports', 'Branch Reports')}</span>
                 </button>
               </>
             )}
@@ -672,7 +680,7 @@ export default function App() {
                     }`}
                 >
                   <ClipboardList className="h-4.5 w-4.5" />
-                  <span>Triage Workbench</span>
+                  <span>{t('nav_triage_workbench', 'Triage Workbench')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/reception/patients')}
@@ -680,7 +688,7 @@ export default function App() {
                     }`}
                 >
                   <Users className="h-4.5 w-4.5" />
-                  <span>Patient Registry</span>
+                  <span>{t('nav_patient_registry', 'Patient Registry')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/reception/appointments')}
@@ -688,7 +696,7 @@ export default function App() {
                     }`}
                 >
                   <Calendar className="h-4.5 w-4.5" />
-                  <span>Schedules Calendar</span>
+                  <span>{t('nav_schedules_calendar', 'Schedules Calendar')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/reception/walkin')}
@@ -696,7 +704,7 @@ export default function App() {
                     }`}
                 >
                   <Clock className="h-4.5 w-4.5" />
-                  <span>Walk-in Intake</span>
+                  <span>{t('nav_walkin_intake', 'Walk-in Intake')}</span>
                 </button>
               </>
             )}
@@ -709,7 +717,7 @@ export default function App() {
                     }`}
                 >
                   <Activity className="h-4.5 w-4.5" />
-                  <span>Consult Workbench</span>
+                  <span>{t('nav_consult_workbench', 'Consult Workbench')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/doctor/appointments')}
@@ -717,7 +725,7 @@ export default function App() {
                     }`}
                 >
                   <Calendar className="h-4.5 w-4.5" />
-                  <span>Upcoming Bookings</span>
+                  <span>{t('nav_upcoming_bookings', 'Upcoming Bookings')}</span>
                 </button>
               </>
             )}
@@ -730,7 +738,7 @@ export default function App() {
                     }`}
                 >
                   <DollarSign className="h-4.5 w-4.5" />
-                  <span>Billing Desk</span>
+                  <span>{t('nav_billing_desk', 'Billing Desk')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/billing/invoices')}
@@ -738,7 +746,7 @@ export default function App() {
                     }`}
                 >
                   <FileText className="h-4.5 w-4.5" />
-                  <span>Invoice Ledger</span>
+                  <span>{t('nav_invoice_ledger', 'Invoice Ledger')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/billing/claims')}
@@ -746,7 +754,7 @@ export default function App() {
                     }`}
                 >
                   <ShieldCheck className="h-4.5 w-4.5" />
-                  <span>Insurance Claims</span>
+                  <span>{t('nav_insurance_claims', 'Insurance Claims')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/billing/reports')}
@@ -754,7 +762,7 @@ export default function App() {
                     }`}
                 >
                   <TrendingUp className="h-4.5 w-4.5" />
-                  <span>Finance Reports</span>
+                  <span>{t('nav_finance_reports', 'Finance Reports')}</span>
                 </button>
               </>
             )}
@@ -767,7 +775,7 @@ export default function App() {
                     }`}
                 >
                   <Building className="h-4.5 w-4.5" />
-                  <span>Home Dashboard</span>
+                  <span>{t('nav_home_dashboard', 'Home Dashboard')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/portal/book')}
@@ -775,7 +783,7 @@ export default function App() {
                     }`}
                 >
                   <Calendar className="h-4.5 w-4.5" />
-                  <span>Self Booking Wizard</span>
+                  <span>{t('nav_self_booking_wizard', 'Self Booking Wizard')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/portal/medical-history')}
@@ -783,7 +791,7 @@ export default function App() {
                     }`}
                 >
                   <FileText className="h-4.5 w-4.5" />
-                  <span>My Consultations</span>
+                  <span>{t('nav_my_consultations', 'My Consultations')}</span>
                 </button>
                 <button
                   onClick={() => navigateTo('/portal/billing')}
@@ -791,7 +799,7 @@ export default function App() {
                     }`}
                 >
                   <DollarSign className="h-4.5 w-4.5" />
-                  <span>My Receipts</span>
+                  <span>{t('nav_my_receipts', 'My Receipts')}</span>
                 </button>
               </>
             )}
@@ -801,7 +809,7 @@ export default function App() {
         {/* User Session Info */}
         <div className="p-4 border-t border-slate-900 bg-slate-950/50">
           <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-            Active Session
+            {t('active_session', 'Active Session')}
           </div>
           <div className="text-xs font-semibold text-slate-300 mt-1 flex items-center space-x-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
@@ -830,31 +838,34 @@ export default function App() {
                     value={selectedBranch}
                     onChange={e => setSelectedBranch(e.target.value)}
                   >
-                    <option value="All Branches">All Branches</option>
-                    <option value="Colombo Main">Colombo Main</option>
-                    <option value="Kandy">Kandy</option>
-                    <option value="Galle">Galle</option>
+                    <option value="All Branches">{t('all_branches', 'All Branches')}</option>
+                    <option value="Colombo Main">{t('colombo_main', 'Colombo Main')}</option>
+                    <option value="Kandy">{t('kandy', 'Kandy')}</option>
+                    <option value="Galle">{t('galle', 'Galle')}</option>
                   </select>
                 </div>
               ) : (
                 <span className="text-xs font-semibold text-slate-500 flex items-center space-x-1">
                   <Building className="h-4 w-4 text-slate-400" />
-                  <span>Branch: <strong>{currentUser.branch || 'None'}</strong> [Locked]</span>
+                  <span>{t('branch', 'Branch')}: <strong>{currentUser.branch || 'None'}</strong> [Locked]</span>
                 </span>
               )}
             </div>
           </div>
 
-          {/* Center search indicator button */}
-          <div className="flex items-center space-x-4">
+          {/* Center search & actions cluster */}
+          <div className="flex items-center space-x-3.5">
             <button
               onClick={() => setGlobalSearchOpen(true)}
               className="hidden md:flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-1.5 text-xs text-slate-450 hover:bg-slate-100 hover:border-slate-300 transition-all font-medium cursor-pointer"
             >
               <Search className="h-3.5 w-3.5" />
-              <span>Search Patient Code / Name...</span>
+              <span>{t('search_placeholder', 'Search Patient Code / Name...')}</span>
               <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-mono shadow-2xs">Ctrl + K</kbd>
             </button>
+
+            {/* Language Selector Dropdown in Top Bar */}
+            <LanguageSelector />
 
             {/* User Profile & Badge */}
             <div className="h-5 w-px bg-slate-200" />
@@ -876,7 +887,7 @@ export default function App() {
               <button
                 onClick={() => setShowChangePasswordModal(true)}
                 className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-xl transition-all cursor-pointer"
-                title="Change Password"
+                title={t('change_password', 'Change Password')}
               >
                 <KeyRound className="h-4.5 w-4.5" />
               </button>
@@ -885,7 +896,7 @@ export default function App() {
               <button
                 onClick={handleLogout}
                 className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition-all cursor-pointer"
-                title="Instant Logout"
+                title={t('instant_logout', 'Instant Logout')}
               >
                 <LogOut className="h-4.5 w-4.5" />
               </button>
@@ -904,15 +915,18 @@ export default function App() {
               return (
                 <div className="bg-white border border-red-200 rounded-xl p-10 text-center text-slate-700 shadow-xs">
                   <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
-                  <h3 className="font-bold text-slate-900 text-lg">Access Denied</h3>
+                  <h3 className="font-bold text-slate-900 text-lg">{t('access_denied', 'Access Denied')}</h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Your account role ({currentUser.roleCode.replace('ROLE_', '')}) does not have permission to access {path}.
+                    {t('access_denied_desc', `Your account role (${currentUser.roleCode.replace('ROLE_', '')}) does not have permission to access ${path}.`, {
+                      role: currentUser.roleCode.replace('ROLE_', ''),
+                      path
+                    })}
                   </p>
                   <button
                     onClick={() => navigateTo(getRoleDefaultPath(currentUser.roleCode))}
                     className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
                   >
-                    Return to My Workspace
+                    {t('return_to_workspace', 'Return to My Workspace')}
                   </button>
                 </div>
               );

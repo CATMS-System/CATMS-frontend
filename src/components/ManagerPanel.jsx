@@ -5,8 +5,10 @@ import AddStaffDrawer from './AddStaffDrawer';
 import api from '../api/axios';
 import { getDoctors, getDoctorSchedules, getAppointmentStatusCounts } from '../services/appointmentService';
 import { getBranchDailySummary } from '../api/reportsApi';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function ManagerPanel({ subView, db, handlers }) {
+  const { t } = useLanguage();
   const { staffList, patientList, appointmentList, liveQueue, invoiceList, branches } = db;
   const { setStaffList, setAppointmentList, triggerToast, addAuditLog } = handlers;
 
@@ -547,7 +549,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold flex items-center space-x-2 shadow-xs cursor-pointer"
             >
               <Plus className="h-4 w-4" />
-              <span>Add Staff Member</span>
+              <span>{t('add_staff_member', 'Add Staff Member')}</span>
             </button>
           </div>
 

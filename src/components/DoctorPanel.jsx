@@ -4,8 +4,10 @@ import { useDoctorQueue } from '../hooks/useDoctorQueue';
 import { getCatalogue, getCategories } from '../api/treatmentApi';
 import { createConsultation, getPatientHistory, getConsultation } from '../api/consultationApi';
 import { getAppointments, getAppointmentById } from '../services/appointmentService';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
+  const { t } = useLanguage();
   const currentDoctorId = db?.currentUser?.doctor_id ?? db?.currentUser?.doctorId ?? db?.currentUser?.id ?? 'STF-001';
   const currentDoctorName = db?.currentUser?.name || 'Dr. Alexander Bennett';
   // TODO: branch_id should come from auth context once Member 1's auth work lands
@@ -1084,7 +1086,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         <div className="space-y-6 animate-fade-in">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Clinician Triage Workbench</h1>
+              <h1 className="text-2xl font-bold text-slate-900">{t('doctor_workbench_title', 'Clinician Triage Workbench')}</h1>
               <p className="text-sm text-slate-500 mt-1">
                 Manage waiting room queues, recall diagnostics, review upcoming schedules, and open active clinical consoles
               </p>

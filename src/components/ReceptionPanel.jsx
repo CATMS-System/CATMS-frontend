@@ -9,8 +9,10 @@ import {
   ClinicQueueTable,
 } from './appointments';
 import { getDoctors, getSpecialties } from '../services/appointmentService';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function ReceptionPanel({ subView, db, handlers }) {
+  const { t } = useLanguage();
   const { patientList, staffList, appointmentList, liveQueue } = db;
   const { setAppointmentList, setLiveQueue, triggerToast, addAuditLog, navigateTo, reloadPatients } = handlers;
 

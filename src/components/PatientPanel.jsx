@@ -4,8 +4,10 @@ import { getSpecialties, getDoctors, getDoctorAvailableSlots, bookAppointment, g
 import { getPatientHistory } from '../api/consultationApi';
 import { getInvoices } from '../api/billingApi';
 import ChangePasswordModal from './ChangePasswordModal';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function PatientPanel({ subView, db, handlers }) {
+  const { t } = useLanguage();
   const { appointmentList, invoiceList, patientList, staffList, medicalHistories, branches, liveQueue } = db;
   const { setAppointmentList, setLiveQueue, triggerToast, addAuditLog, navigateTo } = handlers;
   const [showChangePassword, setShowChangePassword] = useState(false);

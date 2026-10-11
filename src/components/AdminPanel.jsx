@@ -3,8 +3,10 @@ import { Users, Building, AlertCircle, Calendar, Plus, MapPin, Key, RefreshCw, C
 import api from '../api/axios';
 import ReportsPanel from './ReportsPanel';
 import AddStaffDrawer from './AddStaffDrawer';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function AdminPanel({ subView, db, handlers }) {
+  const { t } = useLanguage();
   const { staffList, patientList, appointmentList, liveQueue, invoiceList, auditLogs, branches, selectedBranch: initialSelectedBranch } = db;
   const { setStaffList, setBranches, setAuditLogs, addAuditLog, triggerToast, navigateTo, setSelectedBranch: setGlobalSelectedBranch } = handlers;
 
@@ -376,12 +378,12 @@ export default function AdminPanel({ subView, db, handlers }) {
           {/* Dashboard Header with Branch Scope Selector */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Executive Administration Dashboard</h1>
-              <p className="text-sm text-slate-500 mt-1">Multi-branch network analytics, live fulfillment monitoring, and operations command</p>
+              <h1 className="text-2xl font-bold text-slate-900">{t('admin_dash_title', 'Executive Administration Dashboard')}</h1>
+              <p className="text-sm text-slate-500 mt-1">{t('admin_dash_subtitle', 'Multi-branch network analytics, live fulfillment monitoring, and operations command')}</p>
             </div>
             <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-xs shrink-0">
               <Building className="h-4 w-4 text-slate-400" />
-              <label htmlFor="admin-branch-select" className="text-xs font-semibold text-slate-500">Branch Scope:</label>
+              <label htmlFor="admin-branch-select" className="text-xs font-semibold text-slate-500">{t('branch_scope', 'Branch Scope:')}</label>
               <select
                 id="admin-branch-select"
                 aria-label="Branch Scope"
@@ -389,10 +391,10 @@ export default function AdminPanel({ subView, db, handlers }) {
                 value={selectedBranch}
                 onChange={e => handleBranchChange(e.target.value)}
               >
-                <option value="All Branches">All Branches (Network-Wide)</option>
-                <option value="Colombo Main">Colombo Main Clinic</option>
-                <option value="Kandy">Kandy Central Clinic</option>
-                <option value="Galle">Galle Coastal Clinic</option>
+                <option value="All Branches">{t('all_branches_network_wide', 'All Branches (Network-Wide)')}</option>
+                <option value="Colombo Main">{t('colombo_main_clinic', 'Colombo Main Clinic')}</option>
+                <option value="Kandy">{t('kandy_central_clinic', 'Kandy Central Clinic')}</option>
+                <option value="Galle">{t('galle_coastal_clinic', 'Galle Coastal Clinic')}</option>
               </select>
             </div>
           </div>
@@ -401,7 +403,7 @@ export default function AdminPanel({ subView, db, handlers }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Revenue Collected</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_revenue_collected', 'Revenue Collected')}</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-revenue-collected">
                   Rs. {revenueCollected.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
@@ -413,7 +415,7 @@ export default function AdminPanel({ subView, db, handlers }) {
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Outstanding Balance</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_outstanding_balance', 'Outstanding Balance')}</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-outstanding-balance">
                   Rs. {outstandingBalance.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
@@ -425,7 +427,7 @@ export default function AdminPanel({ subView, db, handlers }) {
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Total Patients</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_total_patients', 'Total Patients')}</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-total-patients">
                   {totalPatientsCount}
                 </span>
@@ -437,7 +439,7 @@ export default function AdminPanel({ subView, db, handlers }) {
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Active Doctors</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_active_doctors', 'Active Doctors')}</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-active-doctors">
                   {activeDoctorsCount}
                 </span>
@@ -449,7 +451,7 @@ export default function AdminPanel({ subView, db, handlers }) {
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Appointments Today</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_appointments_today', 'Appointments Today')}</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono" data-testid="stat-appointments-today">
                   {appointmentsTodayCount}
                 </span>
@@ -462,7 +464,7 @@ export default function AdminPanel({ subView, db, handlers }) {
 
           {/* Branch Performance Grid */}
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-slate-900">Branch Performance Overview</h2>
+            <h2 className="text-lg font-bold text-slate-900">{t('branch_performance_overview', 'Branch Performance Overview')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {(branches && branches.length > 0 ? branches : ['Colombo Main', 'Kandy', 'Galle'].map((name, i) => ({ Branch_ID: i + 1, Branch_Name: name }))).map(br => {
                 const brName = br.Branch_Name || br.name;
@@ -517,7 +519,7 @@ export default function AdminPanel({ subView, db, handlers }) {
         <div className="space-y-6 animate-fade-in">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Staff Directory & Identity Control</h1>
+              <h1 className="text-2xl font-bold text-slate-900">{t('staff_directory_title', 'Staff Directory & Identity Control')}</h1>
               <p className="text-sm text-slate-500 mt-1">Manage network accounts, assign roles, transfer branches, and audit profiles</p>
             </div>
             <button
@@ -525,7 +527,7 @@ export default function AdminPanel({ subView, db, handlers }) {
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold flex items-center space-x-2 shadow-xs cursor-pointer"
             >
               <Plus className="h-4 w-4" />
-              <span>Add Staff Member</span>
+              <span>{t('add_staff_member', 'Add Staff Member')}</span>
             </button>
           </div>
 

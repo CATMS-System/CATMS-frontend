@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Download, FileText, Filter } from 'lucide-react';
 import { createReportCsv, createReportPdf, downloadCsv, reportFilename } from '../utils/reportExport';
 import { getCurrentReportDates } from '../utils/reportDates.js';
+import { useLanguage } from '../contexts/LanguageContext';
 import {
   getBranchDailySummary,
   getDoctorRevenue,
@@ -65,6 +66,7 @@ const reports = [
 ];
 
 export default function ReportsPanel({ db }) {
+  const { t } = useLanguage();
   // Use the same role codes as App routing; display names are not permission keys.
   const role = db?.currentUser?.roleCode ||
     (db?.currentUser?.System_Role === 'Branch_Manager' || db?.currentUser?.role === 'Branch Manager' || db?.currentUser?.role === 'Branch_Manager' ? 'ROLE_BRANCH_MANAGER' :
@@ -200,7 +202,7 @@ export default function ReportsPanel({ db }) {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Operational & Management Reports Suite</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('reports_suite_title', 'Operational & Management Reports Suite')}</h1>
           <p className="text-sm text-slate-500 mt-1">Cross-branch statistical analytics, financial audits, and treatment monitoring</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -210,7 +212,7 @@ export default function ReportsPanel({ db }) {
           </button>
           <button disabled={!canExport} onClick={() => handleExport('pdf')}
             className="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-            <FileText className="h-3.5 w-3.5" />Export PDF
+            <FileText className="h-3.5 w-3.5" />{t('export_pdf', 'Export PDF')}
           </button>
           {exporting && <span role="status" className="text-xs text-slate-500">Preparing export…</span>}
         </div>
