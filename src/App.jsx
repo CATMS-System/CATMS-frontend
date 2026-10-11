@@ -400,7 +400,8 @@ export default function App() {
   // Switch default branch lock when user changes
   useEffect(() => {
     if (currentUser) {
-      setSelectedBranch(currentUser.branch || 'All Branches');
+      // admins start on the whole network, everyone else on their own branch
+      setSelectedBranch(currentUser.roleCode === 'ROLE_ADMIN' ? 'All Branches' : (currentUser.branch || 'All Branches'));
     }
   }, [currentUser]);
 
