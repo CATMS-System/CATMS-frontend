@@ -120,6 +120,7 @@ export default function App() {
 
   const [patientList, setPatientList] = useState([]);
   const [patientsVersion, setPatientsVersion] = useState(0);
+  const [totalPatients, setTotalPatients] = useState(0);
 
   const [appointmentList, setAppointmentList] = useState(() => {
     const saved = localStorage.getItem('catms_appointments');
@@ -156,21 +157,81 @@ export default function App() {
       api.get('/staff').then(res => {
         if (res.data && res.data.length > 0) {
           // Map backend staff schema to frontend format
-          const mapped = res.data.map(s => ({
-            id: `STF-${s.Staff_ID}`,
-            Staff_ID: s.Staff_ID,
-            staffId: s.Staff_ID,
-            Account_ID: s.Account_ID,
-            name: `${s.First_Name} ${s.Last_Name}`,
-            role: s.Job_Title,
-            branch: branches.find(b => b.Branch_ID === s.Branch_ID)?.Branch_Name || 'Colombo Main',
-            Branch_ID: s.Branch_ID,
-            status: s.Employment_Status,
-            details: { email: s.Email, contact: s.Contact_Number }
-          }));
+          const mapped = res.data.map(s => {
+            const isDoc = s.System_Role === 'Doctor' ||
+              Boolean(s.Doctor_ID) ||
+              (s.Job_Title && (
+                s.Job_Title.toLowerCase().includes('doc') ||
+                s.Job_Title.toLowerCase().includes('cardiolog') ||
+                s.Job_Title.toLowerCase().includes('dermatolog') ||
+                s.Job_Title.toLowerCase().includes('practitioner')
+              ));
+            return {
+              id: `STF-${s.Staff_ID}`,
+              Staff_ID: s.Staff_ID,
+              staffId: s.Staff_ID,
+              Account_ID: s.Account_ID,
+              name: `${s.First_Name} ${s.Last_Name}`,
+              role: s.Job_Title,
+              branch: branches.find(b => b.Branch_ID === s.Branch_ID)?.Branch_Name || 'Colombo Main Clinic',
+              Branch_ID: s.Branch_ID,
+              status: s.Employment_Status,
+              systemRole: s.System_Role,
+              isDoctor: isDoc,
+              license: s.License_Number,
+              details: { email: s.Email, contact: s.Contact_Number }
+            };
+          });
           setStaffList(mapped);
         }
       }).catch(err => console.error("API Error (Staff):", err));
+
+      api.get('/appointments').then(res => {
+        if (res.data && res.data.length > 0) {
+          const mappedAppts = res.data.map(a => ({
+            id: `APP-${a.Appointment_ID}`,
+            Appointment_ID: a.Appointment_ID,
+            date: a.Appointment_Date,
+            time: a.Start_Time ? a.Start_Time.slice(0, 5) : '09:00',
+            doctorId: `STF-${a.Doctor_ID}`,
+            Doctor_ID: a.Doctor_ID,
+            doctorName: a.Doctor_Name ? `Dr. ${a.Doctor_Name}` : `Doctor #${a.Doctor_ID}`,
+            patientId: `PAT-${a.Patient_ID}`,
+            Patient_ID: a.Patient_ID,
+            patientName: a.Patient_Name || `Patient #${a.Patient_ID}`,
+            branch: a.Branch_Name || 'Colombo Main Clinic',
+            Branch_ID: a.Branch_ID,
+            status: a.Status,
+            reason: a.Reason_For_Visit,
+            isWalkIn: a.Appointment_Type === 'Walk_In'
+          }));
+          setAppointmentList(mappedAppts);
+        }
+      }).catch(err => console.error("API Error (Appointments):", err));
+
+      api.get('/billing/invoices').then(res => {
+        if (res.data && res.data.length > 0) {
+          const mappedInvoices = res.data.map(inv => ({
+            id: `INV-${inv.Invoice_ID}`,
+            Invoice_ID: inv.Invoice_ID,
+            invoiceId: inv.Invoice_ID,
+            appointmentId: `APP-${inv.Appointment_ID}`,
+            patientName: inv.Patient_Name,
+            doctorFee: Number(inv.Billed_Consultation_Fee || 0),
+            treatmentsSubtotal: Number(inv.Total_Treatments_Fee || 0),
+            patientBalance: Number(inv.Patient_Paid || 0),
+            outstandingBalance: Number(inv.Outstanding_Balance || 0),
+            insuranceCoverage: Number(inv.Insurance_Covered || 0),
+            total: Number(inv.Invoice_Total != null ? inv.Invoice_Total : (Number(inv.Billed_Consultation_Fee || 0) + Number(inv.Total_Treatments_Fee || 0))),
+            status: inv.Invoice_Status,
+            Invoice_Status: inv.Invoice_Status,
+            branch: inv.Branch_Name || 'Colombo Main Clinic',
+            Branch_ID: inv.Branch_ID,
+            date: inv.Invoice_Date
+          }));
+          setInvoiceList(mappedInvoices);
+        }
+      }).catch(err => console.error("API Error (Invoices):", err));
 
       if (currentUser.roleCode === 'ROLE_ADMIN') {
         api.get('/audit-logs').then(res => {
@@ -233,9 +294,15 @@ export default function App() {
     searchPatients('', 1, 50)
       .then(res => {
         if (!isCurrent) return;
+        setTotalPatients(res.total != null ? res.total : (res.items || []).length);
         setPatientList((res.items || []).map(adaptPatientForPanels));
       })
-      .catch(() => isCurrent && setPatientList([]));
+      .catch(() => {
+        if (isCurrent) {
+          setPatientList([]);
+          setTotalPatients(0);
+        }
+      });
     return () => {
       isCurrent = false;
     };
@@ -378,7 +445,7 @@ export default function App() {
 
 
   // State bundle pack
-  const db = { staffList, patientList, appointmentList, liveQueue, invoiceList, auditLogs, branches, currentUser, selectedBranch, medicalHistories };
+  const db = { staffList, patientList, totalPatients, appointmentList, liveQueue, invoiceList, auditLogs, branches, currentUser, selectedBranch, medicalHistories };
   const handlers = { setStaffList, setAppointmentList, setLiveQueue, setInvoiceList, setMedicalHistories, setAuditLogs, setBranches, addAuditLog, triggerToast, navigateTo, reloadPatients };
 
   // ==========================================

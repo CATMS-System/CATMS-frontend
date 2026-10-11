@@ -309,7 +309,9 @@ export default function AdminPanel({ subView, db, handlers }) {
     return staffList.filter(s => {
       const matchSearch = s.name.toLowerCase().includes(staffSearchQuery.toLowerCase()) || s.id.toLowerCase().includes(staffSearchQuery.toLowerCase());
       const matchBranch = staffBranchFilter === 'All' || s.branch === staffBranchFilter;
-      const matchRole = staffRoleFilter === 'All' || s.role.toUpperCase().replace(' ', '_').includes(staffRoleFilter);
+      const matchRole = staffRoleFilter === 'All' || (staffRoleFilter === 'DOC'
+        ? (s.isDoctor || s.systemRole === 'Doctor' || (s.role && (s.role.toUpperCase().includes('DOC') || s.role.toUpperCase().includes('CARDIOLOG') || s.role.toUpperCase().includes('DERMATOLOG') || s.role.toUpperCase().includes('PRACTITIONER'))))
+        : s.role.toUpperCase().replace(' ', '_').includes(staffRoleFilter));
       const matchStatus = staffStatusFilter === 'All' || s.status === staffStatusFilter;
       return matchSearch && matchBranch && matchRole && matchStatus;
     });
@@ -340,11 +342,15 @@ export default function AdminPanel({ subView, db, handlers }) {
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Network Revenue</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  ${invoiceList.reduce((sum, inv) => {
-                    if (inv.status === 'Paid') return sum + inv.patientBalance + inv.insuranceCoverage;
-                    if (inv.status === 'Partially Paid') return sum + (inv.patientBalance * 0.5) + inv.insuranceCoverage;
+                  Rs. {invoiceList.reduce((sum, inv) => {
+                    const paid = Number(inv.patientBalance != null ? inv.patientBalance : (inv.Patient_Paid || 0));
+                    const ins = Number(inv.insuranceCoverage != null ? inv.insuranceCoverage : (inv.Insurance_Covered || 0));
+                    if (paid > 0 || ins > 0) return sum + paid + ins;
+                    const tot = Number(inv.total != null ? inv.total : (inv.Invoice_Total || 0));
+                    if (inv.status === 'Paid' || inv.Invoice_Status === 'Paid') return sum + tot;
+                    if (inv.status === 'Partially Paid' || inv.status === 'Partially_Paid' || inv.Invoice_Status === 'Partially_Paid') return sum + (tot * 0.5);
                     return sum;
-                  }, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  }, 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="p-3.5 bg-blue-50 text-blue-600 rounded-xl">
@@ -356,7 +362,7 @@ export default function AdminPanel({ subView, db, handlers }) {
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Total Patients</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  {patientList.length}
+                  {db.totalPatients != null && db.totalPatients > 0 ? db.totalPatients : patientList.length}
                 </span>
               </div>
               <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -368,7 +374,19 @@ export default function AdminPanel({ subView, db, handlers }) {
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Active Doctors</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  {staffList.filter(s => (s.role.includes('Doc') || s.role === 'Cardiologist' || s.role === 'Dermatologist' || s.role === 'General Practitioner') && s.status === 'Active').length}
+                  {staffList.filter(s => (
+                    s.isDoctor ||
+                    s.systemRole === 'Doctor' ||
+                    (s.role && (
+                      s.role.toLowerCase().includes('doc') ||
+                      s.role.toLowerCase().includes('cardiolog') ||
+                      s.role.toLowerCase().includes('dermatolog') ||
+                      s.role.toLowerCase().includes('practitioner') ||
+                      s.role.toLowerCase().includes('physician') ||
+                      s.role.toLowerCase().includes('surgeon') ||
+                      s.role.toLowerCase().includes('specialist')
+                    ))
+                  ) && s.status === 'Active').length}
                 </span>
               </div>
               <div className="p-3.5 bg-sky-50 text-sky-600 rounded-xl">
@@ -380,7 +398,7 @@ export default function AdminPanel({ subView, db, handlers }) {
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Appointments Today</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1.5 block font-mono">
-                  {appointmentList.filter(a => a.date === todayStr).length}
+                  {appointmentList.filter(a => (a.date === todayStr || a.Appointment_Date === todayStr)).length}
                 </span>
               </div>
               <div className="p-3.5 bg-purple-50 text-purple-600 rounded-xl">
@@ -393,17 +411,18 @@ export default function AdminPanel({ subView, db, handlers }) {
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-slate-900">Branch Performance Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {['Colombo Main', 'Kandy', 'Galle'].map(brName => {
-                const branchAppts = appointmentList.filter(a => a.branch === brName);
+              {(branches && branches.length > 0 ? branches : ['Colombo Main', 'Kandy', 'Galle'].map((name, i) => ({ Branch_ID: i + 1, Branch_Name: name }))).map(br => {
+                const brName = br.Branch_Name || br.name;
+                const branchAppts = appointmentList.filter(a => Number(a.Branch_ID) === Number(br.Branch_ID) || a.branch === brName || a.branch?.includes(br.name) || brName?.includes(a.branch));
                 const completed = branchAppts.filter(a => a.status === 'Completed').length;
                 const total = branchAppts.length || 1;
                 const fulfillment = Math.round((completed / total) * 100);
-                const walkins = branchAppts.filter(a => a.isWalkIn || a.status === 'Walk-In').length;
-                const offlineStaff = staffList.filter(s => s.branch === brName && s.status !== 'Active').length;
-                const onlineStaff = staffList.filter(s => s.branch === brName && s.status === 'Active').length;
+                const walkins = branchAppts.filter(a => a.isWalkIn || a.status === 'Walk-In' || a.status === 'Walk_In').length;
+                const offlineStaff = staffList.filter(s => (Number(s.Branch_ID) === Number(br.Branch_ID) || s.branch === brName || s.branch?.includes(br.name) || brName?.includes(s.branch)) && s.status !== 'Active').length;
+                const onlineStaff = staffList.filter(s => (Number(s.Branch_ID) === Number(br.Branch_ID) || s.branch === brName || s.branch?.includes(br.name) || brName?.includes(s.branch)) && s.status === 'Active').length;
 
                 return (
-                  <div key={brName} className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+                  <div key={br.Branch_ID || brName} className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
                     <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                       <div>
                         <h3 className="font-bold text-slate-900 text-md">{brName}</h3>
@@ -670,6 +689,9 @@ export default function AdminPanel({ subView, db, handlers }) {
               onChange={e => setAuditActionFilter(e.target.value)}
             >
               <option value="All">All Actions</option>
+              <option value="INSERT">INSERT</option>
+              <option value="UPDATE">UPDATE</option>
+              <option value="DELETE">DELETE</option>
               <option value="CREATE_STAFF">CREATE_STAFF</option>
               <option value="UPDATE_STAFF">UPDATE_STAFF</option>
               <option value="CONFIG_BRANCH">CONFIG_BRANCH</option>
