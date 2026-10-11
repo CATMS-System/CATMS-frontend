@@ -28,47 +28,6 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
     db?.liveQueue
   );
 
-  // Filter state for live triage queue
-  const [queueFilter, setQueueFilter] = useState('all'); // 'all' | 'waiting' | 'completed'
-
-  const queueWaitingCount = useMemo(() => {
-    return queue.filter((q) => !['Completed', 'COMPLETED'].includes(q.status) && !['Completed', 'COMPLETED'].includes(q.Status)).length;
-  }, [queue]);
-
-  const queueCompletedCount = useMemo(() => {
-    return queue.filter((q) => ['Completed', 'COMPLETED'].includes(q.status) || ['Completed', 'COMPLETED'].includes(q.Status)).length;
-  }, [queue]);
-
-  const filteredQueue = useMemo(() => {
-    if (queueFilter === 'waiting') {
-      return queue.filter((q) => !['Completed', 'COMPLETED'].includes(q.status) && !['Completed', 'COMPLETED'].includes(q.Status));
-    }
-    if (queueFilter === 'completed') {
-      return queue.filter((q) => ['Completed', 'COMPLETED'].includes(q.status) || ['Completed', 'COMPLETED'].includes(q.Status));
-    }
-    return queue;
-  }, [queue, queueFilter]);
-
-  // Tab navigation between live queue and upcoming schedule
-  const [activeTab, setActiveTab] = useState(subView === 'appointments' ? 'appointments' : 'queue');
-
-  useEffect(() => {
-    if (subView === 'appointments') {
-      setActiveTab('appointments');
-    } else if (subView === 'workbench') {
-      setActiveTab('queue');
-    }
-  }, [subView]);
-
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    if (tab === 'appointments') {
-      if (handlers?.navigateTo) handlers.navigateTo('/doctor/appointments');
-    } else {
-      if (handlers?.navigateTo) handlers.navigateTo('/doctor/workbench');
-    }
-  };
-
   // Doctor upcoming appointments state & queries
   const [doctorAppointments, setDoctorAppointments] = useState([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
@@ -98,6 +57,104 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
   useEffect(() => {
     fetchDoctorAppointments();
   }, [fetchDoctorAppointments]);
+
+  // Resolve real backend status for queue items
+  const resolveQueueItemStatus = useCallback((q) => {
+    if (!q) return 'SCHEDULED';
+    const qApptId = String(q.Appointment_ID || q.appointment_id || q.appointmentId || q.id || '').trim();
+    const qApptNum = qApptId.replace(/\D/g, '');
+
+    // 1. Check real doctor appointments fetched from backend
+    if (doctorAppointments && doctorAppointments.length > 0) {
+      const match = doctorAppointments.find((a) => {
+        const aApptId = String(a.Appointment_ID || a.appointment_id || a.id || '').trim();
+        const aApptNum = aApptId.replace(/\D/g, '');
+        if (qApptNum && aApptNum && qApptNum === aApptNum) return true;
+        if (qApptId && aApptId && qApptId.toLowerCase() === aApptId.toLowerCase()) return true;
+        return false;
+      });
+      if (match?.Status) {
+        return match.Status;
+      }
+    }
+
+    // 2. Check global appointmentList
+    if (db?.appointmentList && db.appointmentList.length > 0) {
+      const match = db.appointmentList.find((a) => {
+        const aApptId = String(a.Appointment_ID || a.appointment_id || a.id || '').trim();
+        const aApptNum = aApptId.replace(/\D/g, '');
+        if (qApptNum && aApptNum && qApptNum === aApptNum) return true;
+        if (qApptId && aApptId && qApptId.toLowerCase() === aApptId.toLowerCase()) return true;
+        return false;
+      });
+      if (match?.Status || match?.status) {
+        return match.Status || match.status;
+      }
+    }
+
+    // 3. Fallback to queue item's own status
+    return q.Status || q.status || 'SCHEDULED';
+  }, [doctorAppointments, db?.appointmentList]);
+
+  const isQueueItemCompleted = useCallback((q) => {
+    const status = resolveQueueItemStatus(q);
+    const s = String(status || '').toLowerCase();
+    if (['completed', 'finalized'].includes(s)) return true;
+    const ownStatus = String(q?.status || q?.Status || '').toLowerCase();
+    return ['completed', 'finalized'].includes(ownStatus);
+  }, [resolveQueueItemStatus]);
+
+  // Auto-sync completed appointments to queue status so state is consistent
+  useEffect(() => {
+    if (queue && queue.length > 0) {
+      queue.forEach((item) => {
+        if (isQueueItemCompleted(item) && item.status !== 'Completed' && item.Status !== 'Completed') {
+          updateQueueStatus(item.Appointment_ID || item.appointmentId || item.patientId, 'Completed');
+        }
+      });
+    }
+  }, [queue, isQueueItemCompleted, updateQueueStatus]);
+
+  // Filter state for live triage queue
+  const [queueFilter, setQueueFilter] = useState('all'); // 'all' | 'waiting' | 'completed'
+
+  const queueWaitingCount = useMemo(() => {
+    return queue.filter((q) => !isQueueItemCompleted(q)).length;
+  }, [queue, isQueueItemCompleted]);
+
+  const queueCompletedCount = useMemo(() => {
+    return queue.filter((q) => isQueueItemCompleted(q)).length;
+  }, [queue, isQueueItemCompleted]);
+
+  const filteredQueue = useMemo(() => {
+    if (queueFilter === 'waiting') {
+      return queue.filter((q) => !isQueueItemCompleted(q));
+    }
+    if (queueFilter === 'completed') {
+      return queue.filter((q) => isQueueItemCompleted(q));
+    }
+    return queue;
+  }, [queue, queueFilter, isQueueItemCompleted]);
+
+  // Tab navigation between live queue and upcoming schedule
+  const [activeTab, setActiveTab] = useState(subView === 'appointments' ? 'appointments' : 'queue');
+
+  useEffect(() => {
+    if (subView === 'appointments') {
+      setActiveTab('appointments');
+    } else if (subView === 'workbench') {
+      setActiveTab('queue');
+    }
+  }, [subView]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'appointments') {
+      if (handlers?.navigateTo) handlers.navigateTo('/doctor/appointments');
+    } else {
+      if (handlers?.navigateTo) handlers.navigateTo('/doctor/workbench');
+    }
+  };
 
   // Date boundary calculations
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -347,6 +404,24 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
     const s = String(activeAppt?.status || activeAppt?.Status || '').toLowerCase();
     return s === 'completed';
   }, [activeAppt]);
+
+  // Synchronize queue state if active consultation is already completed
+  useEffect(() => {
+    if (isAlreadyCompleted && (activeAppointmentId || activePatientId)) {
+      if (activeAppointmentId) updateQueueStatus(activeAppointmentId, 'Completed');
+      if (activePatientId) updateQueueStatus(activePatientId, 'Completed');
+      if (handlers?.setLiveQueue) {
+        handlers.setLiveQueue((prev) =>
+          (prev || []).map((q) => {
+            const match =
+              String(q.Appointment_ID || q.appointment_id || q.appointmentId || q.id) === String(activeAppointmentId) ||
+              String(q.Patient_ID || q.patient_id || q.patientId) === String(activePatientId);
+            return match ? { ...q, status: 'Completed', Status: 'Completed' } : q;
+          })
+        );
+      }
+    }
+  }, [isAlreadyCompleted, activeAppointmentId, activePatientId, updateQueueStatus, handlers?.setLiveQueue]);
 
   // Vitals inputs state
   const [vitals, setVitals] = useState({
@@ -729,6 +804,19 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       if (activePatientId) {
         updateQueueStatus(activePatientId, 'Completed');
       }
+      if (resolvedApptId) {
+        updateQueueStatus(resolvedApptId, 'Completed');
+      }
+      if (handlers?.setLiveQueue) {
+        handlers.setLiveQueue((prev) =>
+          (prev || []).map((q) => {
+            const match =
+              String(q.Appointment_ID || q.appointment_id || q.appointmentId || q.id) === String(resolvedApptId) ||
+              String(q.Patient_ID || q.patient_id || q.patientId) === String(activePatientId);
+            return match ? { ...q, status: 'Completed', Status: 'Completed' } : q;
+          })
+        );
+      }
 
       if (handlers?.setAppointmentList) {
         handlers.setAppointmentList((prev) =>
@@ -817,6 +905,19 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         if (activePatientId) {
           updateQueueStatus(activePatientId, 'Completed');
         }
+        if (resolvedApptId) {
+          updateQueueStatus(resolvedApptId, 'Completed');
+        }
+        if (handlers?.setLiveQueue) {
+          handlers.setLiveQueue((prev) =>
+            (prev || []).map((q) => {
+              const match =
+                String(q.Appointment_ID || q.appointment_id || q.appointmentId || q.id) === String(resolvedApptId) ||
+                String(q.Patient_ID || q.patient_id || q.patientId) === String(activePatientId);
+              return match ? { ...q, status: 'Completed', Status: 'Completed' } : q;
+            })
+          );
+        }
         if (handlers?.setAppointmentList) {
           handlers.setAppointmentList((prev) =>
             (prev || []).map((a) =>
@@ -874,6 +975,19 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
         }
         if (activePatientId) {
           updateQueueStatus(activePatientId, 'Completed');
+        }
+        if (resolvedApptId) {
+          updateQueueStatus(resolvedApptId, 'Completed');
+        }
+        if (handlers?.setLiveQueue) {
+          handlers.setLiveQueue((prev) =>
+            (prev || []).map((q) => {
+              const match =
+                String(q.Appointment_ID || q.appointment_id || q.appointmentId || q.id) === String(resolvedApptId) ||
+                String(q.Patient_ID || q.patient_id || q.patientId) === String(activePatientId);
+              return match ? { ...q, status: 'Completed', Status: 'Completed' } : q;
+            })
+          );
         }
         if (handlers?.setAppointmentList) {
           handlers.setAppointmentList((prev) =>
@@ -947,7 +1061,12 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
     const apptId = resolvedApptId || 1;
     const patientId = rawPatientId || 'PAT-0001';
 
-    updateQueueStatus(patientId, 'IN_PROGRESS');
+    const isCompleted = isQueueItemCompleted(queueItem);
+
+    // Only update queue status to IN_PROGRESS if not already finalized
+    if (!isCompleted) {
+      updateQueueStatus(apptId || patientId, 'IN_PROGRESS');
+    }
 
     const targetRoute = `/doctor/consultation/${apptId}?patient_id=${patientId}`;
     if (handlers?.navigateTo) {
@@ -1097,17 +1216,14 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                       </tr>
                     ) : filteredQueue.length > 0 ? (
                       filteredQueue.map((q, idx) => {
-                        const isCompleted = ['Completed', 'COMPLETED'].includes(q.status) || ['Completed', 'COMPLETED'].includes(q.Status);
+                        const isCompleted = isQueueItemCompleted(q);
+                        const resolvedStatus = resolveQueueItemStatus(q);
                         return (
                           <tr
                             key={q.queueNo || q.appointmentId || idx}
-                            onClick={() => {
-                              if (!isCompleted) {
-                                handleSelectPatient(q);
-                              }
-                            }}
-                            className={`transition-colors ${
-                              isCompleted ? 'bg-emerald-50/20 hover:bg-emerald-50/40' : 'hover:bg-slate-50/70 cursor-pointer'
+                            onClick={() => handleSelectPatient(q)}
+                            className={`transition-colors cursor-pointer ${
+                              isCompleted ? 'bg-emerald-50/20 hover:bg-emerald-50/40' : 'hover:bg-slate-50/70'
                             }`}
                           >
                             <td className="px-6 py-4 text-center font-mono font-bold text-slate-900">
@@ -1125,22 +1241,30 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${
                                   isCompleted
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    : q.status === 'IN_PROGRESS' || q.Status === 'In_Progress'
+                                    : resolvedStatus === 'IN_PROGRESS' || resolvedStatus === 'In_Progress'
                                     ? 'bg-blue-50 text-blue-700 border-blue-150 animate-pulse'
-                                    : q.status === 'WALK_IN' || q.status === 'Walk_In'
+                                    : resolvedStatus === 'WALK_IN' || resolvedStatus === 'Walk_In'
                                     ? 'bg-amber-50 text-amber-700 border-amber-150'
                                     : 'bg-slate-100 text-slate-700 border-slate-200'
                                 }`}
                               >
-                                {isCompleted ? 'Completed' : (q.status || q.Status)}
+                                {isCompleted ? 'Completed' : (resolvedStatus || 'SCHEDULED')}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
                               {isCompleted ? (
-                                <span className="inline-flex items-center space-x-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold ml-auto shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectPatient(q);
+                                  }}
+                                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-2xs transition-colors"
+                                  title="View finalized consultation record"
+                                >
                                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                                  <span>Completed</span>
-                                </span>
+                                  <span>View Completed</span>
+                                </button>
                               ) : (
                                 <button
                                   type="button"
@@ -1150,7 +1274,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                                   }}
                                   className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold py-1.5 px-3 rounded-lg inline-flex items-center space-x-1.5 cursor-pointer ml-auto shadow-xs"
                                 >
-                                  <span>{q.status === 'IN_PROGRESS' || q.Status === 'In_Progress' ? 'Resume Console' : 'Call Patient'}</span>
+                                  <span>{resolvedStatus === 'IN_PROGRESS' || resolvedStatus === 'In_Progress' ? 'Resume Console' : 'Call Patient'}</span>
                                   <CornerDownRight className="h-3.5 w-3.5" />
                                 </button>
                               )}

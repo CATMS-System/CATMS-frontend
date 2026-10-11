@@ -287,3 +287,78 @@ test('Doctor consultation room renders completed banner and badge for completed 
   assert.ok(html.includes('Consultation Completed'));
   assert.ok(html.includes('Return to Queue'));
 });
+
+test('Doctor queue resolves backend status, displays Completed tag and View Completed button, avoiding stale Resume Console', async t => {
+  const { default: DoctorPanel } = await server.ssrLoadModule('/src/components/DoctorPanel.jsx');
+  const db = {
+    currentUser: { id: 'STF-001', doctor_id: 1, name: 'Dr. Alexander Bennett', branch_id: 1 },
+    appointmentList: [
+      { Appointment_ID: 1, id: 1, Status: 'Completed', status: 'Completed', Patient_ID: 1, Patient_Name: 'John Doe' },
+      { Appointment_ID: 2, id: 2, Status: 'Confirmed', status: 'Confirmed', Patient_ID: 2, Patient_Name: 'Clara Oswald' }
+    ],
+    liveQueue: [
+      { queueNo: 1, appointmentId: 1, Appointment_ID: 1, patientId: 'PAT-0001', patientName: 'John Doe', status: 'IN_PROGRESS', reason: 'Checkup' },
+      { queueNo: 2, appointmentId: 2, Appointment_ID: 2, patientId: 'PAT-0002', patientName: 'Clara Oswald', status: 'WAITING', reason: 'Throat ache' }
+    ]
+  };
+
+  const html = renderToStaticMarkup(React.createElement(DoctorPanel, {
+    subView: 'workbench',
+    db,
+    handlers: { navigateTo: () => {} }
+  }));
+
+  // Confirm Completed status is resolved and rendered
+  assert.ok(html.includes('View Completed'), 'Completed appointment should render View Completed button');
+  assert.ok(html.includes('Completed (1)'), 'Queue completed count should reflect 1 completed item');
+  assert.ok(html.includes('Waiting (1)'), 'Queue waiting count should exclude completed item');
+  assert.ok(html.includes('Call Patient'), 'Active waiting appointment should render Call Patient button');
+  // Confirm stale Resume Console button is NOT rendered for the completed appointment
+  assert.ok(!html.includes('Resume Console'), 'Completed appointment must never render Resume Console button');
+});
+
+test('Branch Manager local staff directory renders Add Staff Member button and locked branch drawer pattern', async t => {
+  browser(t, {
+    name: 'Marcus Vance',
+    email: 'mgr_vance@careflow.com',
+    roleCode: 'ROLE_BRANCH_MANAGER',
+    branch: 'Colombo Main',
+    branch_id: 1
+  }, '/manager/staff');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Local Staff Directory'));
+  assert.ok(html.includes('Add Staff Member'));
+
+  const { default: AddStaffDrawer } = await server.ssrLoadModule('/src/components/AddStaffDrawer.jsx');
+  const drawerHtml = renderToStaticMarkup(React.createElement(AddStaffDrawer, {
+    isOpen: true,
+    initialStep: 2,
+    lockedBranch: 'Colombo Main',
+    branches: [{ Branch_ID: 1, Branch_Name: 'Colombo Main' }]
+  }));
+  assert.ok(drawerHtml.includes('Add New Staff Member'));
+  assert.ok(drawerHtml.includes('Branch: <strong>Colombo Main</strong> [Locked]'));
+});
+
+test('Admin staff directory renders Add Staff Member button and flexible branch options in drawer', async t => {
+  browser(t, {
+    name: 'System Admin',
+    email: 'admin@careflow.com',
+    roleCode: 'ROLE_ADMIN',
+    branch: 'Colombo Main'
+  }, '/admin/staff');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Staff Directory'));
+  assert.ok(html.includes('Add Staff Member'));
+
+  const { default: AddStaffDrawer } = await server.ssrLoadModule('/src/components/AddStaffDrawer.jsx');
+  const drawerHtml = renderToStaticMarkup(React.createElement(AddStaffDrawer, {
+    isOpen: true,
+    initialStep: 2,
+    lockedBranch: null,
+    branches: [{ Branch_ID: 1, Branch_Name: 'Colombo Main' }, { Branch_ID: 2, Branch_Name: 'Kandy' }]
+  }));
+  assert.ok(drawerHtml.includes('value="Colombo Main"'));
+  assert.ok(drawerHtml.includes('value="Kandy"'));
+});
+

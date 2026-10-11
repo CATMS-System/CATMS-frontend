@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Clock, Calendar, Users, DollarSign, Activity, AlertCircle, Plus, Phone, Mail, HelpCircle } from 'lucide-react';
 import ReportsPanel from './ReportsPanel';
+import AddStaffDrawer from './AddStaffDrawer';
 import api from '../api/axios';
 import { getDoctors, getDoctorSchedules, getAppointmentStatusCounts } from '../services/appointmentService';
 import { getBranchDailySummary } from '../api/reportsApi';
@@ -28,6 +29,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
   const [apiStatusCounts, setApiStatusCounts] = useState(null);
   const [apiDailySummary, setApiDailySummary] = useState(null);
   const [apiSchedules, setApiSchedules] = useState([]);
+  const [showAddStaffDrawer, setShowAddStaffDrawer] = useState(false);
 
   // Fetch real staff, doctors, and metrics for the manager's branch
   useEffect(() => {
@@ -535,9 +537,18 @@ export default function ManagerPanel({ subView, db, handlers }) {
       {/* 3. LOCAL STAFF DIRECTORY */}
       {subView === 'staff' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Local Staff Directory ({managerBranch})</h1>
-            <p className="text-sm text-slate-500 mt-1">Read-only view of branch personnel, schedules, and quick communication lines</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Local Staff Directory ({managerBranch})</h1>
+              <p className="text-sm text-slate-500 mt-1">Manage branch personnel, assign roles, and onboard staff for {managerBranch}</p>
+            </div>
+            <button
+              onClick={() => setShowAddStaffDrawer(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold flex items-center space-x-2 shadow-xs cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Staff Member</span>
+            </button>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
@@ -697,6 +708,42 @@ export default function ManagerPanel({ subView, db, handlers }) {
           </div>
         </div>
       )}
+
+      {/* ADD STAFF DRAWER */}
+      <AddStaffDrawer
+        isOpen={showAddStaffDrawer}
+        onClose={() => setShowAddStaffDrawer(false)}
+        branches={branches}
+        lockedBranch={managerBranch}
+        lockedBranchId={managerBranchId}
+        currentUserRole={db.currentUser?.role}
+        onStaffCreated={(newStaffMember, apiData) => {
+          setStaffList([...staffList, newStaffMember]);
+          setApiStaff(prev => [...prev, {
+            id: newStaffMember.id,
+            Staff_ID: apiData.Staff_ID,
+            name: newStaffMember.name,
+            role: newStaffMember.role,
+            Branch_ID: managerBranchId,
+            branch: managerBranch,
+            status: 'Active',
+            details: { email: apiData.Email, contact: apiData.Contact_Number }
+          }]);
+          if (newStaffMember.role.includes('Doc') || apiData.Doctor_ID) {
+            setApiDoctors(prev => [...prev, {
+              id: newStaffMember.id,
+              Doctor_ID: apiData.Doctor_ID || apiData.Staff_ID,
+              Staff_ID: apiData.Staff_ID,
+              name: `Dr. ${apiData.First_Name} ${apiData.Last_Name}`,
+              role: apiData.Job_Title || 'Doctor',
+              Branch_ID: managerBranchId,
+              currentAvailability: 'Available'
+            }]);
+          }
+        }}
+        triggerToast={triggerToast}
+        addAuditLog={addAuditLog}
+      />
     </div>
   );
 }
