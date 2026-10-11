@@ -55,7 +55,11 @@ export default function PatientsSection({ triggerToast, addAuditLog, onPatientsC
         const name = formatPatientName(created.first_name, created.last_name);
         addAuditLog('CREATE_PATIENT', `Registered new patient ${name}`, 'null', JSON.stringify(created));
         const username = created.portal_access?.username || `pat_${created.nic?.toLowerCase()}`;
-        triggerToast(`Patient registered! Code: ${formatPatientId(created.patient_id)} | Login: ${username} | Pass: Password123!`);
+        triggerToast(`Patient registered! Code: ${formatPatientId(created.patient_id)} | Login: ${username}`);
+        // the first password is only returned once, so keep it on screen until reception closes it
+        if (created.temporary_password) {
+            window.alert(`Give these login details to the patient:\n\nUsername: ${username}\nPassword: ${created.temporary_password}\n\nThis password will not be shown again.`);
+        }
         setSelectedId(created.patient_id);
         refreshAll();
     };
