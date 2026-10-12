@@ -10,21 +10,22 @@ The frontend is built with **React**, **Vite**, and **Tailwind CSS**. It include
 
 ## Table of Contents
 1. [What This Repository Does](#what-this-repository-does)
-2. [How the Frontend Connects to the Backend](#how-the-frontend-connects-to-the-backend)
-3. [Main Implemented Features](#main-implemented-features)
-4. [Team Workload Distribution](#team-workload-distribution)
-5. [Additional Features & Future Work](#additional-features--future-work)
-6. [Technologies Used](#technologies-used)
-7. [System Requirements](#system-requirements)
-8. [Local Setup Without Docker](#local-setup-without-docker)
-9. [Running with Docker Compose](#running-with-docker-compose)
-10. [URLs & Health Check](#urls--health-check)
-11. [Database Initialization & Seeding](#database-initialization--seeding)
-12. [Configuration & Environment](#configuration--environment)
-13. [Running Tests & Build Checks](#running-tests--build-checks)
-14. [Project Structure Overview](#project-structure-overview)
-15. [Troubleshooting Common Issues](#troubleshooting-common-issues)
-16. [Security Notes](#security-notes)
+2. [Live Demo & Cloud Hosting](#live-demo--cloud-hosting)
+3. [How the Frontend Connects to the Backend](#how-the-frontend-connects-to-the-backend)
+4. [Main Implemented Features](#main-implemented-features)
+5. [Team Workload Distribution](#team-workload-distribution)
+6. [Additional Features & Future Work](#additional-features--future-work)
+7. [Technologies Used](#technologies-used)
+8. [System Requirements](#system-requirements)
+9. [Local Setup Without Docker](#local-setup-without-docker)
+10. [Running with Docker Compose](#running-with-docker-compose)
+11. [URLs & Health Check](#urls--health-check)
+12. [Database Initialization & Seeding](#database-initialization--seeding)
+13. [Configuration & Environment](#configuration--environment)
+14. [Running Tests & Build Checks](#running-tests--build-checks)
+15. [Project Structure Overview](#project-structure-overview)
+16. [Troubleshooting Common Issues](#troubleshooting-common-issues)
+17. [Security Notes](#security-notes)
 
 ---
 
@@ -40,6 +41,26 @@ The frontend application provides role-based workspaces tailored to each user's 
 
 ### Trilingual Language Selector
 Users can change the interface language at any time using the dropdown in the top bar: **English**, **සිංහල (Sinhala)**, or **தமிழ் (Tamil)**. The selected language is saved in browser storage (`localStorage`) so it stays active across page reloads. English is the default language and serves as an automatic fallback if a translation is missing.
+
+---
+
+## Live Demo & Cloud Hosting
+
+A live demonstration of the full CATMS system is deployed and running on free-tier cloud infrastructure:
+
+| Component | Provider / Hosting Type | Live URL | Description |
+| :--- | :--- | :--- | :--- |
+| **Frontend Web App** | Render Static Site | [https://catms-frontend.onrender.com](https://catms-frontend.onrender.com) | Interactive React client with trilingual support |
+| **Backend API Root** | Render Web Service | [https://catms-backend.onrender.com](https://catms-backend.onrender.com) | FastAPI REST service root |
+| **Interactive API Docs** | Render Web Service | [https://catms-backend.onrender.com/docs](https://catms-backend.onrender.com/docs) | Swagger UI for exploring and testing API endpoints |
+| **Alternative API Docs** | Render Web Service | [https://catms-backend.onrender.com/redoc](https://catms-backend.onrender.com/redoc) | ReDoc API specifications |
+| **Backend Health Check** | Render Web Service | [https://catms-backend.onrender.com/api/v1/health](https://catms-backend.onrender.com/api/v1/health) | Live service and cloud database health status |
+
+> [!NOTE]
+> **Free Tier Sleep Notice**: Free services on Render automatically spin down or sleep after 15 minutes of inactivity. When visiting the site or API after a period of idleness, the first request may take approximately 30–50 seconds while the backend web service spins back up. Subsequent requests respond immediately.
+
+> [!CAUTION]
+> **Educational & Demo Use Only**: This deployment is strictly for academic and demonstration purposes. It contains fictional sample data only and **must not be used with real patient data** or clinical records.
 
 ---
 
@@ -133,6 +154,10 @@ As confirmed in the project document `TEAM_WORKLOAD_DISTRIBUTION.md`, the fronte
 - **Real Names in Audit Log**: Shows staff usernames and branch labels instead of generic system placeholders (Fix M-6).
 - **Automated CI Workflow**: A GitHub Actions Continuous Integration (CI) workflow runs `npm ci`, `npm test`, and `npm run build` on every push and pull request. (This workflow runs tests and builds only; it does not deploy the application).
 - **Full-Stack Containerization**: Docker packages the backend and frontend as separate images. The `docker-compose.full.yml` file in the backend repository runs MySQL, the backend API, and the frontend together, and initializes the database on first startup. Run `docker compose -f docker-compose.full.yml up --build` from the backend repository. The frontend repository must be in a sibling folder.
+- **Cloud Hosting & Live Deployment**: The complete project is deployed and accessible online using free-tier cloud infrastructure:
+  - **Frontend**: Hosted as a **Render Static Site** at [https://catms-frontend.onrender.com](https://catms-frontend.onrender.com) with global CDN delivery and automated builds from GitHub.
+  - **Backend API**: Runs as a **Render Web Service** (Python / FastAPI) at [https://catms-backend.onrender.com](https://catms-backend.onrender.com).
+  - **Cloud Database**: Managed **MySQL 8.0** database hosted on **Aiven**, supporting all project schemas, views, stored procedures, and triggers.
 
 ### Possible Future Improvements (Not Implemented Yet)
 - **Email, SMS, and Push Notifications**: Sending automated reminders for appointment bookings and payment receipts is not implemented in the current code; all queue and appointment statuses are currently viewed directly in the application UI.
@@ -153,6 +178,8 @@ As confirmed in the project document `TEAM_WORKLOAD_DISTRIBUTION.md`, the fronte
 - **PDF & Canvas Export**: jsPDF, jspdf-autotable, html2canvas
 - **Animation Effects**: canvas-confetti
 - **Testing**: Node.js Test Runner (`node:test`, `node:assert`)
+- **Containerization**: Docker (multi-stage build with Nginx reverse proxy)
+- **Cloud Hosting**: Render (Static Site deployment with global CDN delivery)
 
 ---
 
@@ -351,6 +378,7 @@ CATMS-frontend/
 
 ## Security Notes
 
+- **Educational & Demo Use Only**: This project and its live cloud deployment are intended strictly for academic demonstration and evaluation. Never use this system or its cloud instances to store or process real patient medical records or personal health information (PHI).
 - **Demo Accounts Only**: All sample accounts and passwords are for testing and academic demonstration only.
 - **No Client Secrets**: Client-side single-page applications should never contain private API keys, backend secrets, or database passwords.
 - **Logout Clears Sensitive State**: Upon logging out, the application clears all stored JWT tokens and cached user data from `localStorage`.
