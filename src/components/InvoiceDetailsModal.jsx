@@ -25,7 +25,7 @@ export default function InvoiceDetailsModal({ details, loading, error, onClose }
             }
           }
         }}
-        className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 space-y-5">
+        className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-5">
         <div className="flex justify-between items-center border-b border-slate-200 pb-3">
           <h2 id="invoice-details-title" className="text-lg font-bold text-slate-900">Invoice Details {details && `#${details.invoice.Invoice_ID}`}</h2>
           <button onClick={onClose} className="text-sm font-semibold text-slate-500 hover:text-slate-900 cursor-pointer">Close</button>

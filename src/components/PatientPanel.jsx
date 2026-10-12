@@ -478,7 +478,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                 <span>Insurance: {patientObj?.insurance?.provider || 'Cash / Self'}</span>
               </div>
             </div>
-            <div className="flex items-center space-x-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
               <button
                 onClick={() => setShowChangePassword(true)}
                 className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold hover:shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer"
@@ -588,7 +588,7 @@ export default function PatientPanel({ subView, db, handlers }) {
           </div>
 
           {/* Stepper Progress Indicator */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { step: 1, title: 'Location & Department' },
               { step: 2, title: 'Choose Doctor' },
@@ -605,7 +605,7 @@ export default function PatientPanel({ subView, db, handlers }) {
             ))}
           </div>
 
-          <form onSubmit={handleConfirmBooking} className="bg-white rounded-xl border border-slate-200 p-6 space-y-6 shadow-xs">
+          <form onSubmit={handleConfirmBooking} className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 space-y-6 shadow-xs">
             {/* Step 1: Branch & Specialty */}
             {bookingStep === 1 && (
               <div className="space-y-4">

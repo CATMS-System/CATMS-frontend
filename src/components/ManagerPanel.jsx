@@ -310,18 +310,18 @@ export default function ManagerPanel({ subView, db, handlers }) {
       {/* 1. OPERATIONS DASHBOARD */}
       {subView === 'dashboard' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Branch Operations Dashboard</h1>
               <p className="text-sm text-slate-500 mt-1">Real-time indicators, clinician trackers, and queue statistics for {managerBranch}</p>
             </div>
-            <span className="bg-blue-50 text-blue-800 border border-blue-200 px-3 py-1 rounded-full text-xs font-semibold">
+            <span className="bg-blue-50 text-blue-800 border border-blue-200 px-3 py-1 rounded-full text-xs font-semibold shrink-0">
               Home Branch: {managerBranch}
             </span>
           </div>
 
           {/* Metric Stat Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Appointments Today</span>
@@ -364,7 +364,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
           </div>
 
           {/* Branch Overview Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Total Doctors</span>
@@ -399,7 +399,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
           {/* Doctor Status Trackers */}
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-slate-900">Clinician Status Monitor</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {doctorsInBranch.map(doc => {
                 const currentStatus = doc.currentAvailability || 'Available';
                 const docKey = doc.Doctor_ID ? `doc-${doc.Doctor_ID}` : doc.id;
@@ -419,9 +419,9 @@ export default function ManagerPanel({ subView, db, handlers }) {
                       </span>
                     </div>
 
-                    <div className="flex items-center space-x-1 justify-between border-t border-slate-100 pt-3">
-                      <span className="text-xs font-semibold text-slate-400 uppercase">Set Status:</span>
-                      <div className="flex space-x-1">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 justify-between border-t border-slate-100 pt-3">
+                      <span className="text-xs font-semibold text-slate-400 uppercase shrink-0">Set Status:</span>
+                      <div className="flex flex-wrap gap-1">
                         {['Available', 'In Consultation', 'On Break', 'On Leave'].map(statusOption => (
                           <button
                             key={statusOption}
@@ -539,7 +539,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
       {/* 3. LOCAL STAFF DIRECTORY */}
       {subView === 'staff' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Local Staff Directory ({managerBranch})</h1>
               <p className="text-sm text-slate-500 mt-1">Manage branch personnel, assign roles, and onboard staff for {managerBranch}</p>
@@ -554,45 +554,47 @@ export default function ManagerPanel({ subView, db, handlers }) {
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                  <th className="px-6 py-3">Employee</th>
-                  <th className="px-6 py-3">Assigned Role</th>
-                  <th className="px-6 py-3">Contact Email</th>
-                  <th className="px-6 py-3">Direct Phone</th>
-                  <th className="px-6 py-3 text-right">Duty Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-650">
-                {localStaff.map(s => (
-                  <tr key={s.id} className="hover:bg-slate-50/50">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900">{s.name}</div>
-                      <span className="text-xs text-slate-400 font-mono">{s.id}</span>
-                    </td>
-                    <td className="px-6 py-4 font-medium text-slate-700">{s.role}</td>
-                    <td className="px-6 py-4 font-mono text-xs flex items-center space-x-1.5 mt-1 border-none">
-                      <Mail className="h-3.5 w-3.5 text-slate-400" />
-                      <span>{s.details?.email || `${s.id.toLowerCase()}@careflow.com`}</span>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-xs">
-                      <div className="flex items-center space-x-1.5">
-                        <Phone className="h-3.5 w-3.5 text-slate-400" />
-                        <span>{s.details?.contact || '+94 77 123 4567'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                        s.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-                      }`}>
-                        {s.status === 'Active' ? 'On Duty' : 'On Leave'}
-                      </span>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm min-w-[640px]">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                    <th className="px-6 py-3">Employee</th>
+                    <th className="px-6 py-3">Assigned Role</th>
+                    <th className="px-6 py-3">Contact Email</th>
+                    <th className="px-6 py-3">Direct Phone</th>
+                    <th className="px-6 py-3 text-right">Duty Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-650">
+                  {localStaff.map(s => (
+                    <tr key={s.id} className="hover:bg-slate-50/50">
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-slate-900">{s.name}</div>
+                        <span className="text-xs text-slate-400 font-mono">{s.id}</span>
+                      </td>
+                      <td className="px-6 py-4 font-medium text-slate-700">{s.role}</td>
+                      <td className="px-6 py-4 font-mono text-xs flex items-center space-x-1.5 mt-1 border-none">
+                        <Mail className="h-3.5 w-3.5 text-slate-400" />
+                        <span>{s.details?.email || `${s.id.toLowerCase()}@careflow.com`}</span>
+                      </td>
+                      <td className="px-6 py-4 font-mono text-xs">
+                        <div className="flex items-center space-x-1.5">
+                          <Phone className="h-3.5 w-3.5 text-slate-400" />
+                          <span>{s.details?.contact || '+94 77 123 4567'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          s.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                        }`}>
+                          {s.status === 'Active' ? 'On Duty' : 'On Leave'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

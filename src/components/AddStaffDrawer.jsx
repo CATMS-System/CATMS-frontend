@@ -210,7 +210,7 @@ export default function AddStaffDrawer({
         className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs"
         onClick={handleClose}
       />
-      <div className="relative bg-white h-full w-full max-w-lg border-l border-slate-200 shadow-2xl p-8 overflow-y-auto animate-in slide-in-from-right duration-250 flex flex-col justify-between">
+      <div className="relative bg-white h-full w-full max-w-lg border-l border-slate-200 shadow-2xl p-4 sm:p-6 md:p-8 overflow-y-auto animate-in slide-in-from-right duration-250 flex flex-col justify-between">
         <div>
           <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
             <h2 className="text-lg font-bold text-slate-900">Add New Staff Member</h2>
@@ -218,7 +218,7 @@ export default function AddStaffDrawer({
           </div>
 
           {/* Progress Steps */}
-          <div className="flex items-center justify-between mb-8 text-xs font-semibold text-slate-400">
+          <div className="flex items-center justify-between mb-6 sm:mb-8 text-[11px] sm:text-xs font-semibold text-slate-400 overflow-x-auto pb-1">
             <div className={`flex items-center space-x-1 ${onboardingStep >= 1 ? 'text-blue-600 font-bold' : ''}`}>
               <span className="h-5 w-5 rounded-full border border-current flex items-center justify-center">1</span>
               <span>Identity</span>
