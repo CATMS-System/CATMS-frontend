@@ -132,6 +132,7 @@ As confirmed in the project document `TEAM_WORKLOAD_DISTRIBUTION.md`, the fronte
 - **Sri Lankan Rupee Currency**: Standardized currency formatting (`Rs.`) across all panels.
 - **Real Names in Audit Log**: Shows staff usernames and branch labels instead of generic system placeholders (Fix M-6).
 - **Automated CI Workflow**: A GitHub Actions Continuous Integration (CI) workflow runs `npm ci`, `npm test`, and `npm run build` on every push and pull request. (This workflow runs tests and builds only; it does not deploy the application).
+- **Full-Stack Containerization**: Docker packages the backend and frontend as separate images. The `docker-compose.full.yml` file in the backend repository runs MySQL, the backend API, and the frontend together, and initializes the database on first startup. Run `docker compose -f docker-compose.full.yml up --build` from the backend repository. The frontend repository must be in a sibling folder.
 
 ### Possible Future Improvements (Not Implemented Yet)
 - **Email, SMS, and Push Notifications**: Sending automated reminders for appointment bookings and payment receipts is not implemented in the current code; all queue and appointment statuses are currently viewed directly in the application UI.
