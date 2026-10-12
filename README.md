@@ -147,7 +147,7 @@ As confirmed in the project document `TEAM_WORKLOAD_DISTRIBUTION.md`, the fronte
 ## Additional Features & Future Work
 
 ### Implemented Enhancements
-- **3-Language i18n System**: English, Sinhala, and Tamil support across all navigation, buttons, headings, and dialogs with English fallback.
+- **3-Language in one System**: English, Sinhala, and Tamil support across all navigation, buttons, headings, and dialogs with English fallback.
 - **Random Temporary Passwords**: Generates temporary passwords for newly registered patients (Fix C-2).
 - **Session Purge on Logout**: Clears all cached user data, tokens, and profile state from `localStorage` upon logging out (Fix H-4).
 - **Sri Lankan Rupee Currency**: Standardized currency formatting (`Rs.`) across all panels.
