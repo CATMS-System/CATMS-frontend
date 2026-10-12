@@ -419,18 +419,30 @@ export default function ManagerPanel({ subView, db, handlers }) {
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 justify-between border-t border-slate-100 pt-3">
-                      <span className="text-xs font-semibold text-slate-400 uppercase shrink-0">Set Status:</span>
-                      <div className="flex flex-wrap gap-1">
-                        {['Available', 'In Consultation', 'On Break', 'On Leave'].map(statusOption => (
+                    <div className="border-t border-slate-100 pt-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Set Status</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                        {[
+                          { value: 'Available', label: 'Available' },
+                          { value: 'In Consultation', label: 'Consult' },
+                          { value: 'On Break', label: 'Break' },
+                          { value: 'On Leave', label: 'Leave' }
+                        ].map(opt => (
                           <button
-                            key={statusOption}
-                            onClick={() => handleToggleDocStatus(doc.Doctor_ID || doc.id, statusOption)}
-                            className={`px-1.5 py-1 border text-[10px] rounded font-medium cursor-pointer transition-all ${
-                              currentStatus === statusOption ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                            key={opt.value}
+                            type="button"
+                            onClick={() => handleToggleDocStatus(doc.Doctor_ID || doc.id, opt.value)}
+                            className={`py-1.5 px-1 border text-[11px] rounded-lg font-medium cursor-pointer transition-all text-center truncate ${
+                              currentStatus === opt.value
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
                             }`}
+                            title={opt.value}
+                            aria-label={`Set status to ${opt.value}`}
                           >
-                            {statusOption.split(' ')[0]}
+                            {opt.label}
                           </button>
                         ))}
                       </div>
@@ -480,8 +492,13 @@ export default function ManagerPanel({ subView, db, handlers }) {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
+              <div
+                className="overflow-x-auto focus:outline-hidden focus:ring-2 focus:ring-blue-500 rounded-xl"
+                tabIndex={0}
+                role="region"
+                aria-label="Doctor weekly roster table"
+              >
+                <table className="w-full text-left border-collapse text-sm min-w-[600px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
                       <th className="px-4 py-2.5">Day</th>
@@ -554,7 +571,12 @@ export default function ManagerPanel({ subView, db, handlers }) {
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
+            <div
+              className="overflow-x-auto focus:outline-hidden focus:ring-2 focus:ring-blue-500 rounded-xl"
+              tabIndex={0}
+              role="region"
+              aria-label="Local staff directory table"
+            >
               <table className="w-full text-left border-collapse text-sm min-w-[640px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">

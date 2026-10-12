@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users, Building, Calendar, Clock, Search, Plus, Activity, FileText,
   DollarSign, TrendingUp, Download, LogOut, ClipboardList, AlertCircle,
@@ -272,6 +272,12 @@ export default function App() {
   const [authError, setAuthError] = useState('');
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
+  // Focus & accessible interaction refs
+  const hamburgerButtonRef = useRef(null);
+  const drawerRef = useRef(null);
+  const drawerCloseBtnRef = useRef(null);
+  const searchInputRef = useRef(null);
+
   // Save states to localStorage
   useEffect(() => {
     localStorage.setItem('catms_branches', JSON.stringify(branches));
@@ -378,6 +384,66 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Mobile navigation drawer focus management, Escape key listener, and scroll lock
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const timer = setTimeout(() => {
+      drawerCloseBtnRef.current?.focus();
+    }, 50);
+
+    const handleDrawerKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMobileNavOpen(false);
+        return;
+      }
+      if (e.key === 'Tab' && drawerRef.current) {
+        const focusable = drawerRef.current.querySelectorAll(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === drawerRef.current)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleDrawerKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleDrawerKeyDown);
+      hamburgerButtonRef.current?.focus();
+    };
+  }, [mobileNavOpen]);
+
+  // Global Patient Search Escape key listener
+  useEffect(() => {
+    if (!globalSearchOpen) return;
+
+    const handleSearchKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setGlobalSearchOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleSearchKeyDown);
+    return () => window.removeEventListener('keydown', handleSearchKeyDown);
+  }, [globalSearchOpen]);
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
@@ -800,7 +866,13 @@ export default function App() {
 
       {/* Mobile Drawer Backdrop & Sidebar (< lg viewports) */}
       {mobileNavOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Mobile Navigation Sidebar">
+        <div
+          ref={drawerRef}
+          className="fixed inset-0 z-50 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile Navigation Sidebar"
+        >
           <div
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
             onClick={() => setMobileNavOpen(false)}
@@ -816,27 +888,56 @@ export default function App() {
                   <span className="text-lg font-bold tracking-tight">CareFlow CATMS</span>
                 </div>
                 <button
+                  ref={drawerCloseBtnRef}
                   type="button"
                   onClick={() => setMobileNavOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 transition-colors cursor-pointer"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 transition-colors cursor-pointer"
                   aria-label="Close sidebar"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <nav className="mt-4 px-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-140px)]">
+              <nav className="mt-4 px-4 space-y-1.5 overflow-y-auto max-h-[calc(100dvh-180px)]">
                 {renderNavLinks()}
               </nav>
             </div>
 
-            <div className="p-4 border-t border-slate-900 bg-slate-950/50">
-              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                {t('active_session', 'Active Session')}
+            <div className="p-4 border-t border-slate-900 bg-slate-950/50 space-y-3">
+              <div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  {t('active_session', 'Active Session')}
+                </div>
+                <div className="text-xs font-semibold text-slate-300 mt-1 flex items-center space-x-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
+                  <span className="truncate">{currentUser.name.split(' [')[0]} ({currentUser.roleCode.replace('ROLE_', '')})</span>
+                </div>
               </div>
-              <div className="text-xs font-semibold text-slate-300 mt-1 flex items-center space-x-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
-                <span>{currentUser.roleCode.replace('ROLE_', '')}</span>
+
+              <div className="flex items-center space-x-2 pt-1 border-t border-slate-900">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    setShowChangePasswordModal(true);
+                  }}
+                  className="flex-1 flex items-center justify-center space-x-1.5 min-h-[44px] py-2 px-3 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  <span>{t('change_password', 'Password')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex items-center justify-center min-h-[44px] min-w-[44px] p-2 bg-red-950/60 hover:bg-red-900 text-red-300 hover:text-red-100 rounded-lg transition-colors cursor-pointer"
+                  title={t('instant_logout', 'Instant Logout')}
+                  aria-label="Logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </aside>
@@ -876,29 +977,31 @@ export default function App() {
       <div className="pl-0 lg:pl-64 flex-1 flex flex-col min-w-0">
 
         {/* Global Top Header Bar */}
-        <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-6 lg:px-8 flex justify-between items-center shrink-0 z-20 shadow-xs gap-2">
-          <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
+        <header className="bg-white border-b border-slate-200 h-16 px-2.5 sm:px-6 lg:px-8 flex justify-between items-center shrink-0 z-20 shadow-xs gap-1.5 sm:gap-2">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 min-w-0">
             {/* Mobile Hamburger button (< lg) */}
             <button
+              ref={hamburgerButtonRef}
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="lg:hidden p-2 -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg shrink-0 cursor-pointer"
+              className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg shrink-0 cursor-pointer"
               aria-label="Open navigation sidebar"
+              aria-expanded={mobileNavOpen}
             >
               <Menu className="h-5 w-5" />
             </button>
 
             {/* Brand Logo Identity */}
-            <span className="text-sm font-bold text-slate-800 tracking-tight shrink-0 hidden sm:inline">CareFlow CATMS</span>
+            <span className="text-sm font-bold text-slate-800 tracking-tight shrink-0 hidden md:inline">CareFlow CATMS</span>
 
             {/* Active Branch Switcher */}
-            <div className="hidden sm:block h-5 w-px bg-slate-200" />
-            <div className="flex items-center space-x-1.5 min-w-0">
+            <div className="hidden md:block h-5 w-px bg-slate-200" />
+            <div className="flex items-center space-x-1 min-w-0">
               {currentUser.roleCode === 'ROLE_ADMIN' ? (
-                <div className="flex items-center space-x-1 border border-slate-200 rounded-lg p-1 bg-slate-50/50">
+                <div className="flex items-center space-x-1 border border-slate-200 rounded-lg p-1 bg-slate-50/50 min-w-0 max-w-[100px] xs:max-w-[130px] sm:max-w-none">
                   <Building className="h-4 w-4 text-slate-400 shrink-0" />
                   <select
-                    className="border-none bg-transparent rounded-lg text-xs font-bold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-none truncate"
+                    className="border-none bg-transparent rounded-lg text-xs font-bold focus:outline-none cursor-pointer w-full truncate"
                     value={selectedBranch}
                     onChange={e => setSelectedBranch(e.target.value)}
                     aria-label="Select active branch"
@@ -910,20 +1013,21 @@ export default function App() {
                   </select>
                 </div>
               ) : (
-                <span className="text-xs font-semibold text-slate-500 flex items-center space-x-1 truncate">
+                <span className="text-xs font-semibold text-slate-500 flex items-center space-x-1 min-w-0 truncate">
                   <Building className="h-4 w-4 text-slate-400 shrink-0" />
-                  <span className="truncate max-w-[110px] sm:max-w-none">{t('branch', 'Branch')}: <strong>{currentUser.branch || 'None'}</strong></span>
+                  <span className="truncate max-w-[85px] xs:max-w-[120px] sm:max-w-none">{t('branch', 'Branch')}: <strong>{currentUser.branch || 'None'}</strong></span>
                 </span>
               )}
             </div>
           </div>
 
           {/* Center search & actions cluster */}
-          <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+          <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
             {/* Mobile search button */}
             <button
+              type="button"
               onClick={() => setGlobalSearchOpen(true)}
-              className="flex md:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              className="flex md:hidden min-h-[44px] min-w-[44px] items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
               title={t('search_placeholder', 'Search Patient Code / Name...')}
               aria-label="Search patients"
             >
@@ -932,6 +1036,7 @@ export default function App() {
 
             {/* Desktop search bar */}
             <button
+              type="button"
               onClick={() => setGlobalSearchOpen(true)}
               className="hidden md:flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-1.5 text-xs text-slate-450 hover:bg-slate-100 hover:border-slate-300 transition-all font-medium cursor-pointer"
             >
@@ -945,8 +1050,8 @@ export default function App() {
 
             {/* User Profile & Badge */}
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />
-            <div className="flex items-center space-x-1.5 sm:space-x-3">
-              <div className="h-8 w-8 bg-blue-100 text-blue-800 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="h-8 w-8 bg-blue-100 text-blue-800 rounded-xl hidden sm:flex items-center justify-center font-bold text-sm shrink-0">
                 {currentUser.name.charAt(0)}
               </div>
               <div className="text-left hidden md:block">
@@ -961,8 +1066,9 @@ export default function App() {
 
               {/* Change Password button */}
               <button
+                type="button"
                 onClick={() => setShowChangePasswordModal(true)}
-                className="p-1.5 sm:p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-xl transition-all cursor-pointer"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-transparent hover:border-slate-200 rounded-xl transition-all cursor-pointer"
                 title={t('change_password', 'Change Password')}
                 aria-label="Change password"
               >
@@ -971,8 +1077,9 @@ export default function App() {
 
               {/* Logout button */}
               <button
+                type="button"
                 onClick={handleLogout}
-                className="p-1.5 sm:p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition-all cursor-pointer"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center bg-red-50/70 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/60 rounded-xl transition-all cursor-pointer shadow-2xs"
                 title={t('instant_logout', 'Instant Logout')}
                 aria-label="Logout"
               >
@@ -1056,31 +1163,40 @@ export default function App() {
 
       {/* GLOBAL PATIENT SEARCH MODAL (Ctrl+K) */}
       {globalSearchOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setGlobalSearchOpen(false)} />
-          <div className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setGlobalSearchOpen(false)} aria-hidden="true" />
+          <div
+            className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[85vh]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Search patients"
+          >
 
             {/* Search Input bar */}
-            <div className="px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50/50 relative flex items-center">
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 bg-slate-50/50 relative flex items-center shrink-0">
               <Search className="h-5 w-5 text-slate-400 mr-3 shrink-0" />
               <input
+                ref={searchInputRef}
                 type="text"
                 autoFocus
                 placeholder="Type Patient ID, NIC, or Name to lookup..."
                 className="w-full bg-transparent border-none text-sm font-semibold focus:outline-none min-w-0"
                 value={globalSearchQuery}
                 onChange={e => setGlobalSearchQuery(e.target.value)}
+                aria-label="Search patients by ID, NIC, or name"
               />
               <button
+                type="button"
                 onClick={() => setGlobalSearchOpen(false)}
-                className="text-xs bg-slate-200 hover:bg-slate-300 text-slate-650 px-2 py-1 rounded font-bold font-mono transition-all cursor-pointer shrink-0 ml-2"
+                className="min-h-[36px] min-w-[36px] flex items-center justify-center text-xs bg-slate-200 hover:bg-slate-300 text-slate-650 px-2 py-1 rounded-lg font-bold font-mono transition-all cursor-pointer shrink-0 ml-2"
+                aria-label="Close search modal"
               >
                 ESC
               </button>
             </div>
 
             {/* Results */}
-            <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 p-3 sm:p-4 space-y-2">
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-3 sm:p-4 space-y-2 min-h-0">
               {searchResults.map(p => (
                 <div
                   key={p.patient_id}

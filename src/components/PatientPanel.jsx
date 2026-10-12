@@ -588,7 +588,39 @@ export default function PatientPanel({ subView, db, handlers }) {
           </div>
 
           {/* Stepper Progress Indicator */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {/* Mobile Sequential Stepper (< sm viewports) */}
+          <div className="sm:hidden bg-white rounded-xl border border-slate-200 p-3 shadow-xs space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold">
+              <span className="font-mono text-[11px] text-blue-600 font-bold uppercase tracking-wider">
+                Step 0{bookingStep} of 04
+              </span>
+              <span className="text-slate-900 font-bold text-xs truncate max-w-[190px]">
+                {[
+                  'Location & Department',
+                  'Choose Doctor',
+                  'Date & Time Slot',
+                  'Confirmation'
+                ][bookingStep - 1]}
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5" role="progressbar" aria-valuenow={bookingStep} aria-valuemin={1} aria-valuemax={4} aria-label="Booking step progress">
+              {[1, 2, 3, 4].map(s => (
+                <div
+                  key={s}
+                  className={`h-1.5 rounded-full transition-all ${
+                    bookingStep === s
+                      ? 'bg-blue-600'
+                      : bookingStep > s
+                      ? 'bg-emerald-500'
+                      : 'bg-slate-200'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Tablet & Desktop Stepper (sm+ viewports) */}
+          <div className="hidden sm:grid sm:grid-cols-4 gap-2">
             {[
               { step: 1, title: 'Location & Department' },
               { step: 2, title: 'Choose Doctor' },

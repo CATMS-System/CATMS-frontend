@@ -577,7 +577,12 @@ export default function AdminPanel({ subView, db, handlers }) {
 
           {/* Staff Table */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
+            <div
+              className="overflow-x-auto focus:outline-hidden focus:ring-2 focus:ring-blue-500 rounded-xl"
+              tabIndex={0}
+              role="region"
+              aria-label="Staff directory table"
+            >
               <table className="w-full text-left border-collapse min-w-[640px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
@@ -755,7 +760,12 @@ export default function AdminPanel({ subView, db, handlers }) {
 
           {/* Audit Logs Table */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
+            <div
+              className="overflow-x-auto focus:outline-hidden focus:ring-2 focus:ring-blue-500 rounded-xl"
+              tabIndex={0}
+              role="region"
+              aria-label="Security audit logs table"
+            >
               <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">

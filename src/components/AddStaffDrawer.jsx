@@ -47,6 +47,17 @@ export default function AddStaffDrawer({
     }
   }, [lockedBranch]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleToggleSpecialty = (spec) => {
@@ -205,20 +216,38 @@ export default function AddStaffDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div
+      className="fixed inset-0 z-50 flex justify-end"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Add New Staff Member"
+    >
       <div
         className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs"
         onClick={handleClose}
+        aria-hidden="true"
       />
       <div className="relative bg-white h-full w-full max-w-lg border-l border-slate-200 shadow-2xl p-4 sm:p-6 md:p-8 overflow-y-auto animate-in slide-in-from-right duration-250 flex flex-col justify-between">
         <div>
           <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
             <h2 className="text-lg font-bold text-slate-900">Add New Staff Member</h2>
-            <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors font-bold cursor-pointer"
+              aria-label="Close add staff drawer"
+            >
+              ✕
+            </button>
           </div>
 
           {/* Progress Steps */}
-          <div className="flex items-center justify-between mb-6 sm:mb-8 text-[11px] sm:text-xs font-semibold text-slate-400 overflow-x-auto pb-1">
+          <div
+            className="flex items-center justify-between mb-6 sm:mb-8 text-[11px] sm:text-xs font-semibold text-slate-400 overflow-x-auto pb-1 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded"
+            tabIndex={0}
+            role="region"
+            aria-label="Onboarding step progression"
+          >
             <div className={`flex items-center space-x-1 ${onboardingStep >= 1 ? 'text-blue-600 font-bold' : ''}`}>
               <span className="h-5 w-5 rounded-full border border-current flex items-center justify-center">1</span>
               <span>Identity</span>
