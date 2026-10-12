@@ -400,7 +400,7 @@ export default function AdminPanel({ subView, db, handlers }) {
           </div>
 
           {/* Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">{t('stat_revenue_collected', 'Revenue Collected')}</span>
@@ -465,7 +465,7 @@ export default function AdminPanel({ subView, db, handlers }) {
           {/* Branch Performance Grid */}
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-slate-900">{t('branch_performance_overview', 'Branch Performance Overview')}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {(branches && branches.length > 0 ? branches : ['Colombo Main', 'Kandy', 'Galle'].map((name, i) => ({ Branch_ID: i + 1, Branch_Name: name }))).map(br => {
                 const brName = br.Branch_Name || br.name;
                 const branchAppts = appointmentList.filter(a => Number(a.Branch_ID) === Number(br.Branch_ID) || a.branch === brName || a.branch?.includes(br.name) || brName?.includes(a.branch));
@@ -517,7 +517,7 @@ export default function AdminPanel({ subView, db, handlers }) {
       {/* 2. STAFF & ACCOUNT MANAGEMENT HUB */}
       {subView === 'staff' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">{t('staff_directory_title', 'Staff Directory & Identity Control')}</h1>
               <p className="text-sm text-slate-500 mt-1">Manage network accounts, assign roles, transfer branches, and audit profiles</p>
@@ -532,8 +532,8 @@ export default function AdminPanel({ subView, db, handlers }) {
           </div>
 
           {/* Filters */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-4 items-center">
-            <div className="flex-1 min-w-[200px]">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-3 sm:gap-4 items-center">
+            <div className="flex-1 min-w-[200px] w-full sm:w-auto">
               <input
                 type="text"
                 placeholder="Search staff by name or ID..."
@@ -543,7 +543,7 @@ export default function AdminPanel({ subView, db, handlers }) {
               />
             </div>
             <select
-              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white"
+              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto"
               value={staffBranchFilter}
               onChange={e => setStaffBranchFilter(e.target.value)}
             >
@@ -553,7 +553,7 @@ export default function AdminPanel({ subView, db, handlers }) {
               <option value="Galle">Galle</option>
             </select>
             <select
-              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white"
+              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto"
               value={staffRoleFilter}
               onChange={e => setStaffRoleFilter(e.target.value)}
             >
@@ -565,7 +565,7 @@ export default function AdminPanel({ subView, db, handlers }) {
               <option value="DOC">Doctor</option>
             </select>
             <select
-              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white"
+              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto"
               value={staffStatusFilter}
               onChange={e => setStaffStatusFilter(e.target.value)}
             >
@@ -577,7 +577,13 @@ export default function AdminPanel({ subView, db, handlers }) {
 
           {/* Staff Table */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-            <table className="w-full text-left border-collapse">
+            <div
+              className="overflow-x-auto focus:outline-hidden focus:ring-2 focus:ring-blue-500 rounded-xl"
+              tabIndex={0}
+              role="region"
+              aria-label="Staff directory table"
+            >
+              <table className="w-full text-left border-collapse min-w-[640px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
                   <th className="px-6 py-3">Staff Member</th>
@@ -647,6 +653,7 @@ export default function AdminPanel({ subView, db, handlers }) {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -654,7 +661,7 @@ export default function AdminPanel({ subView, db, handlers }) {
       {/* 3. CLINIC BRANCH CONFIGURATION */}
       {subView === 'branches' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Clinic Branch Settings & Governance</h1>
               <p className="text-sm text-slate-500 mt-1">Configure facilities, direct phone lines, and assign operational Branch Managers</p>
@@ -668,7 +675,7 @@ export default function AdminPanel({ subView, db, handlers }) {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {branches.map(br => (
               <div key={br.name} className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
                 <div className="flex justify-between items-start border-b border-slate-100 pb-3">
@@ -719,8 +726,8 @@ export default function AdminPanel({ subView, db, handlers }) {
           </div>
 
           {/* Search Audit Logs */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-4 items-center">
-            <div className="flex-1 min-w-[200px]">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-3 sm:gap-4 items-center">
+            <div className="flex-1 min-w-[200px] w-full sm:w-auto">
               <input
                 type="text"
                 placeholder="Search logs by action description, email, or user..."
@@ -731,12 +738,12 @@ export default function AdminPanel({ subView, db, handlers }) {
             </div>
             <input
               type="date"
-              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white"
+              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto"
               value={auditDateFilter}
               onChange={e => setAuditDateFilter(e.target.value)}
             />
             <select
-              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white"
+              className="border border-slate-350 rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto"
               value={auditActionFilter}
               onChange={e => setAuditActionFilter(e.target.value)}
             >
@@ -753,70 +760,77 @@ export default function AdminPanel({ subView, db, handlers }) {
 
           {/* Audit Logs Table */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                  <th className="px-6 py-3">Timestamp</th>
-                  <th className="px-6 py-3">Action Type</th>
-                  <th className="px-6 py-3">Logged By</th>
-                  <th className="px-6 py-3">Description</th>
-                  <th className="px-6 py-3 text-right">Entity Mutation</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm text-slate-650">
-                {filteredAuditLogs.map(log => {
-                  const isExpanded = expandedAuditId === log.id;
-                  return (
-                    <React.Fragment key={log.id}>
-                      <tr className="hover:bg-slate-50/50">
-                        <td className="px-6 py-4 font-mono text-xs">{log.timestamp}</td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
-                            log.action.includes('SECURITY') ? 'bg-red-50 text-red-700' :
-                            log.action.includes('CREATE') ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
-                          }`}>
-                            {log.action}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 font-medium text-slate-900">
-                          <div>{log.username}</div>
-                          <span className="text-xs text-slate-400 font-mono">{log.userId}</span>
-                        </td>
-                        <td className="px-6 py-4">{log.details}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => setExpandedAuditId(isExpanded ? null : log.id)}
-                            className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
-                          >
-                            {isExpanded ? 'Hide Details' : 'View Snapshot'}
-                          </button>
-                        </td>
-                      </tr>
-                      {isExpanded && (
-                        <tr className="bg-slate-50">
-                          <td colSpan="5" className="px-6 py-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block mb-1">State Before Mutation</span>
-                                <pre className="bg-slate-900 text-slate-200 text-xs rounded-lg p-3 font-mono overflow-x-auto max-h-40">
-                                  {log.before !== 'null' ? JSON.stringify(JSON.parse(log.before), null, 2) : 'NULL'}
-                                </pre>
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block mb-1">State After Mutation</span>
-                                <pre className="bg-slate-900 text-slate-200 text-xs rounded-lg p-3 font-mono overflow-x-auto max-h-40">
-                                  {log.after !== 'null' ? JSON.stringify(JSON.parse(log.after), null, 2) : 'NULL'}
-                                </pre>
-                              </div>
-                            </div>
+            <div
+              className="overflow-x-auto focus:outline-hidden focus:ring-2 focus:ring-blue-500 rounded-xl"
+              tabIndex={0}
+              role="region"
+              aria-label="Security audit logs table"
+            >
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                    <th className="px-6 py-3">Timestamp</th>
+                    <th className="px-6 py-3">Action Type</th>
+                    <th className="px-6 py-3">Logged By</th>
+                    <th className="px-6 py-3">Description</th>
+                    <th className="px-6 py-3 text-right">Entity Mutation</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm text-slate-650">
+                  {filteredAuditLogs.map(log => {
+                    const isExpanded = expandedAuditId === log.id;
+                    return (
+                      <React.Fragment key={log.id}>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-6 py-4 font-mono text-xs">{log.timestamp}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                              log.action.includes('SECURITY') ? 'bg-red-50 text-red-700' :
+                              log.action.includes('CREATE') ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
+                            }`}>
+                              {log.action}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-medium text-slate-900">
+                            <div>{log.username}</div>
+                            <span className="text-xs text-slate-400 font-mono">{log.userId}</span>
+                          </td>
+                          <td className="px-6 py-4">{log.details}</td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => setExpandedAuditId(isExpanded ? null : log.id)}
+                              className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+                            >
+                              {isExpanded ? 'Hide Details' : 'View Snapshot'}
+                            </button>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {isExpanded && (
+                          <tr className="bg-slate-50">
+                            <td colSpan="5" className="px-6 py-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block mb-1">State Before Mutation</span>
+                                  <pre className="bg-slate-900 text-slate-200 text-xs rounded-lg p-3 font-mono overflow-x-auto max-h-40">
+                                    {log.before !== 'null' ? JSON.stringify(JSON.parse(log.before), null, 2) : 'NULL'}
+                                  </pre>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block mb-1">State After Mutation</span>
+                                  <pre className="bg-slate-900 text-slate-200 text-xs rounded-lg p-3 font-mono overflow-x-auto max-h-40">
+                                    {log.after !== 'null' ? JSON.stringify(JSON.parse(log.after), null, 2) : 'NULL'}
+                                  </pre>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

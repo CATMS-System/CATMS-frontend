@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users, Building, Calendar, Clock, Search, Plus, Activity, FileText,
   DollarSign, TrendingUp, Download, LogOut, ClipboardList, AlertCircle,
@@ -263,6 +263,7 @@ export default function App() {
 
   // Global UX settings
   const [selectedBranch, setSelectedBranch] = useState('All Branches');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState(null);
@@ -270,6 +271,12 @@ export default function App() {
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+
+  // Focus & accessible interaction refs
+  const hamburgerButtonRef = useRef(null);
+  const drawerRef = useRef(null);
+  const drawerCloseBtnRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   // Save states to localStorage
   useEffect(() => {
@@ -331,6 +338,7 @@ export default function App() {
   const navigateTo = (path) => {
     window.history.pushState(null, '', path);
     setCurrentPath(path);
+    setMobileNavOpen(false);
   };
 
   // Redirect to correct dashboard based on role on login
@@ -376,6 +384,66 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Mobile navigation drawer focus management, Escape key listener, and scroll lock
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const timer = setTimeout(() => {
+      drawerCloseBtnRef.current?.focus();
+    }, 50);
+
+    const handleDrawerKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMobileNavOpen(false);
+        return;
+      }
+      if (e.key === 'Tab' && drawerRef.current) {
+        const focusable = drawerRef.current.querySelectorAll(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === drawerRef.current)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleDrawerKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleDrawerKeyDown);
+      hamburgerButtonRef.current?.focus();
+    };
+  }, [mobileNavOpen]);
+
+  // Global Patient Search Escape key listener
+  useEffect(() => {
+    if (!globalSearchOpen) return;
+
+    const handleSearchKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setGlobalSearchOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleSearchKeyDown);
+    return () => window.removeEventListener('keydown', handleSearchKeyDown);
+  }, [globalSearchOpen]);
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
@@ -472,11 +540,11 @@ export default function App() {
   if (!currentUser) {
     return (
       <div
-        className="min-h-screen login-bg flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative"
+        className="min-h-screen login-bg flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans relative"
         style={LOGIN_BG_STYLE}
       >
         {/* Top-right language selector on login portal */}
-        <div className="absolute top-6 right-6 z-30">
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30">
           <LanguageSelector variant="portal" />
         </div>
 
@@ -566,6 +634,224 @@ export default function App() {
     );
   }
 
+  const renderNavLinks = () => (
+    <>
+      {currentUser.roleCode === 'ROLE_ADMIN' && (
+        <>
+          <button
+            onClick={() => navigateTo('/admin/dashboard')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Building className="h-4.5 w-4.5" />
+            <span>{t('nav_executive_dashboard', 'Executive Dashboard')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/admin/staff')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Users className="h-4.5 w-4.5" />
+            <span>{t('nav_staff_directory', 'Staff Directory')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/admin/branches')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/branches' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Building className="h-4.5 w-4.5" />
+            <span>{t('nav_clinic_branches', 'Clinic Branches')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/admin/audit-logs')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/audit-logs' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <ClipboardList className="h-4.5 w-4.5" />
+            <span>{t('nav_security_audit_logs', 'Security Audit Logs')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/admin/reports')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <TrendingUp className="h-4.5 w-4.5" />
+            <span>{t('nav_reports_suite', 'Reports Suite')}</span>
+          </button>
+        </>
+      )}
+
+      {currentUser.roleCode === 'ROLE_BRANCH_MANAGER' && (
+        <>
+          <button
+            onClick={() => navigateTo('/manager/dashboard')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Building className="h-4.5 w-4.5" />
+            <span>{t('nav_branch_operations', 'Branch Operations')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/manager/roster')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/roster' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Calendar className="h-4.5 w-4.5" />
+            <span>{t('nav_doctor_roster_planner', 'Doctor Roster Planner')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/manager/staff')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Users className="h-4.5 w-4.5" />
+            <span>{t('nav_local_staff_directory', 'Local Staff Directory')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/manager/reports')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <TrendingUp className="h-4.5 w-4.5" />
+            <span>{t('nav_branch_reports', 'Branch Reports')}</span>
+          </button>
+        </>
+      )}
+
+      {currentUser.roleCode === 'ROLE_RECEPTIONIST' && (
+        <>
+          <button
+            onClick={() => navigateTo('/reception/dashboard')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <ClipboardList className="h-4.5 w-4.5" />
+            <span>{t('nav_triage_workbench', 'Triage Workbench')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/reception/patients')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/patients' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Users className="h-4.5 w-4.5" />
+            <span>{t('nav_patient_registry', 'Patient Registry')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/reception/appointments')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Calendar className="h-4.5 w-4.5" />
+            <span>{t('nav_schedules_calendar', 'Schedules Calendar')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/reception/walkin')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/walkin' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Clock className="h-4.5 w-4.5" />
+            <span>{t('nav_walkin_intake', 'Walk-in Intake')}</span>
+          </button>
+        </>
+      )}
+
+      {currentUser.roleCode === 'ROLE_DOCTOR' && (
+        <>
+          <button
+            onClick={() => navigateTo('/doctor/workbench')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/doctor/workbench' || currentPath.startsWith('/doctor/consultation') ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Activity className="h-4.5 w-4.5" />
+            <span>{t('nav_consult_workbench', 'Consult Workbench')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/doctor/appointments')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/doctor/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Calendar className="h-4.5 w-4.5" />
+            <span>{t('nav_upcoming_bookings', 'Upcoming Bookings')}</span>
+          </button>
+        </>
+      )}
+
+      {currentUser.roleCode === 'ROLE_BILLING_STAFF' && (
+        <>
+          <button
+            onClick={() => navigateTo('/billing/dashboard')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <DollarSign className="h-4.5 w-4.5" />
+            <span>{t('nav_billing_desk', 'Billing Desk')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/billing/invoices')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/invoices' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <FileText className="h-4.5 w-4.5" />
+            <span>{t('nav_invoice_ledger', 'Invoice Ledger')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/billing/claims')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/claims' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <ShieldCheck className="h-4.5 w-4.5" />
+            <span>{t('nav_insurance_claims', 'Insurance Claims')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/billing/reports')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <TrendingUp className="h-4.5 w-4.5" />
+            <span>{t('nav_finance_reports', 'Finance Reports')}</span>
+          </button>
+        </>
+      )}
+
+      {currentUser.roleCode === 'ROLE_PATIENT' && (
+        <>
+          <button
+            onClick={() => navigateTo('/portal/home')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/home' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Building className="h-4.5 w-4.5" />
+            <span>{t('nav_home_dashboard', 'Home Dashboard')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/portal/book')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/book' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <Calendar className="h-4.5 w-4.5" />
+            <span>{t('nav_self_booking_wizard', 'Self Booking Wizard')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/portal/medical-history')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/medical-history' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <FileText className="h-4.5 w-4.5" />
+            <span>{t('nav_my_consultations', 'My Consultations')}</span>
+          </button>
+          <button
+            onClick={() => navigateTo('/portal/billing')}
+            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/billing' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
+              }`}
+          >
+            <DollarSign className="h-4.5 w-4.5" />
+            <span>{t('nav_my_receipts', 'My Receipts')}</span>
+          </button>
+        </>
+      )}
+    </>
+  );
+
   // 2. MAIN APP SHELL (Logged in views)
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex text-slate-900">
@@ -578,8 +864,88 @@ export default function App() {
         </div>
       )}
 
-      {/* Dynamic Sidebar Navigation */}
-      <aside className="w-64 fixed top-0 bottom-0 left-0 bg-slate-950 text-white flex flex-col justify-between z-10 border-r border-slate-900">
+      {/* Mobile Drawer Backdrop & Sidebar (< lg viewports) */}
+      {mobileNavOpen && (
+        <div
+          ref={drawerRef}
+          className="fixed inset-0 z-50 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile Navigation Sidebar"
+        >
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setMobileNavOpen(false)}
+            aria-hidden="true"
+          />
+          <aside className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-slate-950 text-white flex flex-col justify-between shadow-2xl z-50 border-r border-slate-900">
+            <div>
+              <div className="px-5 py-4 border-b border-slate-900 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-1.5 bg-blue-600 rounded-lg text-white">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <span className="text-lg font-bold tracking-tight">CareFlow CATMS</span>
+                </div>
+                <button
+                  ref={drawerCloseBtnRef}
+                  type="button"
+                  onClick={() => setMobileNavOpen(false)}
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 transition-colors cursor-pointer"
+                  aria-label="Close sidebar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <nav className="mt-4 px-4 space-y-1.5 overflow-y-auto max-h-[calc(100dvh-180px)]">
+                {renderNavLinks()}
+              </nav>
+            </div>
+
+            <div className="p-4 border-t border-slate-900 bg-slate-950/50 space-y-3">
+              <div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  {t('active_session', 'Active Session')}
+                </div>
+                <div className="text-xs font-semibold text-slate-300 mt-1 flex items-center space-x-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
+                  <span className="truncate">{currentUser.name.split(' [')[0]} ({currentUser.roleCode.replace('ROLE_', '')})</span>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-1 border-t border-slate-900">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    setShowChangePasswordModal(true);
+                  }}
+                  className="flex-1 flex items-center justify-center space-x-1.5 min-h-[44px] py-2 px-3 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  <span>{t('change_password', 'Password')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex items-center justify-center min-h-[44px] min-w-[44px] p-2 bg-red-950/60 hover:bg-red-900 text-red-300 hover:text-red-100 rounded-lg transition-colors cursor-pointer"
+                  title={t('instant_logout', 'Instant Logout')}
+                  aria-label="Logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop Fixed Sidebar (lg+ viewports) */}
+      <aside className="hidden lg:flex w-64 fixed top-0 bottom-0 left-0 bg-slate-950 text-white flex-col justify-between z-10 border-r border-slate-900">
         <div>
           {/* Logo brand */}
           <div className="px-6 py-5 border-b border-slate-900 flex items-center space-x-2.5">
@@ -590,220 +956,8 @@ export default function App() {
           </div>
 
           {/* Navigation Links based on user claims */}
-          <nav className="mt-6 px-4 space-y-1.5">
-            {currentUser.roleCode === 'ROLE_ADMIN' && (
-              <>
-                <button
-                  onClick={() => navigateTo('/admin/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Building className="h-4.5 w-4.5" />
-                  <span>{t('nav_executive_dashboard', 'Executive Dashboard')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/admin/staff')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Users className="h-4.5 w-4.5" />
-                  <span>{t('nav_staff_directory', 'Staff Directory')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/admin/branches')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/branches' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Building className="h-4.5 w-4.5" />
-                  <span>{t('nav_clinic_branches', 'Clinic Branches')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/admin/audit-logs')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/audit-logs' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <ClipboardList className="h-4.5 w-4.5" />
-                  <span>{t('nav_security_audit_logs', 'Security Audit Logs')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/admin/reports')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <TrendingUp className="h-4.5 w-4.5" />
-                  <span>{t('nav_reports_suite', 'Reports Suite')}</span>
-                </button>
-              </>
-            )}
-
-            {currentUser.roleCode === 'ROLE_BRANCH_MANAGER' && (
-              <>
-                <button
-                  onClick={() => navigateTo('/manager/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Building className="h-4.5 w-4.5" />
-                  <span>{t('nav_branch_operations', 'Branch Operations')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/manager/roster')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/roster' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Calendar className="h-4.5 w-4.5" />
-                  <span>{t('nav_doctor_roster_planner', 'Doctor Roster Planner')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/manager/staff')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Users className="h-4.5 w-4.5" />
-                  <span>{t('nav_local_staff_directory', 'Local Staff Directory')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/manager/reports')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <TrendingUp className="h-4.5 w-4.5" />
-                  <span>{t('nav_branch_reports', 'Branch Reports')}</span>
-                </button>
-              </>
-            )}
-
-            {currentUser.roleCode === 'ROLE_RECEPTIONIST' && (
-              <>
-                <button
-                  onClick={() => navigateTo('/reception/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <ClipboardList className="h-4.5 w-4.5" />
-                  <span>{t('nav_triage_workbench', 'Triage Workbench')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/reception/patients')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/patients' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Users className="h-4.5 w-4.5" />
-                  <span>{t('nav_patient_registry', 'Patient Registry')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/reception/appointments')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Calendar className="h-4.5 w-4.5" />
-                  <span>{t('nav_schedules_calendar', 'Schedules Calendar')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/reception/walkin')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/walkin' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Clock className="h-4.5 w-4.5" />
-                  <span>{t('nav_walkin_intake', 'Walk-in Intake')}</span>
-                </button>
-              </>
-            )}
-
-            {currentUser.roleCode === 'ROLE_DOCTOR' && (
-              <>
-                <button
-                  onClick={() => navigateTo('/doctor/workbench')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/doctor/workbench' || currentPath.startsWith('/doctor/consultation') ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Activity className="h-4.5 w-4.5" />
-                  <span>{t('nav_consult_workbench', 'Consult Workbench')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/doctor/appointments')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/doctor/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Calendar className="h-4.5 w-4.5" />
-                  <span>{t('nav_upcoming_bookings', 'Upcoming Bookings')}</span>
-                </button>
-              </>
-            )}
-
-            {currentUser.roleCode === 'ROLE_BILLING_STAFF' && (
-              <>
-                <button
-                  onClick={() => navigateTo('/billing/dashboard')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <DollarSign className="h-4.5 w-4.5" />
-                  <span>{t('nav_billing_desk', 'Billing Desk')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/billing/invoices')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/invoices' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <FileText className="h-4.5 w-4.5" />
-                  <span>{t('nav_invoice_ledger', 'Invoice Ledger')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/billing/claims')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/claims' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <ShieldCheck className="h-4.5 w-4.5" />
-                  <span>{t('nav_insurance_claims', 'Insurance Claims')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/billing/reports')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <TrendingUp className="h-4.5 w-4.5" />
-                  <span>{t('nav_finance_reports', 'Finance Reports')}</span>
-                </button>
-              </>
-            )}
-
-            {currentUser.roleCode === 'ROLE_PATIENT' && (
-              <>
-                <button
-                  onClick={() => navigateTo('/portal/home')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/home' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Building className="h-4.5 w-4.5" />
-                  <span>{t('nav_home_dashboard', 'Home Dashboard')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/portal/book')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/book' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <Calendar className="h-4.5 w-4.5" />
-                  <span>{t('nav_self_booking_wizard', 'Self Booking Wizard')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/portal/medical-history')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/medical-history' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <FileText className="h-4.5 w-4.5" />
-                  <span>{t('nav_my_consultations', 'My Consultations')}</span>
-                </button>
-                <button
-                  onClick={() => navigateTo('/portal/billing')}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/billing' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-                    }`}
-                >
-                  <DollarSign className="h-4.5 w-4.5" />
-                  <span>{t('nav_my_receipts', 'My Receipts')}</span>
-                </button>
-              </>
-            )}
+          <nav className="mt-6 px-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-140px)]">
+            {renderNavLinks()}
           </nav>
         </div>
 
@@ -820,24 +974,37 @@ export default function App() {
       </aside>
 
       {/* Main Workspace Frame */}
-      <div className="pl-64 flex-1 flex flex-col min-w-0">
+      <div className="pl-0 lg:pl-64 flex-1 flex flex-col min-w-0">
 
         {/* Global Top Header Bar */}
-        <header className="bg-white border-b border-slate-200 h-16 px-8 flex justify-between items-center shrink-0 z-20 shadow-xs">
-          <div className="flex items-center space-x-4">
+        <header className="bg-white border-b border-slate-200 h-16 px-2.5 sm:px-6 lg:px-8 flex justify-between items-center shrink-0 z-20 shadow-xs gap-1.5 sm:gap-2">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 min-w-0">
+            {/* Mobile Hamburger button (< lg) */}
+            <button
+              ref={hamburgerButtonRef}
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg shrink-0 cursor-pointer"
+              aria-label="Open navigation sidebar"
+              aria-expanded={mobileNavOpen}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
             {/* Brand Logo Identity */}
-            <span className="text-sm font-bold text-slate-800 tracking-tight">CareFlow CATMS</span>
+            <span className="text-sm font-bold text-slate-800 tracking-tight shrink-0 hidden md:inline">CareFlow CATMS</span>
 
             {/* Active Branch Switcher */}
-            <div className="h-5 w-px bg-slate-200" />
-            <div className="flex items-center space-x-1.5">
+            <div className="hidden md:block h-5 w-px bg-slate-200" />
+            <div className="flex items-center space-x-1 min-w-0">
               {currentUser.roleCode === 'ROLE_ADMIN' ? (
-                <div className="flex items-center space-x-1 border border-slate-200 rounded-lg p-1 bg-slate-50/50">
-                  <Building className="h-4 w-4 text-slate-400" />
+                <div className="flex items-center space-x-1 border border-slate-200 rounded-lg p-1 bg-slate-50/50 min-w-0 max-w-[100px] xs:max-w-[130px] sm:max-w-none">
+                  <Building className="h-4 w-4 text-slate-400 shrink-0" />
                   <select
-                    className="border-none bg-transparent rounded-lg text-xs font-bold focus:outline-none cursor-pointer"
+                    className="border-none bg-transparent rounded-lg text-xs font-bold focus:outline-none cursor-pointer w-full truncate"
                     value={selectedBranch}
                     onChange={e => setSelectedBranch(e.target.value)}
+                    aria-label="Select active branch"
                   >
                     <option value="All Branches">{t('all_branches', 'All Branches')}</option>
                     <option value="Colombo Main">{t('colombo_main', 'Colombo Main')}</option>
@@ -846,17 +1013,30 @@ export default function App() {
                   </select>
                 </div>
               ) : (
-                <span className="text-xs font-semibold text-slate-500 flex items-center space-x-1">
-                  <Building className="h-4 w-4 text-slate-400" />
-                  <span>{t('branch', 'Branch')}: <strong>{currentUser.branch || 'None'}</strong> [Locked]</span>
+                <span className="text-xs font-semibold text-slate-500 flex items-center space-x-1 min-w-0 truncate">
+                  <Building className="h-4 w-4 text-slate-400 shrink-0" />
+                  <span className="truncate max-w-[85px] xs:max-w-[120px] sm:max-w-none">{t('branch', 'Branch')}: <strong>{currentUser.branch || 'None'}</strong></span>
                 </span>
               )}
             </div>
           </div>
 
           {/* Center search & actions cluster */}
-          <div className="flex items-center space-x-3.5">
+          <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
+            {/* Mobile search button */}
             <button
+              type="button"
+              onClick={() => setGlobalSearchOpen(true)}
+              className="flex md:hidden min-h-[44px] min-w-[44px] items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              title={t('search_placeholder', 'Search Patient Code / Name...')}
+              aria-label="Search patients"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+
+            {/* Desktop search bar */}
+            <button
+              type="button"
               onClick={() => setGlobalSearchOpen(true)}
               className="hidden md:flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-1.5 text-xs text-slate-450 hover:bg-slate-100 hover:border-slate-300 transition-all font-medium cursor-pointer"
             >
@@ -869,35 +1049,39 @@ export default function App() {
             <LanguageSelector />
 
             {/* User Profile & Badge */}
-            <div className="h-5 w-px bg-slate-200" />
-            <div className="flex items-center space-x-3">
-              <div className="h-8 w-8 bg-blue-100 text-blue-800 rounded-xl flex items-center justify-center font-bold text-sm">
+            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="h-8 w-8 bg-blue-100 text-blue-800 rounded-xl hidden sm:flex items-center justify-center font-bold text-sm shrink-0">
                 {currentUser.name.charAt(0)}
               </div>
-              <div className="text-left">
+              <div className="text-left hidden md:block">
                 <div className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
-                  <span>{currentUser.name.split(' [')[0]}</span>
+                  <span className="truncate max-w-[120px] lg:max-w-none">{currentUser.name.split(' [')[0]}</span>
                   <span className="bg-slate-100 text-slate-700 text-[9px] px-1.5 py-0.5 rounded font-mono font-bold uppercase tracking-wider">
                     {currentUser.roleCode.replace('ROLE_', '')}
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-400 block font-mono mt-0.5">{currentUser.email}</span>
+                <span className="text-[10px] text-slate-400 block font-mono mt-0.5 truncate max-w-[140px] lg:max-w-none">{currentUser.email}</span>
               </div>
 
               {/* Change Password button */}
               <button
+                type="button"
                 onClick={() => setShowChangePasswordModal(true)}
-                className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-xl transition-all cursor-pointer"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-transparent hover:border-slate-200 rounded-xl transition-all cursor-pointer"
                 title={t('change_password', 'Change Password')}
+                aria-label="Change password"
               >
                 <KeyRound className="h-4.5 w-4.5" />
               </button>
 
               {/* Logout button */}
               <button
+                type="button"
                 onClick={handleLogout}
-                className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition-all cursor-pointer"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center bg-red-50/70 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/60 rounded-xl transition-all cursor-pointer shadow-2xs"
                 title={t('instant_logout', 'Instant Logout')}
+                aria-label="Logout"
               >
                 <LogOut className="h-4.5 w-4.5" />
               </button>
@@ -906,7 +1090,7 @@ export default function App() {
         </header>
 
         {/* Main Work Area Container */}
-        <main className="max-w-7xl mx-auto w-full px-8 py-8 flex-1">
+        <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 flex-1 min-w-0">
           {(() => {
             // Simple path routing mapping
             const path = currentPath;
@@ -979,31 +1163,40 @@ export default function App() {
 
       {/* GLOBAL PATIENT SEARCH MODAL (Ctrl+K) */}
       {globalSearchOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setGlobalSearchOpen(false)} />
-          <div className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setGlobalSearchOpen(false)} aria-hidden="true" />
+          <div
+            className="relative bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[85vh]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Search patients"
+          >
 
             {/* Search Input bar */}
-            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 relative flex items-center">
-              <Search className="h-5 w-5 text-slate-400 mr-3" />
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 bg-slate-50/50 relative flex items-center shrink-0">
+              <Search className="h-5 w-5 text-slate-400 mr-3 shrink-0" />
               <input
+                ref={searchInputRef}
                 type="text"
                 autoFocus
                 placeholder="Type Patient ID, NIC, or Name to lookup..."
-                className="w-full bg-transparent border-none text-sm font-semibold focus:outline-none"
+                className="w-full bg-transparent border-none text-sm font-semibold focus:outline-none min-w-0"
                 value={globalSearchQuery}
                 onChange={e => setGlobalSearchQuery(e.target.value)}
+                aria-label="Search patients by ID, NIC, or name"
               />
               <button
+                type="button"
                 onClick={() => setGlobalSearchOpen(false)}
-                className="text-xs bg-slate-200 hover:bg-slate-300 text-slate-650 px-2 py-1 rounded font-bold font-mono transition-all cursor-pointer"
+                className="min-h-[36px] min-w-[36px] flex items-center justify-center text-xs bg-slate-200 hover:bg-slate-300 text-slate-650 px-2 py-1 rounded-lg font-bold font-mono transition-all cursor-pointer shrink-0 ml-2"
+                aria-label="Close search modal"
               >
                 ESC
               </button>
             </div>
 
             {/* Results */}
-            <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 p-4 space-y-2">
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-3 sm:p-4 space-y-2 min-h-0">
               {searchResults.map(p => (
                 <div
                   key={p.patient_id}
@@ -1020,10 +1213,10 @@ export default function App() {
                   className="p-3 border border-slate-200 hover:border-blue-500 rounded-xl bg-slate-50/50 hover:bg-white transition-all cursor-pointer text-left"
                 >
                   <div className="flex justify-between items-center font-sans text-xs">
-                    <span className="font-bold text-slate-900 text-sm">{formatPatientName(p.first_name, p.last_name)}</span>
-                    <span className="font-mono text-slate-450">{formatPatientId(p.patient_id)}</span>
+                    <span className="font-bold text-slate-900 text-sm truncate mr-2">{formatPatientName(p.first_name, p.last_name)}</span>
+                    <span className="font-mono text-slate-450 shrink-0">{formatPatientId(p.patient_id)}</span>
                   </div>
-                  <div className="flex justify-between items-center text-[10px] text-slate-450 mt-2 font-mono">
+                  <div className="flex flex-wrap justify-between items-center text-[10px] text-slate-450 mt-2 font-mono gap-1">
                     <span>NIC: {p.nic}</span>
                     <span>Contact: {p.contact_number}</span>
                     <span>Registered: {p.registration_date}</span>

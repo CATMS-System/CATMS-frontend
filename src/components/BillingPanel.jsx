@@ -677,7 +677,7 @@ export default function BillingPanel({ subView, db, handlers }) {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
 
             <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
               <div>

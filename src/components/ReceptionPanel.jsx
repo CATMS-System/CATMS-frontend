@@ -334,7 +334,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
               <h1 className="text-2xl font-bold text-slate-900">Receptionist Desk Workbench</h1>
               <p className="text-sm text-slate-500 mt-1">Review active branch queue triage entries, dispatch walk-ins, and fast-book schedules</p>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               <button
                 onClick={() => navigateTo('/reception/patients')}
                 className="px-3.5 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-all flex items-center space-x-1 cursor-pointer"
@@ -446,7 +446,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs p-6 space-y-6">
             <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3">Daily Consultation Slot Allocations</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {calendarHours.map(hour => {
                 const info = getSlotStatus(hour);
                 return (
