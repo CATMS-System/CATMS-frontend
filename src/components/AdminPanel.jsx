@@ -211,22 +211,62 @@ export default function AdminPanel({ subView, db, handlers }) {
     setTempPassInput('');
   };
 
-  const handleAssignBranchManager = (branchName, managerId) => {
-    const mgr = staffList.find(s => s.id === managerId);
+  const handleAssignBranchManager = async (branchId, managerId) => {
+    // Find the branch by its unique Branch_ID or fallback to name
+    const branch = branches.find(br =>
+      (br.Branch_ID != null && branchId != null && String(br.Branch_ID) === String(branchId)) ||
+      (Boolean(br.name) && Boolean(branchId) && br.name === branchId) ||
+      (Boolean(br.Branch_Name) && Boolean(branchId) && br.Branch_Name === branchId)
+    );
+    if (!branch) return;
+
+    // Find the staff member — match by Staff_ID (numeric) or the frontend id string
+    const mgr = staffList.find(s =>
+      s.id === managerId ||
+      String(s.Staff_ID) === String(managerId) ||
+      (managerId && s.id && String(s.id).replace(/\D+/g, '') === String(managerId).replace(/\D+/g, ''))
+    );
+
+    // Optimistic UI update for ONLY the target branch
     const updatedBranches = branches.map(br => {
-      if (br.name === branchName) {
-        return { ...br, managerId, managerName: mgr ? mgr.name : 'Unassigned' };
+      const isTarget = (branch.Branch_ID != null && br.Branch_ID != null && String(br.Branch_ID) === String(branch.Branch_ID))
+        || (Boolean(branch.name) && Boolean(br.name) && br.name === branch.name)
+        || (Boolean(branch.Branch_Name) && Boolean(br.Branch_Name) && br.Branch_Name === branch.Branch_Name);
+
+      if (isTarget) {
+        return {
+          ...br,
+          managerId: mgr ? mgr.id : (managerId || null),
+          Manager_Staff_ID: mgr ? (mgr.Staff_ID || parseInt(String(mgr.id).replace(/\D+/g, ''), 10)) : null,
+          managerName: mgr ? mgr.name : 'Unassigned'
+        };
       }
       return br;
     });
     setBranches(updatedBranches);
-    addAuditLog(
-      'CONFIG_BRANCH',
-      `Assigned ${mgr ? mgr.name : 'Unassigned'} as Branch Manager for ${branchName}`,
-      'null',
-      JSON.stringify({ branch: branchName, manager: managerId })
-    );
-    triggerToast(`Assigned manager for ${branchName}`);
+
+    // Persist to backend
+    const displayName = branch.Branch_Name || branch.name || `Branch #${branch.Branch_ID}`;
+    try {
+      const staffIdInt = mgr
+        ? (mgr.Staff_ID || parseInt(String(mgr.id || '').replace(/\D+/g, ''), 10) || null)
+        : null;
+      if (branch.Branch_ID) {
+        await api.put(`/branches/${branch.Branch_ID}`, {
+          Manager_Staff_ID: staffIdInt || null
+        });
+      }
+      addAuditLog(
+        'CONFIG_BRANCH',
+        `Assigned ${mgr ? mgr.name : 'Unassigned'} as Branch Manager for ${displayName}`,
+        'null',
+        JSON.stringify({ branch: branch.Branch_ID || branch.name, manager: managerId })
+      );
+      triggerToast(`Assigned ${mgr ? mgr.name : 'manager'} to ${displayName}`);
+    } catch (err) {
+      console.error('Failed to persist branch manager assignment:', err);
+      triggerToast('Saved locally — backend sync failed. Check connection.');
+    }
   };
 
   const handleAddBranch = async (e) => {
@@ -1170,11 +1210,18 @@ export default function AdminPanel({ subView, db, handlers }) {
                     <div className="mt-1.5">
                       <select
                         className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-slate-50/70 focus:bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
-                        value={br.managerId || ''}
-                        onChange={e => handleAssignBranchManager(br.name, e.target.value)}
+                        value={
+                          staffList.find(s =>
+                            s.id === br.managerId ||
+                            String(s.Staff_ID) === String(br.managerId) ||
+                            String(s.Staff_ID) === String(br.Manager_Staff_ID) ||
+                            (br.managerId && s.id && String(s.id).replace(/\D+/g, '') === String(br.managerId).replace(/\D+/g, ''))
+                          )?.id || ''
+                        }
+                        onChange={e => handleAssignBranchManager(br.Branch_ID || br.name || br.Branch_Name, e.target.value)}
                       >
                         <option value="">-- Unassigned --</option>
-                        {staffList.filter(s => s.role.toUpperCase().includes('MANAGER')).map(mgr => (
+                        {staffList.filter(s => (s.role || s.Job_Title || s.systemRole || '').toUpperCase().includes('MANAGER')).map(mgr => (
                           <option key={mgr.id} value={mgr.id}>
                             {mgr.name}
                           </option>

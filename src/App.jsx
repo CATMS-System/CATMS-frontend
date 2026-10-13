@@ -159,7 +159,17 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       api.get('/branches').then(res => {
-        if (res.data && res.data.length > 0) setBranches(res.data);
+        if (res.data && res.data.length > 0) {
+          const mapped = res.data.map(b => ({
+            ...b,
+            name:        b.Branch_Name,
+            address:     b.Street_Address,
+            phone:       b.Contact_Number,
+            managerId:   b.Manager_Staff_ID ? `STF-${b.Manager_Staff_ID}` : null,
+            managerName: b.managerName || 'Unassigned',
+          }));
+          setBranches(mapped);
+        }
       }).catch(err => console.error("API Error (Branches):", err));
 
       api.get('/staff').then(res => {
