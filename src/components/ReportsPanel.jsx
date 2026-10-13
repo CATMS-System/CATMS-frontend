@@ -34,7 +34,7 @@ const reports = [
       ['Appointment_Date', 'Appointment Date'], ['Total_Appointments', 'Total Appointments'],
       ['Scheduled_Appointments', 'Scheduled Appointments'], ['Completed_Appointments', 'Completed Appointments'],
       ['Cancelled_Appointments', 'Cancelled Appointments'], ['No_Show_Appointments', 'No-Shows'],
-      ['Walk_In_Appointments', 'Walk-Ins']
+      ['Walk_In_Appointments', 'Of which: Walk-Ins']
     ]
   },
   {
@@ -220,6 +220,7 @@ export default function ReportsPanel({ db }) {
           Scheduled: Number(row.Scheduled_Appointments || 0),
           Completed: Number(row.Completed_Appointments || 0),
           Cancelled: Number(row.Cancelled_Appointments || 0),
+          NoShow: Number(row.No_Show_Appointments || 0),
           WalkIns: Number(row.Walk_In_Appointments || 0),
         };
       }
@@ -449,7 +450,7 @@ export default function ReportsPanel({ db }) {
                         <Bar dataKey="Scheduled" name="Scheduled" fill="#2563eb" radius={[5, 5, 0, 0]} maxBarSize={28} />
                         <Bar dataKey="Completed" name="Completed" fill="#10b981" radius={[5, 5, 0, 0]} maxBarSize={28} />
                         <Bar dataKey="Cancelled" name="Cancelled" fill="#ef4444" radius={[5, 5, 0, 0]} maxBarSize={28} />
-                        <Bar dataKey="WalkIns" name="Walk-Ins" fill="#f59e0b" radius={[5, 5, 0, 0]} maxBarSize={28} />
+                        <Bar dataKey="NoShow" name="No-Shows" fill="#64748b" radius={[5, 5, 0, 0]} maxBarSize={28} />
                       </BarChart>
                     ) : reportId === 'rep-02' ? (
                       <BarChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
