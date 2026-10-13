@@ -117,17 +117,69 @@ export default function ReceptionPanel({ subView, db, handlers }) {
   const [walkinReason, setWalkinReason] = useState('');
 
   // Triage list filtered to local branch
+  // Triage list filtered to local branch
   const localQueue = useMemo(() => {
     return liveQueue.filter(q => {
       const doc = staffList.find(s => s.id === q.doctorId);
-      return doc?.branch === currentBranch;
+      if (!doc) return true;
+      return (doc.Branch_ID != null && doc.Branch_ID === currentBranchId) ||
+        (doc.branch && currentBranch && (
+          doc.branch.toLowerCase().includes(currentBranch.toLowerCase()) ||
+          currentBranch.toLowerCase().includes(doc.branch.toLowerCase())
+        ));
     });
-  }, [liveQueue, staffList, currentBranch]);
+  }, [liveQueue, staffList, currentBranch, currentBranchId]);
 
-  // Doctors list for calendar
+  // Doctors list for calendar — resilient branch and doctor role matching
   const branchDoctors = useMemo(() => {
-    return staffList.filter(s => s.branch === currentBranch && (s.role.includes('Doc') || s.role === 'Cardiologist' || s.role === 'Dermatologist' || s.role === 'General Practitioner') && s.status === 'Active');
-  }, [staffList, currentBranch]);
+    // 1. If backend /api/v1/doctors loaded, filter by branch
+    if (apiDoctors && apiDoctors.length > 0) {
+      const filtered = apiDoctors.filter(d =>
+        d.Branch_ID === currentBranchId ||
+        (d.Branch_Name && currentBranch && (
+          d.Branch_Name.toLowerCase().includes(currentBranch.toLowerCase()) ||
+          currentBranch.toLowerCase().includes(d.Branch_Name.toLowerCase())
+        ))
+      );
+      if (filtered.length > 0) {
+        return filtered.map(d => ({
+          id: `STF-${d.Staff_ID || d.Doctor_ID}`,
+          Doctor_ID: d.Doctor_ID,
+          Staff_ID: d.Staff_ID || d.Doctor_ID,
+          name: d.Full_Name?.startsWith('Dr.') ? d.Full_Name : `Dr. ${d.Full_Name}`,
+          role: typeof d.Specialties === 'string' ? d.Specialties : (Array.isArray(d.Specialties) ? d.Specialties.join(', ') : 'Specialist'),
+          branch: d.Branch_Name,
+          Branch_ID: d.Branch_ID
+        }));
+      }
+    }
+
+    // 2. Filter from staffList
+    return staffList.filter(s => {
+      const isDoc = s.isDoctor ||
+        s.systemRole === 'Doctor' ||
+        Boolean(s.Doctor_ID) ||
+        (s.role && /doc|cardio|derm|practitioner|physician|surgeon|consultant/i.test(s.role)) ||
+        (s.name && s.name.toLowerCase().includes('dr.'));
+
+      if (!isDoc) return false;
+
+      const matchesBranch = (s.Branch_ID != null && s.Branch_ID === currentBranchId) ||
+        (s.branch && currentBranch && (
+          s.branch.toLowerCase().includes(currentBranch.toLowerCase()) ||
+          currentBranch.toLowerCase().includes(s.branch.toLowerCase())
+        ));
+
+      return matchesBranch;
+    });
+  }, [apiDoctors, staffList, currentBranch, currentBranchId]);
+
+  // Auto-select first branch doctor when available if none selected
+  useEffect(() => {
+    if ((!selectedDocId || !branchDoctors.some(d => d.id === selectedDocId)) && branchDoctors.length > 0) {
+      setSelectedDocId(branchDoctors[0].id);
+    }
+  }, [branchDoctors, selectedDocId]);
 
   // Appointment calendar config
   const calendarHours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'];
@@ -193,11 +245,28 @@ export default function ReceptionPanel({ subView, db, handlers }) {
 
   // Appointment scheduling grid slot actions
   const getSlotStatus = (hour) => {
-    const appt = appointmentList.find(a => a.doctorId === selectedDocId && a.time === hour && a.date === selectedDate && a.branch === currentBranch);
+    const appt = appointmentList.find(a => {
+      const matchDoc = a.doctorId === selectedDocId ||
+        String(a.Doctor_ID) === String(selectedDocId).replace('STF-', '');
+      const apptTime = a.time || (a.Start_Time && a.Start_Time.slice(0, 5));
+      const matchTime = apptTime === hour;
+      const apptDate = a.date || a.Appointment_Date;
+      const matchDate = apptDate === selectedDate;
+      const matchBranch = !a.branch ||
+        (currentBranch && (
+          a.branch.toLowerCase().includes(currentBranch.toLowerCase()) ||
+          currentBranch.toLowerCase().includes(a.branch.toLowerCase())
+        ));
+      return matchDoc && matchTime && matchDate && matchBranch;
+    });
+
     if (!appt) return { status: 'Available', label: 'Available (Green)', style: 'bg-emerald-50 text-emerald-800 border-emerald-100 hover:bg-emerald-100' };
-    if (appt.status === 'Cancelled') return { status: 'Available', label: 'Available (Green)', style: 'bg-emerald-50 text-emerald-800 border-emerald-100 hover:bg-emerald-100' };
-    if (appt.isWalkIn || appt.status === 'Walk-In') return { status: 'Walk-In', appt, label: 'Walk-In (Orange)', style: 'bg-amber-100 text-amber-800 border-amber-200' };
-    if (appt.status === 'Booked') return { status: 'Booked', appt, label: 'Booked (Blue)', style: 'bg-blue-55 text-blue-800 border-blue-200' };
+    const rawStatus = appt.status || appt.Status;
+    if (rawStatus === 'Cancelled') return { status: 'Available', label: 'Available (Green)', style: 'bg-emerald-50 text-emerald-800 border-emerald-100 hover:bg-emerald-100' };
+    if (appt.isWalkIn || rawStatus === 'Walk-In' || appt.Appointment_Type === 'Walk_In') return { status: 'Walk-In', appt, label: 'Walk-In (Orange)', style: 'bg-amber-100 text-amber-800 border-amber-200' };
+    if (rawStatus === 'Booked' || rawStatus === 'Scheduled' || rawStatus === 'Confirmed' || rawStatus === 'In_Progress' || rawStatus === 'Completed') {
+      return { status: 'Booked', appt, label: 'Booked (Blue)', style: 'bg-blue-55 text-blue-800 border-blue-200' };
+    }
     return { status: 'Blocked', appt, label: 'Blocked (Gray)', style: 'bg-slate-100 text-slate-500 border-slate-200' };
   };
 
