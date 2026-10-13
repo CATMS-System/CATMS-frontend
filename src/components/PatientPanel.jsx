@@ -1289,8 +1289,8 @@ export default function PatientPanel({ subView, db, handlers }) {
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wide">
                   <th className="px-6 py-3">Invoice Code</th>
                   <th className="px-6 py-3">Issue Date</th>
-                  <th className="px-6 py-3 text-right">Insurance Paid ($)</th>
-                  <th className="px-6 py-3 text-right">My Balance ($)</th>
+                  <th className="px-6 py-3 text-right">Insurance Paid (Rs.)</th>
+                  <th className="px-6 py-3 text-right">My Balance (Rs.)</th>
                   <th className="px-6 py-3 text-center">Settlement Status</th>
                   <th className="px-6 py-3 text-right">Statements</th>
                 </tr>
