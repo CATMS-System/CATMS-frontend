@@ -1,12 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar, DollarSign, Clock, Check, Plus, AlertCircle, FileText, Download, ShieldAlert, ArrowRight, CornerRightDown, KeyRound } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Calendar, DollarSign, Clock, Check, Plus, AlertCircle, FileText, Download, ShieldAlert, ArrowRight, CornerRightDown, KeyRound, Sparkles } from 'lucide-react';
 import { getSpecialties, getDoctors, getDoctorAvailableSlots, bookAppointment, getAppointments } from '../services/appointmentService';
 import { getPatientHistory } from '../api/consultationApi';
 import { getInvoices } from '../api/billingApi';
 import ChangePasswordModal from './ChangePasswordModal';
 import { useLanguage } from '../contexts/LanguageContext';
+import { PageTransition } from './ui';
+import { MOTION_VARIANTS, ensureMotionSafeEnv } from '../theme/designSystem';
 
 export default function PatientPanel({ subView, db, handlers }) {
+  ensureMotionSafeEnv();
   const { t } = useLanguage();
   const { appointmentList, invoiceList, patientList, staffList, medicalHistories, branches, liveQueue } = db;
   const { setAppointmentList, setLiveQueue, triggerToast, addAuditLog, navigateTo } = handlers;
@@ -461,16 +465,25 @@ export default function PatientPanel({ subView, db, handlers }) {
   }, [apiConsultations, medicalHistories, currentPatientId, numericPatientId]);
 
   return (
-    <div className="space-y-6">
+    <PageTransition transitionKey={subView} className="space-y-6">
       {/* 1. PATIENT HOME PORTAL */}
       {subView === 'home' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Welcome Banner */}
-          <div className="bg-slate-900 rounded-xl p-6 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
-            <div>
-              <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold font-mono">Welcome Back</span>
-              <h1 className="text-2xl font-bold mt-0.5">Welcome, {currentPatientName}!</h1>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/70 font-mono mt-1">
+        <div className="space-y-6">
+          {/* Modern SaaS Patient Welcome Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 p-6 sm:p-7 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl border border-slate-800"
+          >
+            <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs font-semibold mb-2">
+                <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Welcome Back</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">Welcome, {currentPatientName}!</h1>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300 font-mono mt-1.5">
                 <span>Member ID: {currentPatientId}</span>
                 <span>|</span>
                 <span>Primary Branch: {patientObj?.branch || 'Colombo Main'}</span>
@@ -478,10 +491,10 @@ export default function PatientPanel({ subView, db, handlers }) {
                 <span>Insurance: {patientObj?.insurance?.provider || 'Cash / Self'}</span>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="relative z-10 flex flex-wrap items-center gap-2.5">
               <button
                 onClick={() => setShowChangePassword(true)}
-                className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold hover:shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer"
+                className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer backdrop-blur-xs"
                 title="Change Password"
               >
                 <KeyRound className="h-4 w-4 text-amber-400" />
@@ -489,17 +502,17 @@ export default function PatientPanel({ subView, db, handlers }) {
               </button>
               <button
                 onClick={() => navigateTo('/portal/book')}
-                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold hover:shadow-xs transition-all flex items-center space-x-1 cursor-pointer"
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5 cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 <span>Book Appointment</span>
               </button>
             </div>
-          </div>
+          </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Upcoming Appointment Widget */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+            <motion.div custom={0} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 space-y-4">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-slate-900 text-sm">Next Scheduled Visit</h3>
                 <span className="bg-blue-50 text-blue-700 rounded-full px-2 py-0.5 text-[10px] font-bold font-mono uppercase">
@@ -525,10 +538,10 @@ export default function PatientPanel({ subView, db, handlers }) {
                   No upcoming clinic appointments scheduled.
                 </div>
               )}
-            </div>
+            </motion.div>
 
             {/* Account Balance Widget */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+            <motion.div custom={1} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 space-y-4">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-slate-900 text-sm">Outstanding Patient Balance</h3>
                 <span className="bg-emerald-50 text-emerald-700 rounded-full px-2 py-0.5 text-[10px] font-bold font-mono">
@@ -543,19 +556,19 @@ export default function PatientPanel({ subView, db, handlers }) {
 
               <button
                 onClick={() => navigateTo('/portal/billing')}
-                className="w-full py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Review Itemized Dues
               </button>
-            </div>
+            </motion.div>
 
             {/* Quick Actions Card */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+            <motion.div custom={2} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 space-y-4">
               <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3">Quick Navigation</h3>
               <div className="space-y-2">
                 <button
                   onClick={() => navigateTo('/portal/medical-history')}
-                  className="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left text-xs font-semibold text-slate-700 flex justify-between items-center cursor-pointer transition-all"
+                  className="w-full p-3 bg-slate-50 hover:bg-blue-50/50 border border-slate-200 hover:border-blue-200 rounded-xl text-left text-xs font-semibold text-slate-700 flex justify-between items-center cursor-pointer transition-all"
                 >
                   <span className="flex items-center space-x-2">
                     <FileText className="h-4 w-4 text-blue-600" />
@@ -565,7 +578,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                 </button>
                 <button
                   onClick={() => navigateTo('/portal/billing')}
-                  className="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left text-xs font-semibold text-slate-700 flex justify-between items-center cursor-pointer transition-all"
+                  className="w-full p-3 bg-slate-50 hover:bg-emerald-50/50 border border-slate-200 hover:border-emerald-200 rounded-xl text-left text-xs font-semibold text-slate-700 flex justify-between items-center cursor-pointer transition-all"
                 >
                   <span className="flex items-center space-x-2">
                     <DollarSign className="h-4 w-4 text-emerald-600" />
@@ -574,7 +587,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                   <ArrowRight className="h-4 w-4 text-slate-400" />
                 </button>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       )}
@@ -1056,6 +1069,6 @@ export default function PatientPanel({ subView, db, handlers }) {
         onClose={() => setShowChangePassword(false)}
         triggerToast={triggerToast}
       />
-    </div>
+    </PageTransition>
   );
 }

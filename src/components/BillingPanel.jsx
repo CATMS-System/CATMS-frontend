@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import {
   DollarSign,
   AlertCircle,
@@ -6,7 +7,8 @@ import {
   CheckCircle2,
   RefreshCw,
   CreditCard,
-  Eye
+  Eye,
+  Sparkles
 } from 'lucide-react';
 
 import ReportsPanel from './ReportsPanel';
@@ -21,8 +23,11 @@ import {
   updateClaimStatus
 } from '../api/billingApi';
 import { useLanguage } from '../contexts/LanguageContext';
+import { PageTransition } from './ui';
+import { MOTION_VARIANTS, ensureMotionSafeEnv } from '../theme/designSystem';
 
 export default function BillingPanel({ subView, db, handlers }) {
+  ensureMotionSafeEnv();
   const { t } = useLanguage();
   const {
     invoiceList,
@@ -645,41 +650,54 @@ export default function BillingPanel({ subView, db, handlers }) {
 
 
   return (
-    <div className="space-y-6">
+    <PageTransition transitionKey={subView} className="space-y-6">
 
       {/* =====================================================
           1. BILLING DASHBOARD
           ===================================================== */}
 
       {subView === 'dashboard' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6">
 
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">
-                {t('billing_desk_title', 'Billing Desk Dashboard')}
-              </h1>
+          {/* Modern SaaS Billing Hero Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white p-6 sm:p-7 shadow-xl border border-slate-800"
+          >
+            <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs font-semibold mb-2">
+                  <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Revenue &amp; Claims Operations</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                  {t('billing_desk_title', 'Billing Desk Dashboard')}
+                </h1>
 
-              <p className="text-sm text-slate-500 mt-1">
-                Settle itemized invoices, review co-pay ratios, and submit insurance claims for{' '}
-                <span className="font-semibold text-slate-700">{currentBranch}</span>
-              </p>
+                <p className="text-sm text-slate-300 mt-1">
+                  Settle itemized invoices, review co-pay ratios, and submit insurance claims for{' '}
+                  <span className="font-semibold text-white">{currentBranch}</span>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={loadInvoices}
+                disabled={invoicesLoading}
+                className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-500 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
+              >
+                <RefreshCw className={`h-4 w-4 ${invoicesLoading ? 'animate-spin' : ''}`} />
+                {invoicesLoading ? t('loading', 'Refreshing Data...') : t('refresh', 'Refresh Invoices')}
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={loadInvoices}
-              disabled={invoicesLoading}
-              className="px-3.5 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
-            >
-              <RefreshCw className={`h-4 w-4 ${invoicesLoading ? 'animate-spin' : ''}`} />
-              {invoicesLoading ? t('loading', 'Refreshing Data...') : t('refresh', 'Refresh Invoices')}
-            </button>
-          </div>
+          </motion.div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
 
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={0} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
                   {t('total', 'Total Billed')}
@@ -690,12 +708,12 @@ export default function BillingPanel({ subView, db, handlers }) {
                 </span>
               </div>
 
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
                 <DollarSign className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={1} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
                   {t('stat_revenue_collected', 'Payments Collected')}
@@ -706,12 +724,12 @@ export default function BillingPanel({ subView, db, handlers }) {
                 </span>
               </div>
 
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
                 <CheckCircle2 className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={2} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
                   {t('stat_outstanding_balance', 'Outstanding Balance')}
@@ -722,12 +740,12 @@ export default function BillingPanel({ subView, db, handlers }) {
                 </span>
               </div>
 
-              <div className="p-3 bg-red-50 text-red-600 rounded-xl">
+              <div className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-100">
                 <AlertCircle className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={3} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">
                   Pending Settlements
@@ -739,10 +757,10 @@ export default function BillingPanel({ subView, db, handlers }) {
                 </span>
               </div>
 
-              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
                 <Clock className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
 
           </div>
 
@@ -750,7 +768,7 @@ export default function BillingPanel({ subView, db, handlers }) {
               LIVE INVOICE QUEUE & ACTIONS TABLE
               ===================================================== */}
 
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+          <div className="ds-card overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex flex-wrap justify-between items-center gap-2 bg-slate-50/50">
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
@@ -1856,6 +1874,6 @@ export default function BillingPanel({ subView, db, handlers }) {
 
       )}
 
-    </div>
+    </PageTransition>
   );
 }

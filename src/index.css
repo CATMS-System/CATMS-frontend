@@ -28,6 +28,8 @@
   --color-surface-muted: #f1f5f9;
   --color-border: #e2e8f0;
   --color-border-subtle: #f1f5f9;
+  --color-canvas: #f4f7fb;
+  --color-focus: #2563eb;
 
   /* Text Hierarchy */
   --color-text-primary: #0f172a;
@@ -60,6 +62,7 @@
   --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.10), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
   --shadow-glow-primary: 0 8px 20px -4px rgba(37, 99, 235, 0.35);
   --shadow-glow-accent: 0 8px 20px -4px rgba(13, 148, 136, 0.30);
+  --shadow-card: 0 2px 8px rgba(15, 23, 42, 0.035), 0 1px 2px rgba(15, 23, 42, 0.025);
 
   /* Type Scale */
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -75,10 +78,24 @@
 @layer base {
   body {
     font-family: var(--font-sans);
-    background-color: var(--color-surface-subtle);
+    background-color: var(--color-canvas);
     color: var(--color-text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer base {
+  :focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--color-focus) 72%, transparent);
+    outline-offset: 2px;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
   }
 }
 
@@ -131,13 +148,26 @@
   background-color: var(--color-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
   transition: box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ds-card-hover:hover {
   box-shadow: var(--shadow-lg);
   border-color: #cbd5e1;
+}
+
+.dashboard-view > :first-child {
+  animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.dashboard-view h1 {
+  letter-spacing: -0.035em;
+}
+
+.dashboard-view [data-testid^="stat-"] {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
 }
 
 /* Custom scrollbars */
@@ -173,4 +203,15 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

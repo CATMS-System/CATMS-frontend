@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Plus, Calendar, Clock, Check, X, ShieldAlert, Phone, Shield, ArrowRight, UserCheck, AlertTriangle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Search, Plus, Calendar, Clock, Check, X, ShieldAlert, Phone, Shield, ArrowRight, UserCheck, AlertTriangle, Sparkles } from 'lucide-react';
 import PatientsSection from './patients/PatientsSection';
 import {
   AppointmentBookingModal,
@@ -10,8 +11,11 @@ import {
 } from './appointments';
 import { getDoctors, getSpecialties } from '../services/appointmentService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { PageTransition } from './ui';
+import { MOTION_VARIANTS, ensureMotionSafeEnv } from '../theme/designSystem';
 
 export default function ReceptionPanel({ subView, db, handlers }) {
+  ensureMotionSafeEnv();
   const { t } = useLanguage();
   const { patientList, staffList, appointmentList, liveQueue } = db;
   const { setAppointmentList, setLiveQueue, triggerToast, addAuditLog, navigateTo, reloadPatients } = handlers;
@@ -325,39 +329,52 @@ export default function ReceptionPanel({ subView, db, handlers }) {
   };
 
   return (
-    <div className="space-y-6">
+    <PageTransition transitionKey={subView} className="space-y-6">
       {/* 1. RECEPTIONIST WORKBENCH (DASHBOARD) */}
       {subView === 'dashboard' && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Receptionist Desk Workbench</h1>
-              <p className="text-sm text-slate-500 mt-1">Review active branch queue triage entries, dispatch walk-ins, and fast-book schedules</p>
+        <div className="space-y-6">
+          {/* Modern SaaS Receptionist Hero Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white p-6 sm:p-7 shadow-xl border border-slate-800"
+          >
+            <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs font-semibold mb-2">
+                  <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Front-Desk Operations</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Receptionist Desk Workbench</h1>
+                <p className="text-sm text-slate-300 mt-1">Review active branch queue triage entries, dispatch walk-ins, and fast-book schedules</p>
+              </div>
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => navigateTo('/reception/patients')}
+                  className="px-3.5 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer backdrop-blur-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Register Patient</span>
+                </button>
+                <button
+                  onClick={() => setShowBookModal(true)}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span>Book Appointment</span>
+                </button>
+                <button
+                  onClick={() => setShowWalkInModal(true)}
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>Emergency Walk-in</span>
+                </button>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => navigateTo('/reception/patients')}
-                className="px-3.5 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-all flex items-center space-x-1 cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Register Patient</span>
-              </button>
-              <button
-                onClick={() => setShowBookModal(true)}
-                className="px-3.5 py-2 bg-white border border-slate-250 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-50 transition-all flex items-center space-x-1 cursor-pointer"
-              >
-                <Calendar className="h-3.5 w-3.5" />
-                <span>Book Appointment</span>
-              </button>
-              <button
-                onClick={() => setShowWalkInModal(true)}
-                className="px-3.5 py-2 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition-all flex items-center space-x-1 cursor-pointer"
-              >
-                <Clock className="h-3.5 w-3.5" />
-                <span>Emergency Walk-in</span>
-              </button>
-            </div>
-          </div>
+          </motion.div>
 
           {/* Active Triage Queue Table powered by Member 3 ClinicQueueTable */}
           <ClinicQueueTable
@@ -390,7 +407,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
 
       {/* 3. APPOINTMENT SCHEDULING CALENDAR */}
       {subView === 'appointments' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Appointment Scheduling Calendar</h1>
@@ -443,16 +460,20 @@ export default function ReceptionPanel({ subView, db, handlers }) {
           </div>
 
           {/* Interactive Scheduling Grid */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs p-6 space-y-6">
+          <div className="ds-card overflow-hidden p-6 space-y-6">
             <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3">Daily Consultation Slot Allocations</h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-              {calendarHours.map(hour => {
+              {calendarHours.map((hour, idx) => {
                 const info = getSlotStatus(hour);
                 return (
-                  <div
+                  <motion.div
                     key={hour}
-                    className={`border rounded-xl p-4 transition-all flex flex-col justify-between h-32 select-none ${info.style}`}
+                    custom={idx}
+                    variants={MOTION_VARIANTS.fadeUp}
+                    initial="hidden"
+                    animate="visible"
+                    className={`border rounded-xl p-4 transition-all flex flex-col justify-between h-32 select-none shadow-2xs hover:shadow-sm ${info.style}`}
                   >
                     <div className="flex justify-between items-start">
                       <span className="font-mono font-bold text-md flex items-center">
@@ -466,7 +487,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
                       {info.status === 'Available' ? (
                         <button
                           onClick={() => handleBookSlot(hour)}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded py-1 px-2.5 font-semibold cursor-pointer"
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1.5 px-2.5 font-semibold cursor-pointer transition-colors"
                         >
                           Book Slot
                         </button>
@@ -492,7 +513,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
@@ -502,7 +523,7 @@ export default function ReceptionPanel({ subView, db, handlers }) {
 
       {/* 4. EMERGENCY WALK-IN INTAKE MODAL / PANEL */}
       {subView === 'walkin' && (
-        <div className="max-w-2xl mx-auto bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6 animate-fade-in">
+        <div className="max-w-2xl mx-auto ds-card p-6 space-y-6">
           <div className="border-b border-slate-100 pb-3 flex items-center space-x-2">
             <div className="p-2 bg-amber-500 rounded-xl text-white">
               <Clock className="h-5 w-5" />
@@ -715,6 +736,6 @@ export default function ReceptionPanel({ subView, db, handlers }) {
         patients={patientOptions}
         currentBranchId={currentBranchId}
       />
-    </div>
+    </PageTransition>
   );
 }

@@ -1,13 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Clock, Calendar, Users, DollarSign, Activity, AlertCircle, Plus, Phone, Mail, HelpCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Clock, Calendar, Users, DollarSign, Activity, AlertCircle, Plus, Phone, Mail, HelpCircle, Sparkles } from 'lucide-react';
 import ReportsPanel from './ReportsPanel';
 import AddStaffDrawer from './AddStaffDrawer';
 import api from '../api/axios';
 import { getDoctors, getDoctorSchedules, getAppointmentStatusCounts } from '../services/appointmentService';
 import { getBranchDailySummary } from '../api/reportsApi';
 import { useLanguage } from '../contexts/LanguageContext';
+import { PageTransition } from './ui';
+import { MOTION_VARIANTS, ensureMotionSafeEnv } from '../theme/designSystem';
 
 export default function ManagerPanel({ subView, db, handlers }) {
+  ensureMotionSafeEnv();
   const { t } = useLanguage();
   const { staffList, patientList, appointmentList, liveQueue, invoiceList, branches } = db;
   const { setStaffList, setAppointmentList, triggerToast, addAuditLog } = handlers;
@@ -306,105 +310,125 @@ export default function ManagerPanel({ subView, db, handlers }) {
   }, [apiStatusCounts, apiDailySummary, appointmentList, invoiceList, managerBranch, doctorsInBranch, localStaff, todayStr]);
 
   return (
-    <div className="space-y-6">
+    <PageTransition transitionKey={subView} className="space-y-6">
       {/* 1. OPERATIONS DASHBOARD */}
       {subView === 'dashboard' && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Branch Operations Dashboard</h1>
-              <p className="text-sm text-slate-500 mt-1">Real-time indicators, clinician trackers, and queue statistics for {managerBranch}</p>
+        <div className="space-y-6">
+          {/* Modern SaaS Branch Operations Hero Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white p-6 sm:p-7 shadow-xl border border-slate-800"
+          >
+            <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+            <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs font-semibold mb-2">
+                  <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Branch Operations Control</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Branch Operations Dashboard</h1>
+                <p className="text-sm text-slate-300 mt-1">Real-time indicators, clinician trackers, and queue statistics for {managerBranch}</p>
+              </div>
+              <span className="bg-blue-500/20 text-blue-200 border border-blue-400/30 px-3.5 py-1.5 rounded-full text-xs font-semibold shrink-0 backdrop-blur-xs">
+                Home Branch: {managerBranch}
+              </span>
             </div>
-            <span className="bg-blue-50 text-blue-800 border border-blue-200 px-3 py-1 rounded-full text-xs font-semibold shrink-0">
-              Home Branch: {managerBranch}
-            </span>
-          </div>
+          </motion.div>
 
           {/* Metric Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={0} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Appointments Today</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">{localMetrics.appointmentsCount}</span>
               </div>
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
                 <Calendar className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={1} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Completed Consults</span>
                 <span className="text-2xl font-bold text-emerald-600 mt-1 block font-mono">{localMetrics.completedCount}</span>
               </div>
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
                 <Activity className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={2} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Emergency Walk-ins</span>
                 <span className="text-2xl font-bold text-amber-600 mt-1 block font-mono">{localMetrics.walkinsCount}</span>
               </div>
-              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
                 <AlertCircle className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={3} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Local Revenue ($)</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">Rs. {localMetrics.revenueCollected.toFixed(2)}</span>
               </div>
-              <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
+              <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
                 <DollarSign className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
           </div>
 
           {/* Branch Overview Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={4} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Total Doctors</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">{localMetrics.totalDoctors}</span>
               </div>
-              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
                 <Users className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
             
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={5} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Active Staff</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">{localMetrics.activeStaff}</span>
               </div>
-              <div className="p-3 bg-teal-50 text-teal-600 rounded-xl">
+              <div className="p-3 bg-teal-50 text-teal-600 rounded-xl border border-teal-100">
                 <Activity className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-between shadow-xs">
+            <motion.div custom={6} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block">Consultation Rooms</span>
                 <span className="text-2xl font-bold text-slate-900 mt-1 block font-mono">{localMetrics.roomCount}</span>
               </div>
-              <div className="p-3 bg-orange-50 text-orange-600 rounded-xl">
+              <div className="p-3 bg-orange-50 text-orange-600 rounded-xl border border-orange-100">
                 <HelpCircle className="h-6 w-6" />
               </div>
-            </div>
+            </motion.div>
           </div>
 
           {/* Doctor Status Trackers */}
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-slate-900">Clinician Status Monitor</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {doctorsInBranch.map(doc => {
+              {doctorsInBranch.map((doc, idx) => {
                 const currentStatus = doc.currentAvailability || 'Available';
                 const docKey = doc.Doctor_ID ? `doc-${doc.Doctor_ID}` : doc.id;
                 return (
-                  <div key={docKey} className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
+                  <motion.div
+                    key={docKey}
+                    custom={idx + 4}
+                    variants={MOTION_VARIANTS.fadeUp}
+                    initial="hidden"
+                    animate="visible"
+                    className="ds-card ds-card-hover p-5 space-y-4"
+                  >
                     <div className="flex justify-between items-center">
                       <div>
                         <h3 className="font-bold text-slate-950 text-sm">{doc.name}</h3>
@@ -447,7 +471,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
                         ))}
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
@@ -457,7 +481,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
 
       {/* 2. DOCTOR SCHEDULE & ROSTER MANAGEMENT */}
       {subView === 'roster' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Doctor Schedule & Roster Planner</h1>
@@ -474,7 +498,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Shift Planner */}
-            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+            <div className="lg:col-span-2 ds-card p-6 space-y-4">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-slate-900 text-md">Weekly Shift Allocation Grid</h3>
                 <div className="flex items-center space-x-2">
@@ -510,7 +534,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-mono text-xs">
                     {activeWeeklyShifts.map((row, idx) => (
-                      <tr key={row.day} className="hover:bg-slate-50/50">
+                      <tr key={row.day} className="hover:bg-blue-50/30 transition-colors">
                         <td className="px-4 py-3 font-semibold text-slate-900 text-sm font-sans">{row.day}</td>
                         <td className="px-4 py-3 text-center">{row.shift}</td>
                         <td className="px-4 py-3 text-center text-slate-500">{row.duration}</td>
@@ -534,7 +558,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
             </div>
 
             {/* Leave & Unavailability Marker */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 shadow-xs">
+            <div className="ds-card p-6 space-y-4">
               <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-3">Unavailability Blocker Logs</h3>
               <div className="space-y-3">
                 {leaveRecords.map((lv, idx) => (
@@ -555,7 +579,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
 
       {/* 3. LOCAL STAFF DIRECTORY */}
       {subView === 'staff' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Local Staff Directory ({managerBranch})</h1>
@@ -570,7 +594,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
             </button>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+          <div className="ds-card overflow-hidden">
             <div
               className="overflow-x-auto focus:outline-hidden focus:ring-2 focus:ring-blue-500 rounded-xl"
               tabIndex={0}
@@ -589,7 +613,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-650">
                   {localStaff.map(s => (
-                    <tr key={s.id} className="hover:bg-slate-50/50">
+                    <tr key={s.id} className="hover:bg-blue-50/30 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-bold text-slate-900">{s.name}</div>
                         <span className="text-xs text-slate-400 font-mono">{s.id}</span>
@@ -770,6 +794,6 @@ export default function ManagerPanel({ subView, db, handlers }) {
         triggerToast={triggerToast}
         addAuditLog={addAuditLog}
       />
-    </div>
+    </PageTransition>
   );
 }

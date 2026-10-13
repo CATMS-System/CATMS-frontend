@@ -1,12 +1,16 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope, AlertCircle, Search, Filter, Layers, Tag, Plus, Minus, Trash2, ClipboardList, Loader2, CheckCircle2, History, X, ChevronDown, ChevronUp, RefreshCw, CalendarDays } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Activity, Clock, ArrowRight, CornerDownRight, ArrowLeft, Heart, Thermometer, User, Calendar, FileText, Stethoscope, AlertCircle, Search, Filter, Layers, Tag, Plus, Minus, Trash2, ClipboardList, Loader2, CheckCircle2, History, X, ChevronDown, ChevronUp, RefreshCw, CalendarDays, Sparkles } from 'lucide-react';
 import { useDoctorQueue } from '../hooks/useDoctorQueue';
 import { getCatalogue, getCategories } from '../api/treatmentApi';
 import { createConsultation, getPatientHistory, getConsultation } from '../api/consultationApi';
 import { getAppointments, getAppointmentById } from '../services/appointmentService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { PageTransition } from './ui';
+import { MOTION_VARIANTS, ensureMotionSafeEnv } from '../theme/designSystem';
 
 export default function DoctorPanel({ subView = 'workbench', paramId, db, handlers }) {
+  ensureMotionSafeEnv();
   const { t } = useLanguage();
   const currentDoctorId = db?.currentUser?.doctor_id ?? db?.currentUser?.doctorId ?? db?.currentUser?.id ?? 'STF-001';
   const currentDoctorName = db?.currentUser?.name || 'Dr. Alexander Bennett';
@@ -980,23 +984,36 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
   };
 
   return (
-    <div className="space-y-6">
+    <PageTransition transitionKey={`${subView}-${activeTab}`} className="space-y-6">
       {/* 1. DOCTOR WORKBENCH & UPCOMING APPOINTMENTS */}
       {(subView === 'workbench' || subView === 'appointments') && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">{t('doctor_workbench_title', 'Clinician Triage Workbench')}</h1>
-              <p className="text-sm text-slate-500 mt-1">
-                Manage waiting room queues, recall diagnostics, review upcoming schedules, and open active clinical consoles
-              </p>
+        <div className="space-y-6">
+          {/* Modern SaaS Clinician Hero Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white p-6 sm:p-7 shadow-xl border border-slate-800"
+          >
+            <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs font-semibold mb-2">
+                  <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Clinical Consultation Hub</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">{t('doctor_workbench_title', 'Clinician Triage Workbench')}</h1>
+                <p className="text-sm text-slate-300 mt-1">
+                  Manage waiting room queues, recall diagnostics, review upcoming schedules, and open active clinical consoles
+                </p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <span className="bg-blue-500/20 text-blue-200 border border-blue-400/30 rounded-full px-3.5 py-1.5 text-xs font-semibold font-mono backdrop-blur-xs">
+                  Attending: {currentDoctorName}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <span className="bg-blue-50 text-blue-800 border border-blue-100 rounded-full px-3 py-1 text-xs font-semibold font-mono">
-                Attending: {currentDoctorName}
-              </span>
-            </div>
-          </div>
+          </motion.div>
 
           {/* Navigation Tabs */}
           <div className="flex border-b border-slate-200 space-x-2">
@@ -1039,7 +1056,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
 
           {/* TAB 1: DAILY LIVE TRIAGE QUEUE */}
           {activeTab === 'queue' && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="ds-card overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <h2 className="font-bold text-slate-900 text-md">Daily Consultation Queue</h2>
@@ -1125,7 +1142,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                             key={q.queueNo || q.appointmentId || idx}
                             onClick={() => handleSelectPatient(q)}
                             className={`transition-colors cursor-pointer ${
-                              isCompleted ? 'bg-emerald-50/20 hover:bg-emerald-50/40' : 'hover:bg-slate-50/70'
+                              isCompleted ? 'bg-emerald-50/20 hover:bg-emerald-50/40' : 'hover:bg-blue-50/30'
                             }`}
                           >
                             <td className="px-6 py-4 text-center font-mono font-bold text-slate-900">
@@ -1206,7 +1223,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
             <div className="space-y-6">
               {/* Metrics Overview Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                <motion.div custom={0} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-5 flex items-center space-x-4">
                   <div className="h-11 w-11 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
                     <Calendar className="h-5 w-5" />
                   </div>
@@ -1215,9 +1232,9 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                     <div className="text-xl font-bold text-slate-900 font-mono mt-0.5">{upcomingCount}</div>
                     <span className="text-[11px] text-slate-400">Future scheduled visits</span>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                <motion.div custom={1} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-5 flex items-center space-x-4">
                   <div className="h-11 w-11 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
                     <CheckCircle2 className="h-5 w-5" />
                   </div>
@@ -1226,9 +1243,9 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                     <div className="text-xl font-bold text-emerald-700 font-mono mt-0.5">{confirmedCount}</div>
                     <span className="text-[11px] text-slate-400">Confirmed upcoming</span>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                <motion.div custom={2} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-5 flex items-center space-x-4">
                   <div className="h-11 w-11 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
                     <CheckCircle2 className="h-5 w-5" />
                   </div>
@@ -1237,9 +1254,9 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                     <div className="text-xl font-bold text-emerald-700 font-mono mt-0.5">{completedAppointmentsCount}</div>
                     <span className="text-[11px] text-slate-400">Finished consultations</span>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-4">
+                <motion.div custom={3} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-5 flex items-center space-x-4">
                   <div className="h-11 w-11 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
                     <Activity className="h-5 w-5" />
                   </div>
@@ -1248,7 +1265,7 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                     <div className="text-xl font-bold text-indigo-700 font-mono mt-0.5">{queueWaitingCount}</div>
                     <span className="text-[11px] text-slate-400">{queueCompletedCount} completed today</span>
                   </div>
-                </div>
+                </motion.div>
               </div>
 
               {/* Filter and Control Bar */}
@@ -2239,6 +2256,6 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
           </div>
         </div>
       )}
-    </div>
+    </PageTransition>
   );
 }
