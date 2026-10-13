@@ -73,15 +73,15 @@ export default function PatientSearch({
   return (
     <div className="space-y-4">
       {/* search input box */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
+      <div className="ds-card p-4">
         <div className="relative">
-          <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
             <Search className="h-5 w-5" />
           </span>
           <input
             type="text"
             placeholder="Search by Patient Code (PAT-XXXX), Name, Contact, or NIC..."
-            className="w-full pl-10 pr-3 py-2.5 border border-slate-350 rounded-lg text-sm"
+            className="w-full pl-11 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all"
             value={searchText}
             onChange={handleSearchInput}
           />
@@ -89,7 +89,7 @@ export default function PatientSearch({
       </div>
 
       {/* patient list table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+      <div className="ds-card overflow-hidden">
         {errorMessage && (
           <div className="p-3 bg-red-50 text-red-700 text-xs border-b border-red-200">
             {errorMessage}
@@ -126,24 +126,38 @@ export default function PatientSearch({
 
             {!isLoading && patients.map(p => {
               const isSelected = selectedPatientId === p.patient_id;
+              const fullName = formatPatientName(p.first_name, p.last_name);
               return (
                 <tr
                   key={p.patient_id}
-                  className={`hover:bg-slate-50/50 ${isSelected ? 'bg-blue-50/20' : ''}`}
+                  onClick={() => onSelectPatient(p.patient_id)}
+                  className={`transition-colors cursor-pointer ${isSelected ? 'bg-blue-50/50' : 'hover:bg-blue-50/25'}`}
                 >
                   <td className="px-4 py-3">
-                    <div className="font-bold text-slate-900">
-                      {formatPatientName(p.first_name, p.last_name)}
+                    <div className="flex items-center space-x-3">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                        isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {fullName?.charAt(0) || 'P'}
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900">
+                          {fullName}
+                        </div>
+                        <span className="text-xs text-slate-400 font-mono">
+                          {formatPatientId(p.patient_id)}
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-xs text-slate-400 font-mono">
-                      {formatPatientId(p.patient_id)}
-                    </span>
                   </td>
                   <td className="px-4 py-3 font-mono">{p.nic}</td>
                   <td className="px-4 py-3 text-right space-x-2">
                     <button
                       type="button"
-                      onClick={() => onSelectPatient(p.patient_id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectPatient(p.patient_id);
+                      }}
                       className="text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
                     >
                       Inspect Profile
@@ -151,7 +165,10 @@ export default function PatientSearch({
                     <span className="text-slate-300">|</span>
                     <button
                       type="button"
-                      onClick={() => onOpenUpdate(p.patient_id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenUpdate(p.patient_id);
+                      }}
                       className="text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
                     >
                       Update
@@ -173,7 +190,7 @@ export default function PatientSearch({
               type="button"
               disabled={page <= 1 || isLoading}
               onClick={handlePrevPage}
-              className="p-1.5 border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-1.5 border border-slate-300 rounded-lg bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -184,7 +201,7 @@ export default function PatientSearch({
               type="button"
               disabled={page >= totalPages || isLoading}
               onClick={handleNextPage}
-              className="p-1.5 border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-1.5 border border-slate-300 rounded-lg bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight className="h-4 w-4" />
             </button>

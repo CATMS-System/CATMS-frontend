@@ -42,16 +42,16 @@ export default function PatientProfileCard({
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col items-center justify-center py-20 text-slate-400">
+      <div className="ds-card bg-white rounded-2xl border border-slate-200 p-6 flex flex-col items-center justify-center py-20 text-slate-400">
         <Loader2 className="h-6 w-6 animate-spin text-blue-600 mb-2" />
-        <span className="text-xs">Loading patient profile...</span>
+        <span className="text-xs font-medium">Loading patient profile...</span>
       </div>
     );
   }
 
   if (!patient) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 py-20 text-xs">
+      <div className="ds-card bg-white rounded-2xl border border-slate-200 p-6 text-center text-slate-400 py-20 text-xs">
         Select a patient record to view full medical demographics.
       </div>
     );
@@ -61,52 +61,61 @@ export default function PatientProfileCard({
     ? allPolicies
     : (patient.active_policies || []);
 
+  const initials = `${(patient.first_name || 'P')[0]}${(patient.last_name || '')[0] || ''}`.toUpperCase();
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5 shadow-xs">
+    <div className="ds-card bg-white rounded-2xl border border-slate-200 p-6 space-y-5 shadow-xs">
       {/* header */}
-      <div className="border-b border-slate-150 pb-4 flex justify-between items-start">
-        <div>
-          <span className="text-xs text-slate-400 font-mono uppercase tracking-wider">
-            Patient Card File
-          </span>
-          <h2 className="text-xl font-bold text-slate-950 mt-0.5">
-            {formatPatientName(patient.first_name, patient.last_name)}
-          </h2>
-          <span className="text-xs text-slate-500 font-mono mt-1 block">
-            Code: {formatPatientId(patient.patient_id)} | DOB: {patient.date_of_birth} | Gender: {patient.gender}
-          </span>
-          <span className="text-xs text-slate-400 font-mono block mt-0.5">
-            NIC: {patient.nic} | Registered: {patient.registration_date}
-          </span>
+      <div className="border-b border-slate-150 pb-4 flex justify-between items-start gap-3">
+        <div className="flex items-start gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold text-sm flex items-center justify-center shadow-sm shrink-0">
+            {initials}
+          </div>
+          <div>
+            <span className="text-[11px] text-blue-600 font-mono font-bold uppercase tracking-wider">
+              Patient Card File
+            </span>
+            <h2 className="text-xl font-extrabold text-slate-950 mt-0.5 tracking-tight">
+              {formatPatientName(patient.first_name, patient.last_name)}
+            </h2>
+            <span className="text-xs text-slate-500 font-mono mt-1 block">
+              Code: {formatPatientId(patient.patient_id)} | DOB: {patient.date_of_birth} | Gender: {patient.gender}
+            </span>
+            <span className="text-xs text-slate-400 font-mono block mt-0.5">
+              NIC: {patient.nic} | Registered: {patient.registration_date}
+            </span>
+          </div>
         </div>
         <button
           type="button"
           onClick={() => onOpenUpdate(patient.patient_id)}
-          className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 cursor-pointer"
+          className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100/80 px-3 py-1.5 rounded-xl border border-blue-200 cursor-pointer transition-colors shrink-0"
         >
           Edit Details
         </button>
       </div>
 
       <div className="space-y-4 text-xs">
-        {/* contact phone */}
-        <div>
-          <span className="block text-[10px] text-slate-450 font-bold uppercase tracking-wider">
-            Primary Contact Phone
-          </span>
-          <strong className="text-slate-800 text-sm font-mono block mt-0.5">
-            {patient.contact_number}
-          </strong>
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* contact phone */}
+          <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-3">
+            <span className="block text-[10px] text-slate-450 font-bold uppercase tracking-wider">
+              Primary Contact Phone
+            </span>
+            <strong className="text-slate-800 text-sm font-mono block mt-0.5">
+              {patient.contact_number}
+            </strong>
+          </div>
 
-        {/* email */}
-        <div>
-          <span className="block text-[10px] text-slate-450 font-bold uppercase tracking-wider">
-            Email Address
-          </span>
-          <span className="text-slate-700 block mt-0.5 font-mono">
-            {patient.email || 'Not recorded'}
-          </span>
+          {/* email */}
+          <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl p-3">
+            <span className="block text-[10px] text-slate-450 font-bold uppercase tracking-wider">
+              Email Address
+            </span>
+            <span className="text-slate-700 block mt-0.5 font-mono truncate">
+              {patient.email || 'Not recorded'}
+            </span>
+          </div>
         </div>
 
         {/* patient portal login credentials */}

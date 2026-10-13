@@ -8,8 +8,23 @@ import {
   RefreshCw,
   CreditCard,
   Eye,
-  Sparkles
+  Sparkles,
+  BarChart3,
+  PieChart as PieChartIcon
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
+} from 'recharts';
 
 import ReportsPanel from './ReportsPanel';
 import InvoiceDetailsModal from './InvoiceDetailsModal';
@@ -648,6 +663,27 @@ export default function BillingPanel({ subView, db, handlers }) {
     }
   };
 
+  const billingFinancialChartData = useMemo(() => [
+    { name: 'Total Billed', amount: Math.round(metrics.billedToday || 0), fill: '#2563eb' },
+    { name: 'Collected', amount: Math.round(metrics.collectedToday || 0), fill: '#10b981' },
+    { name: 'Outstanding', amount: Math.round(metrics.outstanding || 0), fill: '#ef4444' }
+  ], [metrics]);
+
+  const billingStatusChartData = useMemo(() => {
+    const counts = { Paid: 0, Issued: 0, 'Partially Paid': 0, Draft: 0 };
+    dashboardInvoices.forEach(inv => {
+      const st = inv.Invoice_Status || 'Issued';
+      if (st === 'Paid') counts.Paid += 1;
+      else if (st === 'Partially Paid' || st === 'Partially_Paid') counts['Partially Paid'] += 1;
+      else if (st === 'Draft') counts.Draft += 1;
+      else counts.Issued += 1;
+    });
+    const colors = { Paid: '#10b981', Issued: '#f59e0b', 'Partially Paid': '#2563eb', Draft: '#64748b' };
+    const items = Object.entries(counts)
+      .filter(([, value]) => value > 0)
+      .map(([name, value]) => ({ name, value, color: colors[name] || '#64748b' }));
+    return items.length > 0 ? items : [{ name: 'Issued', value: 1, color: '#f59e0b' }];
+  }, [dashboardInvoices]);
 
   return (
     <PageTransition transitionKey={subView} className="space-y-6">
@@ -762,6 +798,102 @@ export default function BillingPanel({ subView, db, handlers }) {
               </div>
             </motion.div>
 
+          </div>
+
+          {/* =====================================================
+              REVENUE & SETTLEMENT VISUAL ANALYTICS ROW
+              ===================================================== */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <motion.div
+              custom={4}
+              variants={MOTION_VARIANTS.fadeUp}
+              initial="hidden"
+              animate="visible"
+              className="lg:col-span-2 ds-card p-6 space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-blue-600" />
+                    <h2 className="font-bold text-slate-900 text-sm">Financial Settlement Overview (Rs.)</h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">Total billed vs. collected revenue and outstanding balances</p>
+                </div>
+                <span className="text-[11px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold">
+                  {metrics.billedToday > 0 ? `${Math.round((metrics.collectedToday / metrics.billedToday) * 100)}% Settled` : 'Live Ledger'}
+                </span>
+              </div>
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={billingFinancialChartData} margin={{ top: 8, right: 16, left: 8, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(v) => `Rs.${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip
+                      formatter={(val) => [`Rs. ${Number(val).toLocaleString('en-LK')}`, 'Amount']}
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        border: '1px solid #1e293b',
+                        borderRadius: '12px',
+                        color: '#f8fafc',
+                        fontSize: '12px'
+                      }}
+                    />
+                    <Bar dataKey="amount" name="Amount (Rs.)" radius={[6, 6, 0, 0]} maxBarSize={56}>
+                      {billingFinancialChartData.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </motion.div>
+
+            <motion.div
+              custom={5}
+              variants={MOTION_VARIANTS.fadeUp}
+              initial="hidden"
+              animate="visible"
+              className="ds-card p-6 space-y-4 flex flex-col justify-between"
+            >
+              <div className="border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <PieChartIcon className="h-4 w-4 text-teal-600" />
+                  <h2 className="font-bold text-slate-900 text-sm">Invoice Status Breakdown</h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">Settlement distribution across active invoices</p>
+              </div>
+              <div className="h-48 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={billingStatusChartData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={42}
+                      outerRadius={68}
+                      paddingAngle={4}
+                    >
+                      {billingStatusChartData.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        border: '1px solid #1e293b',
+                        borderRadius: '12px',
+                        color: '#f8fafc',
+                        fontSize: '12px'
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </motion.div>
           </div>
 
           {/* =====================================================

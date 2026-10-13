@@ -1,6 +1,19 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Calendar, Users, DollarSign, Activity, AlertCircle, Plus, Phone, Mail, HelpCircle, Sparkles } from 'lucide-react';
+import { Clock, Calendar, Users, DollarSign, Activity, AlertCircle, Plus, Phone, Mail, HelpCircle, Sparkles, BarChart3, PieChart as PieChartIcon } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
+} from 'recharts';
 import ReportsPanel from './ReportsPanel';
 import AddStaffDrawer from './AddStaffDrawer';
 import api from '../api/axios';
@@ -309,6 +322,32 @@ export default function ManagerPanel({ subView, db, handlers }) {
     };
   }, [apiStatusCounts, apiDailySummary, appointmentList, invoiceList, managerBranch, doctorsInBranch, localStaff, todayStr]);
 
+  const branchActivityChartData = useMemo(() => [
+    { name: 'Appointments', count: localMetrics.appointmentsCount, fill: '#2563eb' },
+    { name: 'Completed', count: localMetrics.completedCount, fill: '#0d9488' },
+    { name: 'Walk-ins', count: localMetrics.walkinsCount, fill: '#f59e0b' },
+    { name: 'Doctors', count: localMetrics.totalDoctors, fill: '#4f46e5' },
+    { name: 'Active Staff', count: localMetrics.activeStaff, fill: '#0ea5e9' }
+  ], [localMetrics]);
+
+  const doctorAvailabilityChartData = useMemo(() => {
+    const counts = { Available: 0, 'In Consultation': 0, 'On Break': 0, 'On Leave': 0 };
+    doctorsInBranch.forEach(d => {
+      const st = d.currentAvailability || 'Available';
+      counts[st] = (counts[st] || 0) + 1;
+    });
+    const colors = {
+      Available: '#10b981',
+      'In Consultation': '#2563eb',
+      'On Break': '#f59e0b',
+      'On Leave': '#ef4444'
+    };
+    const items = Object.entries(counts)
+      .filter(([, value]) => value > 0)
+      .map(([name, value]) => ({ name, value, color: colors[name] || '#64748b' }));
+    return items.length > 0 ? items : [{ name: 'Available', value: 1, color: '#10b981' }];
+  }, [doctorsInBranch]);
+
   return (
     <PageTransition transitionKey={subView} className="space-y-6">
       {/* 1. OPERATIONS DASHBOARD */}
@@ -409,6 +448,99 @@ export default function ManagerPanel({ subView, db, handlers }) {
               </div>
               <div className="p-3 bg-orange-50 text-orange-600 rounded-xl border border-orange-100">
                 <HelpCircle className="h-6 w-6" />
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Branch Operations Visual Analytics Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <motion.div
+              custom={7}
+              variants={MOTION_VARIANTS.fadeUp}
+              initial="hidden"
+              animate="visible"
+              className="lg:col-span-2 ds-card p-6 space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-blue-600" />
+                    <h2 className="font-bold text-slate-900 text-sm">Daily Branch Activity &amp; Capacity Breakdown</h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">Live operational volume across {managerBranch}</p>
+                </div>
+                <span className="text-[11px] font-mono bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full font-semibold">
+                  Live Telemetry
+                </span>
+              </div>
+              <div className="h-60 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={branchActivityChartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        border: '1px solid #1e293b',
+                        borderRadius: '12px',
+                        color: '#f8fafc',
+                        fontSize: '12px'
+                      }}
+                    />
+                    <Bar dataKey="count" name="Count" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                      {branchActivityChartData.map((entry, i) => (
+                        <Cell key={i} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </motion.div>
+
+            <motion.div
+              custom={8}
+              variants={MOTION_VARIANTS.fadeUp}
+              initial="hidden"
+              animate="visible"
+              className="ds-card p-6 space-y-4 flex flex-col justify-between"
+            >
+              <div className="border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <PieChartIcon className="h-4 w-4 text-teal-600" />
+                  <h2 className="font-bold text-slate-900 text-sm">Clinician Availability Split</h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">Real-time status of branch practitioners</p>
+              </div>
+              <div className="h-52 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={doctorAvailabilityChartData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={72}
+                      paddingAngle={4}
+                    >
+                      {doctorAvailabilityChartData.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        border: '1px solid #1e293b',
+                        borderRadius: '12px',
+                        color: '#f8fafc',
+                        fontSize: '12px'
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
             </motion.div>
           </div>
