@@ -726,46 +726,48 @@ export default function App() {
     );
   }
 
+  const navItemClass = (isActive) =>
+    `w-full flex items-center space-x-3 px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer ${
+      isActive
+        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/25'
+        : 'text-slate-400 hover:bg-slate-900/90 hover:text-white'
+    }`;
+
   const renderNavLinks = () => (
     <>
       {currentUser.roleCode === 'ROLE_ADMIN' && (
         <>
           <button
             onClick={() => navigateTo('/admin/dashboard')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/admin/dashboard')}
           >
             <Building className="h-4.5 w-4.5" />
             <span>{t('nav_executive_dashboard', 'Executive Dashboard')}</span>
           </button>
           <button
             onClick={() => navigateTo('/admin/staff')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/admin/staff')}
           >
             <Users className="h-4.5 w-4.5" />
             <span>{t('nav_staff_directory', 'Staff Directory')}</span>
           </button>
           <button
             onClick={() => navigateTo('/admin/branches')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/branches' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/admin/branches')}
           >
             <Building className="h-4.5 w-4.5" />
             <span>{t('nav_clinic_branches', 'Clinic Branches')}</span>
           </button>
           <button
             onClick={() => navigateTo('/admin/audit-logs')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/audit-logs' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/admin/audit-logs')}
           >
             <ClipboardList className="h-4.5 w-4.5" />
             <span>{t('nav_security_audit_logs', 'Security Audit Logs')}</span>
           </button>
           <button
             onClick={() => navigateTo('/admin/reports')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/admin/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/admin/reports')}
           >
             <TrendingUp className="h-4.5 w-4.5" />
             <span>{t('nav_reports_suite', 'Reports Suite')}</span>
@@ -777,32 +779,28 @@ export default function App() {
         <>
           <button
             onClick={() => navigateTo('/manager/dashboard')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/manager/dashboard')}
           >
             <Building className="h-4.5 w-4.5" />
             <span>{t('nav_branch_operations', 'Branch Operations')}</span>
           </button>
           <button
             onClick={() => navigateTo('/manager/roster')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/roster' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/manager/roster')}
           >
             <Calendar className="h-4.5 w-4.5" />
             <span>{t('nav_doctor_roster_planner', 'Doctor Roster Planner')}</span>
           </button>
           <button
             onClick={() => navigateTo('/manager/staff')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/staff' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/manager/staff')}
           >
             <Users className="h-4.5 w-4.5" />
             <span>{t('nav_local_staff_directory', 'Local Staff Directory')}</span>
           </button>
           <button
             onClick={() => navigateTo('/manager/reports')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/manager/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/manager/reports')}
           >
             <TrendingUp className="h-4.5 w-4.5" />
             <span>{t('nav_branch_reports', 'Branch Reports')}</span>
@@ -814,32 +812,28 @@ export default function App() {
         <>
           <button
             onClick={() => navigateTo('/reception/dashboard')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/reception/dashboard')}
           >
             <ClipboardList className="h-4.5 w-4.5" />
             <span>{t('nav_triage_workbench', 'Triage Workbench')}</span>
           </button>
           <button
             onClick={() => navigateTo('/reception/patients')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/patients' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/reception/patients')}
           >
             <Users className="h-4.5 w-4.5" />
             <span>{t('nav_patient_registry', 'Patient Registry')}</span>
           </button>
           <button
             onClick={() => navigateTo('/reception/appointments')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/reception/appointments')}
           >
             <Calendar className="h-4.5 w-4.5" />
             <span>{t('nav_schedules_calendar', 'Schedules Calendar')}</span>
           </button>
           <button
             onClick={() => navigateTo('/reception/walkin')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/reception/walkin' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/reception/walkin')}
           >
             <Clock className="h-4.5 w-4.5" />
             <span>{t('nav_walkin_intake', 'Walk-in Intake')}</span>
@@ -851,16 +845,14 @@ export default function App() {
         <>
           <button
             onClick={() => navigateTo('/doctor/workbench')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/doctor/workbench' || currentPath.startsWith('/doctor/consultation') ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/doctor/workbench' || currentPath.startsWith('/doctor/consultation'))}
           >
             <Activity className="h-4.5 w-4.5" />
             <span>{t('nav_consult_workbench', 'Consult Workbench')}</span>
           </button>
           <button
             onClick={() => navigateTo('/doctor/appointments')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/doctor/appointments' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/doctor/appointments')}
           >
             <Calendar className="h-4.5 w-4.5" />
             <span>{t('nav_upcoming_bookings', 'Upcoming Bookings')}</span>
@@ -872,32 +864,28 @@ export default function App() {
         <>
           <button
             onClick={() => navigateTo('/billing/dashboard')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/dashboard' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/billing/dashboard')}
           >
             <DollarSign className="h-4.5 w-4.5" />
             <span>{t('nav_billing_desk', 'Billing Desk')}</span>
           </button>
           <button
             onClick={() => navigateTo('/billing/invoices')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/invoices' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/billing/invoices')}
           >
             <FileText className="h-4.5 w-4.5" />
             <span>{t('nav_invoice_ledger', 'Invoice Ledger')}</span>
           </button>
           <button
             onClick={() => navigateTo('/billing/claims')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/claims' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/billing/claims')}
           >
             <ShieldCheck className="h-4.5 w-4.5" />
             <span>{t('nav_insurance_claims', 'Insurance Claims')}</span>
           </button>
           <button
             onClick={() => navigateTo('/billing/reports')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/billing/reports' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/billing/reports')}
           >
             <TrendingUp className="h-4.5 w-4.5" />
             <span>{t('nav_finance_reports', 'Finance Reports')}</span>
@@ -909,32 +897,28 @@ export default function App() {
         <>
           <button
             onClick={() => navigateTo('/portal/home')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/home' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/portal/home')}
           >
             <Building className="h-4.5 w-4.5" />
             <span>{t('nav_home_dashboard', 'Home Dashboard')}</span>
           </button>
           <button
             onClick={() => navigateTo('/portal/book')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/book' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/portal/book')}
           >
             <Calendar className="h-4.5 w-4.5" />
             <span>{t('nav_self_booking_wizard', 'Self Booking Wizard')}</span>
           </button>
           <button
             onClick={() => navigateTo('/portal/medical-history')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/medical-history' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/portal/medical-history')}
           >
             <FileText className="h-4.5 w-4.5" />
             <span>{t('nav_my_consultations', 'My Consultations')}</span>
           </button>
           <button
             onClick={() => navigateTo('/portal/billing')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/portal/billing' ? 'bg-blue-600 text-white' : 'text-slate-450 hover:bg-slate-900 hover:text-white'
-              }`}
+            className={navItemClass(currentPath === '/portal/billing')}
           >
             <DollarSign className="h-4.5 w-4.5" />
             <span>{t('nav_my_receipts', 'My Receipts')}</span>
@@ -948,13 +932,26 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex text-slate-900">
 
-      {/* Toast Alert Banner */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4.5 py-3.5 rounded-xl shadow-2xl border border-slate-800 flex items-center space-x-2.5 text-xs animate-bounce font-medium">
-          <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      {/* Smooth Animated Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            key="global-toast"
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            role="status"
+            aria-live="polite"
+            className="fixed bottom-6 right-6 z-50 bg-slate-900/95 backdrop-blur-md text-white px-4.5 py-3.5 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center space-x-3 text-xs font-semibold"
+          >
+            <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0">
+              <CheckCircle2 className="h-4.5 w-4.5" />
+            </div>
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Mobile Drawer Backdrop & Sidebar (< lg viewports) */}
       {mobileNavOpen && (
@@ -974,10 +971,10 @@ export default function App() {
             <div>
               <div className="px-5 py-4 border-b border-slate-900 flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
-                  <div className="p-1.5 bg-blue-600 rounded-lg text-white">
+                  <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl text-white shadow-sm">
                     <Activity className="h-5 w-5" />
                   </div>
-                  <span className="text-lg font-bold tracking-tight">CareFlow CATMS</span>
+                  <span className="text-lg font-extrabold tracking-tight">CareFlow CATMS</span>
                 </div>
                 <button
                   ref={drawerCloseBtnRef}
@@ -1037,29 +1034,32 @@ export default function App() {
       )}
 
       {/* Desktop Fixed Sidebar (lg+ viewports) */}
-      <aside className="hidden lg:flex w-64 fixed top-0 bottom-0 left-0 bg-slate-950 text-white flex-col justify-between z-10 border-r border-slate-900">
+      <aside className="hidden lg:flex w-64 fixed top-0 bottom-0 left-0 bg-slate-950 text-white flex-col justify-between z-10 border-r border-slate-900/90 shadow-xl">
         <div>
           {/* Logo brand */}
-          <div className="px-6 py-5 border-b border-slate-900 flex items-center space-x-2.5">
-            <div className="p-1.5 bg-blue-600 rounded-lg text-white">
+          <div className="px-6 py-5 border-b border-slate-900 flex items-center space-x-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl text-white shadow-md shadow-blue-600/25">
               <Activity className="h-5 w-5" />
             </div>
-            <span className="text-lg font-bold tracking-tight">CareFlow CATMS</span>
+            <div>
+              <span className="text-base font-extrabold tracking-tight block leading-none">CareFlow CATMS</span>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-1 block">Clinical Cloud</span>
+            </div>
           </div>
 
           {/* Navigation Links based on user claims */}
-          <nav className="mt-6 px-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-140px)]">
+          <nav className="mt-5 px-3.5 space-y-1.5 overflow-y-auto max-h-[calc(100vh-140px)]">
             {renderNavLinks()}
           </nav>
         </div>
 
         {/* User Session Info */}
-        <div className="p-4 border-t border-slate-900 bg-slate-950/50">
+        <div className="p-4 border-t border-slate-900 bg-slate-900/40">
           <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
             {t('active_session', 'Active Session')}
           </div>
-          <div className="text-xs font-semibold text-slate-300 mt-1 flex items-center space-x-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
+          <div className="text-xs font-semibold text-slate-200 mt-1 flex items-center space-x-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 ring-4 ring-emerald-500/15 inline-block"></span>
             <span>{currentUser.roleCode.replace('ROLE_', '')}</span>
           </div>
         </div>
@@ -1069,7 +1069,7 @@ export default function App() {
       <div className="pl-0 lg:pl-64 flex-1 flex flex-col min-w-0">
 
         {/* Global Top Header Bar */}
-        <header className="bg-white border-b border-slate-200 h-16 px-2.5 sm:px-6 lg:px-8 flex justify-between items-center shrink-0 z-20 shadow-xs gap-1.5 sm:gap-2">
+        <header className="sticky top-0 bg-white/90 backdrop-blur-md border-b border-slate-200/80 h-16 px-2.5 sm:px-6 lg:px-8 flex justify-between items-center shrink-0 z-20 shadow-2xs gap-1.5 sm:gap-2">
           <div className="flex items-center space-x-1.5 sm:space-x-3 min-w-0">
             {/* Mobile Hamburger button (< lg) */}
             <button
@@ -1084,7 +1084,7 @@ export default function App() {
             </button>
 
             {/* Brand Logo Identity */}
-            <span className="text-sm font-bold text-slate-800 tracking-tight shrink-0 hidden md:inline">CareFlow CATMS</span>
+            <span className="text-sm font-extrabold text-slate-800 tracking-tight shrink-0 hidden md:inline">CareFlow CATMS</span>
 
             {/* Active Branch Switcher */}
             <div className="hidden md:block h-5 w-px bg-slate-200" />
