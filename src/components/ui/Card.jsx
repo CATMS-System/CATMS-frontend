@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MOTION_VARIANTS } from '../../theme/designSystem';
+import { MOTION_VARIANTS, ensureMotionSafeEnv } from '../../theme/designSystem';
 
 const VARIANT_CLASSES = {
   default: 'bg-white border border-slate-200/90 shadow-xs',
@@ -32,6 +32,7 @@ export function Card({
   onClick,
   ...rest
 }) {
+  ensureMotionSafeEnv();
   const baseClasses = `rounded-2xl transition-colors duration-200 ${VARIANT_CLASSES[variant] || VARIANT_CLASSES.default} ${PADDING_CLASSES[padding] ?? PADDING_CLASSES.md} ${hoverEffect ? 'ds-card-hover' : ''} ${onClick ? 'cursor-pointer' : ''} ${className}`.trim();
 
   const motionProps = animateEntrance

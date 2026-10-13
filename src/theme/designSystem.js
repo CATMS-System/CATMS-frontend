@@ -175,4 +175,21 @@ export const MOTION_VARIANTS = {
   },
 };
 
+/**
+ * Ensures partial `window` mocks in Node SSR test runners have safe no-op event listeners
+ * so Framer Motion components render cleanly under `renderToStaticMarkup`.
+ */
+export function ensureMotionSafeEnv() {
+  if (typeof window !== 'undefined') {
+    if (typeof window.addEventListener !== 'function') {
+      window.addEventListener = () => {};
+    }
+    if (typeof window.removeEventListener !== 'function') {
+      window.removeEventListener = () => {};
+    }
+  }
+}
+
+ensureMotionSafeEnv();
+
 export default THEME;

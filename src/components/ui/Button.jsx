@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { ensureMotionSafeEnv } from '../../theme/designSystem';
 
 const BUTTON_VARIANTS = {
   primary:
@@ -47,6 +48,7 @@ export function Button({
   onClick,
   ...rest
 }) {
+  ensureMotionSafeEnv();
   const isDisabled = disabled || loading;
 
   const classes = [

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MOTION_VARIANTS } from '../../theme/designSystem';
+import { MOTION_VARIANTS, ensureMotionSafeEnv } from '../../theme/designSystem';
 
 /**
  * Reusable Page / Subview Transition Wrapper.
@@ -12,6 +12,7 @@ export function PageTransition({
   className = '',
   mode = 'wait',
 }) {
+  ensureMotionSafeEnv();
   if (transitionKey !== undefined) {
     return (
       <AnimatePresence mode={mode} initial={false}>
@@ -45,6 +46,7 @@ export function PageTransition({
  * Container that staggers the entrance of child StaggerItem elements.
  */
 export function StaggerContainer({ children, className = '', ...rest }) {
+  ensureMotionSafeEnv();
   return (
     <motion.div
       variants={MOTION_VARIANTS.staggerContainer}
@@ -62,6 +64,7 @@ export function StaggerContainer({ children, className = '', ...rest }) {
  * Child item inside a StaggerContainer.
  */
 export function StaggerItem({ children, className = '', ...rest }) {
+  ensureMotionSafeEnv();
   return (
     <motion.div
       variants={MOTION_VARIANTS.staggerItem}
