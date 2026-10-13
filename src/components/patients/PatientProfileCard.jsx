@@ -133,7 +133,7 @@ export default function PatientProfileCard({
             <div>
               <span className="text-slate-500 text-[11px]">Username: </span>
               <strong className="text-blue-900 font-mono font-semibold">
-                {patient.portal_access?.username || `pat_${patient.nic?.toLowerCase()}`}
+                {`pat_${patient.nic?.toLowerCase()}`}
               </strong>
             </div>
             <div>
