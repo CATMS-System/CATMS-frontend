@@ -578,150 +578,191 @@ export default function App() {
           <LanguageSelector variant="portal" />
         </div>
 
-        {/* Hero Header + Animated Brand Identity */}
-        <motion.div
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-          className="sm:mx-auto sm:w-full sm:max-w-lg text-center relative z-10"
-        >
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-md text-blue-200 text-[11px] font-semibold tracking-wide mb-4 shadow-sm">
-            <ShieldCheck className="h-3.5 w-3.5 text-teal-300" />
-            <span>Enterprise Healthcare Cloud • Multi-Branch Clinical Suite</span>
-          </div>
-
-          <div className="flex justify-center items-center space-x-3">
-            <motion.div
-              initial={{ scale: 0.8, rotate: -8, opacity: 0 }}
-              animate={{ scale: 1, rotate: 0, opacity: 1 }}
-              transition={{ duration: 0.45, delay: 0.08, type: 'spring', stiffness: 220, damping: 16 }}
-              whileHover={{ scale: 1.06, rotate: 3 }}
-              className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl text-white shadow-xl shadow-blue-600/35 ring-2 ring-white/25"
-            >
-              <Activity className="h-6 w-6" />
-            </motion.div>
-            <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white drop-shadow-xs">
-              CareFlow <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-teal-300">CATMS</span>
-            </span>
-          </div>
-          <h2 className="mt-3 text-xs sm:text-sm font-semibold text-slate-200/90 uppercase tracking-widest">
-            {t('system_subtitle', 'CLINIC APPOINTMENT & TREATMENT MANAGEMENT SYSTEM')}
-          </h2>
-
-          {/* Feature highlight pills */}
+        <div className="relative z-10 w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          {/* Left Column: Zocdoc / Doctolib Inspired Healthcare Landing Hero */}
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.38, delay: 0.16 }}
-            className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] text-slate-200/85"
+            transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+            className="lg:col-span-7 text-center lg:text-left space-y-6"
           >
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/45 border border-white/10 backdrop-blur-xs">
-              <CheckCircle2 className="h-3 w-3 text-teal-400" /> Smart Queue & Triage
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/45 border border-white/10 backdrop-blur-xs">
-              <CheckCircle2 className="h-3 w-3 text-blue-400" /> E-Prescriptions & Billing
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/45 border border-white/10 backdrop-blur-xs">
-              <CheckCircle2 className="h-3 w-3 text-indigo-400" /> Role-Scoped Analytics
-            </span>
-          </motion.div>
-        </motion.div>
-
-        {/* Animated Glassmorphic Login Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 22, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.45, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-7 sm:mx-auto sm:w-full sm:max-w-md relative z-10"
-        >
-          <div className="relative overflow-hidden bg-white/95 backdrop-blur-xl py-8 px-5 border border-white/80 shadow-2xl rounded-3xl sm:px-10 space-y-6">
-            {/* Top SaaS accent gradient strip */}
-            <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-teal-500" />
-
-            <div className="text-center border-b border-slate-100 pb-4">
-              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                {t('welcome_back', 'Welcome Back')}
-              </h3>
-              <p className="mt-1 text-xs sm:text-sm text-slate-500">
-                {t('sign_in_subtitle', 'Sign in to access your account')}
-              </p>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-md text-blue-200 text-[11px] font-semibold tracking-wide shadow-sm">
+              <ShieldCheck className="h-3.5 w-3.5 text-teal-300" />
+              <span>Enterprise Healthcare Cloud • Multi-Branch Clinical Suite</span>
             </div>
 
-            <AnimatePresence mode="wait">
-              {authError && (
-                <motion.div
-                  key="auth-error"
-                  initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                  transition={{ duration: 0.2, ease: 'easeOut' }}
-                  role="alert"
-                  className="bg-red-50/95 border border-red-200 text-red-700 p-3.5 rounded-2xl flex items-center space-x-2.5 text-xs font-medium shadow-2xs"
-                >
-                  <AlertCircle className="h-4.5 w-4.5 shrink-0 text-red-600" />
-                  <span>{authError}</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <form className="space-y-4" onSubmit={handleSignIn} noValidate>
-              <div className="group">
-                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                  {t('email_or_username', 'Email Address / Username')}
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 group-focus-within:text-blue-600 transition-colors">
-                    <User className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="text"
-                    required
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-blue-600 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-3 focus:ring-blue-500/20 transition-all duration-200"
-                    placeholder={t('username_placeholder', 'username or name@careflow.com')}
-                    value={emailInput}
-                    onChange={e => setEmailInput(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="group">
-                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                  {t('password', 'Password')}
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 group-focus-within:text-blue-600 transition-colors">
-                    <Lock className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="password"
-                    required
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-blue-600 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-3 focus:ring-blue-500/20 transition-all duration-200"
-                    placeholder="••••••••"
-                    value={passwordInput}
-                    onChange={e => setPasswordInput(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <motion.button
-                type="submit"
-                whileHover={{ y: -1.5, scale: 1.01 }}
-                whileTap={{ scale: 0.98, y: 0 }}
-                transition={{ duration: 0.15, ease: 'easeOut' }}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-sm font-bold transition-all cursor-pointer shadow-lg shadow-blue-600/25"
+            <div className="flex justify-center lg:justify-start items-center space-x-3.5">
+              <motion.div
+                initial={{ scale: 0.8, rotate: -8, opacity: 0 }}
+                animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                transition={{ duration: 0.45, delay: 0.08, type: 'spring', stiffness: 220, damping: 16 }}
+                whileHover={{ scale: 1.06, rotate: 3 }}
+                className="p-3.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl text-white shadow-xl shadow-blue-600/35 ring-2 ring-white/25"
               >
-                <span>{t('sign_in_button', 'Sign In to System')}</span>
-              </motion.button>
-            </form>
-
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-              <span className="inline-flex items-center gap-1">
-                <Lock className="h-3 w-3 text-emerald-500" /> TLS Role-Based Access
-              </span>
-              <span>Colombo • Kandy • Galle</span>
+                <Activity className="h-7 w-7" />
+              </motion.div>
+              <div>
+                <span className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white drop-shadow-xs block">
+                  CareFlow <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-teal-300">CATMS</span>
+                </span>
+              </div>
             </div>
-          </div>
-        </motion.div>
+
+            <h2 className="text-xs sm:text-sm font-bold text-blue-200/95 uppercase tracking-widest">
+              {t('system_subtitle', 'CLINIC APPOINTMENT & TREATMENT MANAGEMENT SYSTEM')}
+            </h2>
+
+            <p className="text-sm sm:text-base text-slate-200/90 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+              Book verified specialists in seconds, track real-time outpatient waiting queues, manage electronic medical records, and process insurance claims across our 3-branch hospital network.
+            </p>
+
+            {/* Zocdoc / Doctolib Style Specialty Showcase Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+              {[
+                { spec: 'Cardiology', sub: 'Heart & Vascular', rating: '4.9 ★' },
+                { spec: 'General Medicine', sub: 'Primary & Family Care', rating: '4.9 ★' },
+                { spec: 'Dermatology', sub: 'Skin & Aesthetics', rating: '4.8 ★' },
+                { spec: 'Pediatrics', sub: 'Child & Infant Specialists', rating: '5.0 ★' },
+                { spec: 'Orthopedics', sub: 'Bone, Joint & Spine', rating: '4.9 ★' },
+                { spec: 'Diagnostics & Lab', sub: 'ECG, Blood & Imaging', rating: '4.9 ★' }
+              ].map((item) => (
+                <div
+                  key={item.spec}
+                  className="p-3 rounded-2xl bg-slate-900/55 border border-white/15 backdrop-blur-md text-left hover:bg-slate-900/75 hover:border-blue-400/40 transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-white">{item.spec}</span>
+                    <span className="text-[10px] font-bold text-amber-300 bg-amber-400/15 px-1.5 py-0.5 rounded-full">
+                      {item.rating}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300/80 mt-0.5">{item.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Live Hospital Branch Network Status Bar */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.38, delay: 0.16 }}
+              className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5 text-[11px] text-slate-200/90 pt-1"
+            >
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/15 backdrop-blur-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Colombo Main Hospital
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/15 backdrop-blur-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Kandy Regional Clinic
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/15 backdrop-blur-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Galle Southern Center
+              </span>
+            </motion.div>
+          </motion.div>
+
+          {/* Right Column: Animated Glassmorphic Login Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 22, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.45, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="lg:col-span-5 w-full max-w-md mx-auto relative z-10"
+          >
+            <div className="relative overflow-hidden bg-white/95 backdrop-blur-xl py-8 px-6 border border-white/80 shadow-2xl rounded-3xl sm:px-9 space-y-6">
+              {/* Top SaaS accent gradient strip */}
+              <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-teal-500" />
+
+              <div className="text-center border-b border-slate-100 pb-4">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider mb-2 border border-blue-200/60">
+                  <CheckCircle2 className="h-3 w-3 text-blue-600" />
+                  <span>Unified Patient & Staff Portal</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+                  {t('welcome_back', 'Welcome Back')}
+                </h3>
+                <p className="mt-1 text-xs sm:text-sm text-slate-500">
+                  {t('sign_in_subtitle', 'Sign in to access your account')}
+                </p>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {authError && (
+                  <motion.div
+                    key="auth-error"
+                    initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    role="alert"
+                    className="bg-red-50/95 border border-red-200 text-red-700 p-3.5 rounded-2xl flex items-center space-x-2.5 text-xs font-medium shadow-2xs"
+                  >
+                    <AlertCircle className="h-4.5 w-4.5 shrink-0 text-red-600" />
+                    <span>{authError}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <form className="space-y-4" onSubmit={handleSignIn} noValidate>
+                <div className="group">
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                    {t('email_or_username', 'Email Address / Username')}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                      <User className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-blue-600 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-3 focus:ring-blue-500/20 transition-all duration-200"
+                      placeholder={t('username_placeholder', 'username or name@careflow.com')}
+                      value={emailInput}
+                      onChange={e => setEmailInput(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="group">
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                    {t('password', 'Password')}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                      <Lock className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="password"
+                      required
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-blue-600 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-3 focus:ring-blue-500/20 transition-all duration-200"
+                      placeholder="••••••••"
+                      value={passwordInput}
+                      onChange={e => setPasswordInput(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <motion.button
+                  type="submit"
+                  whileHover={{ y: -1.5, scale: 1.01 }}
+                  whileTap={{ scale: 0.98, y: 0 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-sm font-bold transition-all cursor-pointer shadow-lg shadow-blue-600/25"
+                >
+                  <span>{t('sign_in_button', 'Sign In to System')}</span>
+                </motion.button>
+              </form>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                <span className="inline-flex items-center gap-1">
+                  <Lock className="h-3 w-3 text-emerald-500" /> TLS Role-Based Access
+                </span>
+                <span>Colombo • Kandy • Galle</span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </div>
     );
   }

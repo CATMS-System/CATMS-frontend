@@ -72,23 +72,51 @@ export const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-100">
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-            Appointment Date
-          </label>
-          <div className="relative">
-            <input
-              type="date"
-              min={todayStr}
-              value={selectedDate}
-              onChange={(e) => onDateChange(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium text-gray-800"
-            />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+        <div className="flex flex-wrap items-end gap-2.5">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+              Appointment Date
+            </label>
+            <div className="relative">
+              <input
+                type="date"
+                min={todayStr}
+                value={selectedDate}
+                onChange={(e) => onDateChange(e.target.value)}
+                className="px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-semibold text-slate-800"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 pb-0.5">
+            {[
+              { label: 'Today', offset: 0 },
+              { label: 'Tomorrow', offset: 1 },
+              { label: '+2 Days', offset: 2 }
+            ].map(({ label, offset }) => {
+              const d = new Date();
+              d.setDate(d.getDate() + offset);
+              const dStr = d.toISOString().split('T')[0];
+              const active = selectedDate === dStr;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => onDateChange(dStr)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                    active
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-gray-500 self-end sm:self-center">
+        <div className="flex items-center gap-3 text-xs text-slate-500 self-end sm:self-center font-medium">
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
             Available
@@ -98,7 +126,7 @@ export const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
             Selected
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-gray-300 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block" />
             Booked
           </span>
         </div>

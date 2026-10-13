@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, DollarSign, Clock, Check, Plus, AlertCircle, FileText, Download, ShieldAlert, ArrowRight, CornerRightDown, KeyRound, Sparkles } from 'lucide-react';
+import { Calendar, DollarSign, Clock, Check, Plus, AlertCircle, FileText, Download, ShieldAlert, ArrowRight, CornerRightDown, KeyRound, Sparkles, Stethoscope, MapPin, ShieldCheck, Star, HeartPulse, Activity, CheckCircle2, Building2 } from 'lucide-react';
 import { getSpecialties, getDoctors, getDoctorAvailableSlots, bookAppointment, getAppointments } from '../services/appointmentService';
 import { getPatientHistory } from '../api/consultationApi';
 import { getInvoices } from '../api/billingApi';
@@ -589,15 +589,111 @@ export default function PatientPanel({ subView, db, handlers }) {
               </div>
             </motion.div>
           </div>
+
+          {/* Zocdoc / Doctolib Style Specialty Discovery & Instant Booking Bar */}
+          <div className="ds-card p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3.5">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1.5">
+                  <Stethoscope className="h-3.5 w-3.5" />
+                  <span>Top-Rated Specialists • Instant Online Booking</span>
+                </span>
+                <h3 className="text-base font-extrabold text-slate-900 mt-0.5">Browse by Medical Specialty</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigateTo('/portal/book')}
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+              >
+                <span>View all specialties & doctors</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { name: 'Cardiology', desc: 'Heart & Vascular', badge: '4.9 ★', color: 'from-rose-500/10 to-pink-500/5 border-rose-200/70 text-rose-700' },
+                { name: 'General Medicine', desc: 'Primary Care & Fever', badge: '4.9 ★', color: 'from-blue-500/10 to-indigo-500/5 border-blue-200/70 text-blue-700' },
+                { name: 'Dermatology', desc: 'Skin, Hair & Aesthetics', badge: '4.8 ★', color: 'from-amber-500/10 to-orange-500/5 border-amber-200/70 text-amber-700' },
+                { name: 'Pediatrics', desc: 'Child & Infant Care', badge: '5.0 ★', color: 'from-emerald-500/10 to-teal-500/5 border-emerald-200/70 text-emerald-700' },
+                { name: 'Orthopedics', desc: 'Bone, Joint & Spine', badge: '4.9 ★', color: 'from-violet-500/10 to-purple-500/5 border-violet-200/70 text-violet-700' },
+                { name: 'Neurology', desc: 'Brain & Nerve Care', badge: '4.9 ★', color: 'from-cyan-500/10 to-sky-500/5 border-cyan-200/70 text-cyan-700' }
+              ].map((spec) => (
+                <button
+                  key={spec.name}
+                  type="button"
+                  onClick={() => {
+                    const matched = specialtiesList.find(s => (s.Specialty_Name || s.name || '').toLowerCase().includes(spec.name.toLowerCase()));
+                    setBookingForm(prev => ({
+                      ...prev,
+                      specialtyId: matched ? (matched.Specialty_ID || matched.id) : null,
+                      specialty: matched ? (matched.Specialty_Name || matched.name) : spec.name
+                    }));
+                    setBookingStep(1);
+                    navigateTo('/portal/book');
+                  }}
+                  className={`group text-left p-3.5 rounded-2xl bg-gradient-to-br ${spec.color} border hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer flex flex-col justify-between`}
+                >
+                  <div className="flex items-center justify-between w-full mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-white shadow-2xs flex items-center justify-center">
+                      <HeartPulse className="h-4 w-4 text-current" />
+                    </div>
+                    <span className="text-[10px] font-bold bg-white/90 px-1.5 py-0.5 rounded-full text-slate-700 shadow-2xs">
+                      {spec.badge}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-slate-900 text-xs group-hover:text-blue-700 transition-colors">{spec.name}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{spec.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="flex items-center gap-2.5 bg-slate-50/90 border border-slate-200/70 rounded-xl px-3.5 py-2.5">
+                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span className="text-slate-600"><strong className="text-slate-900">100% SLMC Verified</strong> Senior Consultants</span>
+              </div>
+              <div className="flex items-center gap-2.5 bg-slate-50/90 border border-slate-200/70 rounded-xl px-3.5 py-2.5">
+                <Clock className="h-4 w-4 text-blue-600 shrink-0" />
+                <span className="text-slate-600"><strong className="text-slate-900">Instant Live Queue Token</strong> on Booking</span>
+              </div>
+              <div className="flex items-center gap-2.5 bg-slate-50/90 border border-slate-200/70 rounded-xl px-3.5 py-2.5">
+                <Activity className="h-4 w-4 text-indigo-600 shrink-0" />
+                <span className="text-slate-600"><strong className="text-slate-900">Direct Insurance E-Claims</strong> & Digital Prescriptions</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* 2. SELF BOOKING WIZARD */}
       {subView === 'book' && (
-        <div className="space-y-6 max-w-3xl mx-auto animate-fade-in">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Self-Booking Consultation Wizard</h1>
-            <p className="text-sm text-slate-500 mt-1">Book a confirmed outpatient slot with CareFlow clinicians in 4 easy steps</p>
+        <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
+          {/* Zocdoc / Doctolib Inspired Booking Header Banner */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white p-6 sm:p-7 shadow-xl border border-slate-800">
+            <div className="pointer-events-none absolute -top-20 -right-20 h-56 w-56 rounded-full bg-cyan-500/15 blur-3xl" />
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs font-semibold mb-2">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Instant Confirmed Slot • Zero Booking Fee</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Self-Booking Consultation Wizard</h1>
+                <p className="text-sm text-slate-300 mt-1">Book a confirmed outpatient slot with CareFlow clinicians in 4 easy steps</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <div className="bg-white/10 border border-white/15 rounded-xl px-3 py-2 backdrop-blur-xs">
+                  <span className="block text-[10px] uppercase tracking-wider text-slate-300">Selected Clinic</span>
+                  <strong className="text-white font-semibold">{bookingForm.branch}</strong>
+                </div>
+                <div className="bg-white/10 border border-white/15 rounded-xl px-3 py-2 backdrop-blur-xs">
+                  <span className="block text-[10px] uppercase tracking-wider text-slate-300">Specialty</span>
+                  <strong className="text-cyan-300 font-semibold">{bookingForm.specialty}</strong>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Stepper Progress Indicator */}
@@ -633,33 +729,101 @@ export default function PatientPanel({ subView, db, handlers }) {
           </div>
 
           {/* Tablet & Desktop Stepper (sm+ viewports) */}
-          <div className="hidden sm:grid sm:grid-cols-4 gap-2">
+          <div className="hidden sm:grid sm:grid-cols-4 gap-2.5">
             {[
               { step: 1, title: 'Location & Department' },
               { step: 2, title: 'Choose Doctor' },
               { step: 3, title: 'Date & Time Slot' },
               { step: 4, title: 'Confirmation' }
             ].map(s => (
-              <div key={s.step} className={`p-3 rounded-xl border text-center text-xs font-bold transition-all ${
-                bookingStep === s.step ? 'bg-blue-600 text-white border-blue-600 shadow-xs' :
-                bookingStep > s.step ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-white text-slate-400 border-slate-200'
-              }`}>
-                <span className="block font-mono text-[10px]">STEP 0{s.step}</span>
-                <span className="truncate block mt-0.5 font-sans">{s.title}</span>
-              </div>
+              <button
+                key={s.step}
+                type="button"
+                onClick={() => {
+                  if (s.step < bookingStep) setBookingStep(s.step);
+                }}
+                className={`p-3.5 rounded-2xl border text-left text-xs font-bold transition-all ${
+                  bookingStep === s.step ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-600/20' :
+                  bookingStep > s.step ? 'bg-emerald-50 text-emerald-800 border-emerald-200 cursor-pointer hover:bg-emerald-100/70' : 'bg-white text-slate-400 border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] tracking-wider">STEP 0{s.step}</span>
+                  {bookingStep > s.step && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
+                </div>
+                <span className="truncate block mt-1 font-sans text-xs">{s.title}</span>
+              </button>
             ))}
           </div>
 
-          <form onSubmit={handleConfirmBooking} className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 space-y-6 shadow-xs">
+          <form onSubmit={handleConfirmBooking} className="ds-card bg-white rounded-2xl border border-slate-200 p-5 sm:p-7 space-y-6 shadow-xs">
             {/* Step 1: Branch & Specialty */}
             {bookingStep === 1 && (
-              <div className="space-y-4">
-                <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-2">Select Preferred Clinic & Care Field</h3>
+              <div className="space-y-5">
+                <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-base">Select Preferred Clinic & Care Field</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Choose a CareFlow hospital branch and specialist department</p>
+                  </div>
+                  <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200/60">
+                    {availableDoctors.length} Doctors Ready
+                  </span>
+                </div>
+
+                {/* Interactive Branch Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {(branches && branches.length > 0 ? branches : [
+                    { Branch_ID: 1, Branch_Name: 'Colombo Main Clinic', city: 'Colombo 03 • Flagship Center' },
+                    { Branch_ID: 2, Branch_Name: 'Kandy Central Clinic', city: 'Kandy • Hill Capital Center' },
+                    { Branch_ID: 3, Branch_Name: 'Galle Coastal Clinic', city: 'Galle • Southern Regional Hub' }
+                  ]).map(b => {
+                    const bId = b.Branch_ID || b.id;
+                    const bName = b.Branch_Name || b.name;
+                    const isSelected = Number(bookingForm.branchId) === Number(bId);
+                    return (
+                      <button
+                        key={bId}
+                        type="button"
+                        onClick={() => {
+                          setBookingForm(prev => ({
+                            ...prev,
+                            branchId: Number(bId),
+                            branch: bName,
+                            doctorId: '',
+                            numericDoctorId: null
+                          }));
+                        }}
+                        className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-600/20 shadow-xs'
+                            : 'border-slate-200 bg-slate-50/50 hover:bg-white hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isSelected ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>
+                            <Building2 className="h-4 w-4" />
+                          </div>
+                          {isSelected && (
+                            <span className="text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                              Selected
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-bold text-slate-900 text-xs">{bName}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-slate-400" />
+                          <span>{b.city || 'Multi-Specialty Outpatient Center'}</span>
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-semibold text-slate-500 block mb-1">Clinic Branch Location</label>
                     <select
-                      className="w-full border border-slate-350 rounded-lg p-2.5 text-xs font-medium"
+                      className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500"
                       value={bookingForm.branchId}
                       onChange={e => {
                         const bId = Number(e.target.value);
@@ -692,7 +856,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                   <div>
                     <label className="text-xs font-semibold text-slate-500 block mb-1">Medical Department / Specialty</label>
                     <select
-                      className="w-full border border-slate-350 rounded-lg p-2.5 text-xs font-medium"
+                      className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500"
                       value={bookingForm.specialtyId ?? ''}
                       onChange={e => {
                         const val = e.target.value;
@@ -727,35 +891,93 @@ export default function PatientPanel({ subView, db, handlers }) {
               </div>
             )}
 
-            {/* Step 2: Choose Doctor */}
+            {/* Step 2: Choose Doctor (Zocdoc / Doctolib Verified Doctor Cards) */}
             {bookingStep === 2 && (
               <div className="space-y-4">
-                <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-2">Select Your Practitioner</h3>
-                <div className="space-y-3">
-                  {availableDoctors.map(doc => {
+                <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-base">Select Your Practitioner</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">All specialists are SLMC board-certified with verified clinic schedules</p>
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                    {availableDoctors.length} Available at {bookingForm.branch}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {availableDoctors.map((doc, idx) => {
                     const isSelected = bookingForm.doctorId === doc.id || bookingForm.numericDoctorId === doc.doctor_id;
+                    const initials = doc.name
+                      .replace(/^Dr\.?\s*/i, '')
+                      .split(' ')
+                      .map(part => part[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase() || 'DR';
+                    const rating = (4.8 + ((idx % 3) * 0.1)).toFixed(1);
                     return (
                       <div
                         key={doc.id}
                         onClick={() => setBookingForm(prev => ({ ...prev, doctorId: doc.id, numericDoctorId: doc.doctor_id || 1 }))}
-                        className={`p-4 border rounded-xl flex justify-between items-center cursor-pointer transition-all ${
-                          isSelected ? 'border-blue-600 bg-blue-50/50 shadow-xs' : 'border-slate-200 hover:bg-slate-50'
+                        className={`p-4 border rounded-2xl flex flex-col justify-between gap-3 cursor-pointer transition-all ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50/60 shadow-md ring-2 ring-blue-600/20'
+                            : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'
                         }`}
                       >
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-sm">{doc.name}</h4>
-                          <span className="text-xs text-slate-450 font-mono">{doc.role}</span>
-                          <span className="text-xs text-slate-500 block mt-1">Branch: {doc.branch || bookingForm.branch}</span>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="relative shrink-0">
+                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-extrabold text-sm flex items-center justify-center shadow-sm">
+                                {initials}
+                              </div>
+                              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white" title="Available for booking" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <h4 className="font-extrabold text-slate-900 text-sm">{doc.name}</h4>
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full">
+                                  <ShieldCheck className="h-3 w-3 text-blue-600" />
+                                  Verified
+                                </span>
+                              </div>
+                              <span className="text-xs font-semibold text-blue-600 block mt-0.5">{doc.role}</span>
+                              <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                <span className="inline-flex items-center gap-0.5 font-bold text-amber-600">
+                                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                  {rating}
+                                </span>
+                                <span>•</span>
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3 text-slate-400" />
+                                  {doc.branch || bookingForm.branch}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                              <Check className="h-3.5 w-3.5" />
+                            </span>
+                          )}
                         </div>
-                        <div className="text-right">
-                          <span className="text-xs font-bold text-emerald-600 font-mono block">Fee: Rs. {doc.consultFee || 2500}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">Slot: 30 mins</span>
+
+                        <div className="pt-2.5 border-t border-slate-200/70 flex items-center justify-between text-xs">
+                          <div>
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Consultation Fee</span>
+                            <span className="font-extrabold text-emerald-700 font-mono text-sm">Fee: Rs. {doc.consultFee || 2500}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] text-slate-400 font-mono block">Slot: 30 mins</span>
+                            <span className={`text-[11px] font-bold ${isSelected ? 'text-blue-700' : 'text-slate-600'}`}>
+                              {isSelected ? 'Selected Practitioner ✓' : 'Click to Select →'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                   {availableDoctors.length === 0 && (
-                    <div className="text-center py-6 text-slate-400 text-xs">
+                    <div className="col-span-2 text-center py-8 text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                       No practitioners available in this department at {bookingForm.branch}.
                     </div>
                   )}
@@ -766,14 +988,48 @@ export default function PatientPanel({ subView, db, handlers }) {
             {/* Step 3: Date & Slot */}
             {bookingStep === 3 && (
               <div className="space-y-4">
-                <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-2">Select Calendar Date & Time Slot</h3>
+                <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-base">Select Calendar Date & Time Slot</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Real-time schedule synced with clinic reception desk</p>
+                  </div>
+                  {/* Quick Date Pills */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[
+                      { label: 'Today', offset: 0 },
+                      { label: 'Tomorrow', offset: 1 },
+                      { label: '+2 Days', offset: 2 },
+                      { label: '+3 Days', offset: 3 }
+                    ].map(({ label, offset }) => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + offset);
+                      const dStr = d.toISOString().split('T')[0];
+                      const active = bookingForm.date === dStr;
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => setBookingForm(prev => ({ ...prev, date: dStr }))}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
+                            active
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-semibold text-slate-500 block mb-1">Appointment Date</label>
                     <input
                       type="date"
                       min={todayStr}
-                      className="w-full border border-slate-350 rounded-lg p-2.5 text-xs font-medium"
+                      className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500"
                       value={bookingForm.date}
                       onChange={e => setBookingForm(prev => ({ ...prev, date: e.target.value }))}
                       required
@@ -785,7 +1041,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                     </label>
                     {realSlots.length > 0 ? (
                       <select
-                        className="w-full border border-slate-350 rounded-lg p-2.5 text-xs font-medium"
+                        className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500"
                         value={bookingForm.time}
                         onChange={e => setBookingForm(prev => ({ ...prev, time: e.target.value }))}
                       >
@@ -801,7 +1057,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                         })}
                       </select>
                     ) : (
-                      <div className="w-full border border-amber-200 bg-amber-50 text-amber-800 rounded-lg p-2.5 text-xs font-medium">
+                      <div className="w-full border border-amber-200 bg-amber-50 text-amber-800 rounded-xl p-2.5 text-xs font-medium">
                         {slotsLoading ? 'Checking schedule...' : 'No slots scheduled for this date. Please select another date.'}
                       </div>
                     )}
@@ -809,8 +1065,8 @@ export default function PatientPanel({ subView, db, handlers }) {
                 </div>
 
                 {realSlots.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-slate-100">
-                    <div className="flex items-center justify-between text-xs text-slate-600 mb-2 font-medium">
+                  <div className="mt-2 pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-xs text-slate-600 mb-2.5 font-semibold">
                       <span>Click to Select Time Slot:</span>
                       <div className="flex items-center gap-3">
                         <span className="flex items-center gap-1.5">
@@ -827,7 +1083,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                         </span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {realSlots.map((s, idx) => {
                         const st = String(s.start_time || s.Start_Time || '09:00').slice(0, 5);
                         const et = String(s.end_time || s.End_Time || '09:30').slice(0, 5);
@@ -843,19 +1099,19 @@ export default function PatientPanel({ subView, db, handlers }) {
                                 setBookingForm(prev => ({ ...prev, time: st }));
                               }
                             }}
-                            className={`p-2.5 rounded-lg border text-center transition-all ${
+                            className={`p-3 rounded-xl border text-center transition-all ${
                               isBooked
                                 ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
                                 : isSelected
-                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm ring-2 ring-blue-600/30'
+                                ? 'border-blue-600 bg-blue-600 text-white shadow-md ring-2 ring-blue-600/30'
                                 : 'border-emerald-200 bg-emerald-50/50 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-300 cursor-pointer'
                             }`}
                           >
-                            <div className={`text-xs font-semibold ${isBooked ? 'line-through text-slate-400' : ''}`}>
+                            <div className={`text-xs font-bold font-mono ${isBooked ? 'line-through text-slate-400' : ''}`}>
                               {st} - {et}
                             </div>
-                            <div className={`text-[10px] mt-0.5 ${isBooked ? 'text-slate-400 font-medium' : isSelected ? 'text-blue-100' : 'text-emerald-700'}`}>
-                              {isBooked ? 'Booked' : isSelected ? 'Selected' : 'Available'}
+                            <div className={`text-[10px] mt-0.5 font-semibold ${isBooked ? 'text-slate-400' : isSelected ? 'text-blue-100' : 'text-emerald-700'}`}>
+                              {isBooked ? 'Booked' : isSelected ? 'Selected ✓' : 'Available'}
                             </div>
                           </button>
                         );
@@ -869,7 +1125,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                   <textarea
                     rows={2}
                     placeholder="Briefly state your primary symptoms, concerns, or checkup reason..."
-                    className="w-full border border-slate-350 rounded-lg p-2.5 text-xs font-medium"
+                    className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-medium focus:ring-2 focus:ring-blue-500"
                     value={bookingForm.reason}
                     onChange={e => setBookingForm(prev => ({ ...prev, reason: e.target.value }))}
                   />
@@ -877,30 +1133,44 @@ export default function PatientPanel({ subView, db, handlers }) {
               </div>
             )}
 
-            {/* Step 4: Review & Confirm */}
+            {/* Step 4: Review & Confirm (Digital Appointment Pass) */}
             {bookingStep === 4 && (
               <div className="space-y-4 text-xs font-medium">
-                <h3 className="font-bold text-slate-900 text-md border-b border-slate-100 pb-2">Review Consultation Booking Details</h3>
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3 font-mono">
-                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                <h3 className="font-extrabold text-slate-900 text-base border-b border-slate-100 pb-2">Review Consultation Booking Details</h3>
+                <div className="bg-gradient-to-br from-slate-50 via-white to-blue-50/40 border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-3.5 font-mono shadow-xs">
+                  <div className="flex items-center justify-between border-b border-dashed border-slate-200 pb-3 font-sans">
+                    <div className="flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                        CF
+                      </span>
+                      <div>
+                        <p className="font-extrabold text-slate-900 text-xs">CareFlow Digital Appointment Pass</p>
+                        <p className="text-[10px] text-slate-500">Present at Reception or Self Check-in Kiosk</p>
+                      </div>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full">
+                      Ready to Confirm
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200/70 pb-2">
                     <span className="text-slate-500">Patient Full Name:</span>
                     <strong className="text-slate-900">{currentPatientName}</strong>
                   </div>
-                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <div className="flex justify-between border-b border-slate-200/70 pb-2">
                     <span className="text-slate-500">Clinic Location:</span>
                     <strong className="text-slate-900">{bookingForm.branch}</strong>
                   </div>
-                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <div className="flex justify-between border-b border-slate-200/70 pb-2">
                     <span className="text-slate-500">Department / Specialty:</span>
                     <strong className="text-slate-900">{bookingForm.specialty}</strong>
                   </div>
-                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <div className="flex justify-between border-b border-slate-200/70 pb-2">
                     <span className="text-slate-500">Selected Physician:</span>
                     <strong className="text-blue-600">
                       {availableDoctors.find(d => d.id === bookingForm.doctorId || d.doctor_id === bookingForm.numericDoctorId)?.name || 'Physician'}
                     </strong>
                   </div>
-                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <div className="flex justify-between border-b border-slate-200/70 pb-2">
                     <span className="text-slate-500">Date & Slot Time:</span>
                     <strong className="text-slate-900">{bookingForm.date} @ {bookingForm.time}</strong>
                   </div>
@@ -918,7 +1188,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                 <button
                   type="button"
                   onClick={() => setBookingStep(prev => prev - 1)}
-                  className="bg-white border border-slate-350 text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer"
+                  className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl px-4 py-2.5 text-sm font-semibold cursor-pointer transition-colors"
                 >
                   Back
                 </button>
@@ -927,7 +1197,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer shadow-xs ml-auto"
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold cursor-pointer shadow-sm ml-auto transition-all"
                 >
                   Continue
                 </button>
@@ -936,7 +1206,7 @@ export default function PatientPanel({ subView, db, handlers }) {
                 <button
                   type="submit"
                   disabled={isSubmittingBooking}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer shadow-xs ml-auto"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold cursor-pointer shadow-sm ml-auto transition-all"
                 >
                   {isSubmittingBooking ? 'Submitting...' : 'Confirm & Schedule'}
                 </button>
