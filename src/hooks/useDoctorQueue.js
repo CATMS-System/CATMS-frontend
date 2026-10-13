@@ -56,10 +56,8 @@ export function useDoctorQueue(doctorIdentifier, branchId = 1, initialQueue = []
         params.doctor_id = numericDoctorId;
       }
       const response = await api.get('/appointments/queue', { params });
-      if (response?.data && Array.isArray(response.data) && response.data.length > 0) {
+      if (response?.data && Array.isArray(response.data)) {
         setQueue(response.data.map(normalizeQueueItem));
-      } else if (Array.isArray(resolvedInitialQueue) && resolvedInitialQueue.length > 0) {
-        setQueue(resolvedInitialQueue.map(normalizeQueueItem));
       } else {
         setQueue([]);
       }
