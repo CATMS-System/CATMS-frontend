@@ -222,7 +222,10 @@ export default function PatientProfileCard({
                       )}
                     </span>
                   </div>
-                  <div>Policy No: <strong>{policy.policy_number}</strong></div>
+                  <div className="flex items-center justify-between">
+                    <span>Policy ID: <strong className="text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-mono">#{policy.policy_id || policy.Policy_ID}</strong></span>
+                    <span>Policy No: <strong>{policy.policy_number}</strong></span>
+                  </div>
                   <div>Type: {policy.policy_type.replace('_', ' ')}</div>
                   <div>Dates: {policy.start_date} to {policy.end_date}</div>
                   <div>Coverage: {policy.default_coverage_percentage}%</div>
