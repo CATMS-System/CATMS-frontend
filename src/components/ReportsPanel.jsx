@@ -169,10 +169,15 @@ export default function ReportsPanel({ db }) {
           case 'rep-02': rows = await getDoctorRevenue(dateStart, dateEnd, effectiveBranchId); break;
           case 'rep-03': rows = await getOutstandingBalances(effectiveBranchId); break;
           case 'rep-04': rows = await getTreatmentUsage(dateStart, dateEnd, effectiveBranchId); break;
-          case 'rep-05':
-            if (isManager) throw new Error('Access denied: Branch Managers cannot view organization-wide insurance reports.');
+          case 'rep-05': {
+            const isBranchManager = role === 'ROLE_BRANCH_MANAGER' ||
+              db?.currentUser?.role === 'Branch Manager' ||
+              db?.currentUser?.role === 'Branch_Manager' ||
+              db?.currentUser?.System_Role === 'Branch_Manager';
+            if (isBranchManager) throw new Error('Access denied: Branch Managers cannot view organization-wide insurance reports.');
             rows = await getInsuranceVsOutOfPocket(dateStart, dateEnd, effectiveBranchId);
             break;
+          }
         }
         if (!Array.isArray(rows)) throw new Error('The report API returned an invalid response.');
         if (active) setResult({ key: requestKey, rows, loading: false, error: '' });

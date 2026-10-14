@@ -66,3 +66,15 @@ test('all dated report APIs preserve dynamic and manually selected YYYY-MM-DD da
     }
   }
 });
+
+test('ReportsPanel renders Insurance vs. Out-of-Pocket tab for Billing_Staff and Admin', () => {
+  const adminHtml = renderToStaticMarkup(React.createElement(ReportsPanel, {
+    db: { currentUser: { roleCode: 'ROLE_ADMIN' } }
+  }));
+  assert.ok(adminHtml.includes('Insurance vs. Out-of-Pocket (REP-05)'));
+
+  const billingHtml = renderToStaticMarkup(React.createElement(ReportsPanel, {
+    db: { currentUser: { roleCode: 'ROLE_BILLING_STAFF', branch: 'Colombo Main', branch_id: 1 } }
+  }));
+  assert.ok(billingHtml.includes('Insurance vs. Out-of-Pocket (REP-05)'));
+});

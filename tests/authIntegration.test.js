@@ -208,6 +208,7 @@ test('Billing_Staff in Galle locks reports to Branch 3 with Scoped badge', t => 
   assert.ok(html.includes('Branch Scope (Locked)'));
   assert.ok(html.includes('Branch 3 - Galle'));
   assert.ok(html.includes('Scoped'));
+  assert.ok(html.includes('Insurance vs. Out-of-Pocket (REP-05)'));
 });
 
 test('Billing_Staff in Galle locks invoices to Branch 3 with Scoped badge', t => {
