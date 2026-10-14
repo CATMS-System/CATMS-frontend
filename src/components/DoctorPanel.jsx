@@ -177,10 +177,10 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
 
   // Filtered upcoming appointments
   const filteredAppointments = useMemo(() => {
-    return doctorAppointments.filter((appt) => {
-      const apptDate = appt.Appointment_Date;
+    return (doctorAppointments || []).filter((appt) => {
+      const apptDate = String(appt.Appointment_Date || appt.appointment_date || appt.date || '').slice(0, 10);
       if (dateFilter === 'upcoming') {
-        if (apptDate < todayStr) return false;
+        if (apptDate && apptDate < todayStr) return false;
       } else if (dateFilter === 'today') {
         if (apptDate !== todayStr) return false;
       } else if (dateFilter === 'tomorrow') {
@@ -198,11 +198,21 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
       }
 
       if (searchFilter.trim()) {
-        const q = searchFilter.toLowerCase();
-        const matchName = (appt.Patient_Name || '').toLowerCase().includes(q);
-        const matchId = String(appt.Patient_ID || '').toLowerCase().includes(q);
-        const matchReason = (appt.Reason_For_Visit || '').toLowerCase().includes(q);
-        if (!matchName && !matchId && !matchReason) return false;
+        const q = searchFilter.toLowerCase().trim();
+        const rawPatId = appt.Patient_ID != null ? String(appt.Patient_ID) : (appt.patientId != null ? String(appt.patientId) : '');
+        const padPatId = rawPatId ? rawPatId.padStart(4, '0') : '';
+        const rawApptId = appt.Appointment_ID != null ? String(appt.Appointment_ID) : (appt.id != null ? String(appt.id) : '');
+
+        const matchName = String(appt.Patient_Name || appt.patientName || '').toLowerCase().includes(q);
+        const matchId = rawPatId.includes(q) ||
+          (rawPatId && `pat-${rawPatId}`.includes(q)) ||
+          (padPatId && `pat-${padPatId}`.includes(q));
+        const matchApptId = rawApptId.includes(q) ||
+          (rawApptId && `app-${rawApptId}`.includes(q));
+        const matchReason = String(appt.Reason_For_Visit || appt.reason || '').toLowerCase().includes(q);
+        const matchPhone = String(appt.Contact_Number || appt.Patient_Phone || appt.phone || '').toLowerCase().includes(q);
+
+        if (!matchName && !matchId && !matchApptId && !matchReason && !matchPhone) return false;
       }
 
       return true;
@@ -1466,7 +1476,23 @@ export default function DoctorPanel({ subView = 'workbench', paramId, db, handle
                       ) : (
                         <tr>
                           <td colSpan="6" className="px-6 py-10 text-center text-slate-400">
-                            No upcoming appointments found matching your selected filters.
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <span>No appointments found matching your selected filters.</span>
+                              {(searchFilter || dateFilter !== 'upcoming' || statusFilter !== 'active' || customDate) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSearchFilter('');
+                                    setDateFilter('upcoming');
+                                    setStatusFilter('active');
+                                    setCustomDate('');
+                                  }}
+                                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                >
+                                  Reset filters
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       )}

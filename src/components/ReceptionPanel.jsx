@@ -119,10 +119,28 @@ export default function ReceptionPanel({ subView, db, handlers }) {
   // Triage list filtered to local branch
   // Triage list filtered to local branch
   const localQueue = useMemo(() => {
-    return liveQueue.filter(q => {
-      const doc = staffList.find(s => s.id === q.doctorId);
+    return (liveQueue || []).filter(q => {
+      // 1. Direct branch check on queue item if available
+      const qBranchId = q.Branch_ID ?? q.branch_id ?? q.branchId;
+      if (qBranchId != null && currentBranchId != null) {
+        return Number(qBranchId) === Number(currentBranchId);
+      }
+      if (q.branch && currentBranch) {
+        const qBranchStr = String(q.branch).toLowerCase();
+        const curBranchStr = String(currentBranch).toLowerCase();
+        if (qBranchStr.includes(curBranchStr) || curBranchStr.includes(qBranchStr)) {
+          return true;
+        }
+      }
+
+      // 2. Fallback to doctor lookup in staffList
+      const doc = staffList.find(s =>
+        s.id === q.doctorId ||
+        String(s.Staff_ID) === String(q.doctorId).replace('STF-', '') ||
+        String(s.Doctor_ID) === String(q.doctorId).replace('STF-', '').replace('DOC-', '')
+      );
       if (!doc) return true;
-      return (doc.Branch_ID != null && doc.Branch_ID === currentBranchId) ||
+      return (doc.Branch_ID != null && Number(doc.Branch_ID) === Number(currentBranchId)) ||
         (doc.branch && currentBranch && (
           doc.branch.toLowerCase().includes(currentBranch.toLowerCase()) ||
           currentBranch.toLowerCase().includes(doc.branch.toLowerCase())
@@ -250,13 +268,14 @@ export default function ReceptionPanel({ subView, db, handlers }) {
         String(a.Doctor_ID) === String(selectedDocId).replace('STF-', '');
       const apptTime = a.time || (a.Start_Time && a.Start_Time.slice(0, 5));
       const matchTime = apptTime === hour;
-      const apptDate = a.date || a.Appointment_Date;
+      const apptDate = String(a.date || a.Appointment_Date || '').slice(0, 10);
       const matchDate = apptDate === selectedDate;
-      const matchBranch = !a.branch ||
-        (currentBranch && (
-          a.branch.toLowerCase().includes(currentBranch.toLowerCase()) ||
-          currentBranch.toLowerCase().includes(a.branch.toLowerCase())
-        ));
+      const matchBranch = (a.Branch_ID != null && currentBranchId != null)
+        ? Number(a.Branch_ID) === Number(currentBranchId)
+        : (!a.branch || !currentBranch || (
+            a.branch.toLowerCase().includes(currentBranch.toLowerCase()) ||
+            currentBranch.toLowerCase().includes(a.branch.toLowerCase())
+          ));
       return matchDoc && matchTime && matchDate && matchBranch;
     });
 

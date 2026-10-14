@@ -375,35 +375,50 @@ export default function BillingPanel({ subView, db, handlers }) {
   )).values()], [apiInvoices]);
 
   const filteredInvoices = useMemo(() => {
-    return apiInvoices.filter(inv => {
-      const search =
-        invoiceSearchQuery
-          .trim()
-          .toLowerCase();
+    return (apiInvoices || []).filter(inv => {
+      const search = (invoiceSearchQuery || '').trim().toLowerCase();
 
-      const matchSearch =
-        inv.Invoice_ID
-          .toString()
-          .includes(search) ||
-        inv.Consultation_ID
-          .toString()
-          .includes(search);
+      let matchSearch = true;
+      if (search) {
+        const invId = inv.Invoice_ID != null ? String(inv.Invoice_ID) : '';
+        const conId = inv.Consultation_ID != null ? String(inv.Consultation_ID) : '';
+        const apptId = inv.Appointment_ID != null ? String(inv.Appointment_ID) : '';
+        const patId = inv.Patient_ID != null ? String(inv.Patient_ID) : (inv.patient_id != null ? String(inv.patient_id) : '');
+        const patName = String(inv.Patient_Name || inv.patient_name || '').toLowerCase();
+        const docName = String(inv.Doctor_Name || inv.doctor_name || '').toLowerCase();
+        const branchName = String(inv.Branch_Name || inv.branch || '').toLowerCase();
 
-      const normalizedStatus =
-        inv.Invoice_Status
-          .toUpperCase()
-          .replaceAll(' ', '_');
+        matchSearch = invId.includes(search) ||
+          (invId && `inv-${invId}`.includes(search)) ||
+          (invId && `inv-${invId.padStart(4, '0')}`.includes(search)) ||
+          conId.includes(search) ||
+          (conId && `con-${conId}`.includes(search)) ||
+          apptId.includes(search) ||
+          (apptId && `app-${apptId}`.includes(search)) ||
+          patId.includes(search) ||
+          (patId && `pat-${patId}`.includes(search)) ||
+          (patId && `pat-${patId.padStart(4, '0')}`.includes(search)) ||
+          patName.includes(search) ||
+          docName.includes(search) ||
+          branchName.includes(search);
+      }
+
+      const normalizedStatus = String(inv.Invoice_Status || inv.status || '')
+        .toUpperCase()
+        .replace(/[\s-]+/g, '_');
 
       const matchStatus =
         invoiceStatusFilter === 'All' ||
-        normalizedStatus === invoiceStatusFilter;
+        normalizedStatus === invoiceStatusFilter ||
+        (invoiceStatusFilter === 'PARTIALLY_PAID' && (normalizedStatus === 'PARTIALLY_PAID' || normalizedStatus === 'PARTIAL'));
 
-      return (
-        matchSearch &&
-        matchStatus &&
-        (!invoiceDateFilter || inv.Invoice_Date === invoiceDateFilter) &&
-        (!invoiceBranchFilter || String(inv.Branch_ID) === invoiceBranchFilter)
-      );
+      const invDate = String(inv.Invoice_Date || inv.date || '').slice(0, 10);
+      const matchDate = !invoiceDateFilter || invDate === invoiceDateFilter;
+
+      const invBranchId = inv.Branch_ID != null ? String(inv.Branch_ID) : '';
+      const matchBranch = !invoiceBranchFilter || invBranchId === String(invoiceBranchFilter);
+
+      return matchSearch && matchStatus && matchDate && matchBranch;
     });
   }, [
     apiInvoices,
@@ -1057,7 +1072,7 @@ export default function BillingPanel({ subView, db, handlers }) {
 
               <input
                 type="text"
-                placeholder="Search by invoice or consultation ID..."
+                placeholder="Search by invoice, consultation, patient, or doctor..."
                 className="w-full border border-slate-350 rounded-lg px-3 py-2 text-sm"
                 value={
                   invoiceSearchQuery
@@ -1220,7 +1235,23 @@ export default function BillingPanel({ subView, db, handlers }) {
                         colSpan="3"
                         className="px-4 py-10 text-center text-sm text-slate-400"
                       >
-                        No invoices found.
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <span>No invoices match the selected filters.</span>
+                          {(invoiceSearchQuery || invoiceStatusFilter !== 'All' || invoiceDateFilter || (invoiceBranchFilter && !isBranchScoped)) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInvoiceSearchQuery('');
+                                setInvoiceStatusFilter('All');
+                                setInvoiceDateFilter('');
+                                if (!isBranchScoped) setInvoiceBranchFilter('');
+                              }}
+                              className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                            >
+                              Reset filters
+                            </button>
+                          )}
+                        </div>
                       </td>
 
                     </tr>

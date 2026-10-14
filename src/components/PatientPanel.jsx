@@ -289,11 +289,26 @@ export default function PatientPanel({ subView, db, handlers }) {
         branch: d.Branch_Name || bookingForm.branch
       }));
     }
-    return staffList.filter(s => {
-      const matchBranch = s.Branch_ID === selectedBranchId || (s.branch && bookingForm.branch && (s.branch.toLowerCase().includes(bookingForm.branch.toLowerCase()) || bookingForm.branch.toLowerCase().includes(s.branch.toLowerCase())));
-      const isDoc = s.role && (s.role.includes('Doc') || s.role.includes('Card') || s.role.includes('Derm') || s.role.includes('Practitioner') || s.role.includes('Physician') || s.role.includes('Surgeon'));
-      const matchRole = !bookingForm.specialtyId || (s.role && s.role.toLowerCase().includes((bookingForm.specialty || '').toLowerCase().split(' ')[0]));
-      return matchBranch && isDoc && (bookingForm.specialty === 'All Specialties' || matchRole) && s.status === 'Active';
+    return (staffList || []).filter(s => {
+      const matchBranch = (s.Branch_ID != null && selectedBranchId != null && Number(s.Branch_ID) === Number(selectedBranchId)) ||
+        (s.branch && bookingForm.branch && (
+          s.branch.toLowerCase().includes(bookingForm.branch.toLowerCase()) ||
+          bookingForm.branch.toLowerCase().includes(s.branch.toLowerCase())
+        ));
+
+      const roleStr = String(s.role || s.System_Role || s.systemRole || '');
+      const isDoc = s.isDoctor ||
+        s.systemRole === 'Doctor' ||
+        Boolean(s.Doctor_ID) ||
+        /doc|cardio|derm|practitioner|physician|surgeon|consultant/i.test(roleStr) ||
+        (s.name && s.name.toLowerCase().includes('dr.'));
+
+      const specQuery = (bookingForm.specialty || '').toLowerCase().split(' ')[0];
+      const matchRole = !bookingForm.specialtyId || bookingForm.specialty === 'All Specialties' || (specQuery && roleStr.toLowerCase().includes(specQuery));
+
+      const isActive = (s.status || s.Employment_Status || '').toLowerCase() === 'active';
+
+      return matchBranch && isDoc && matchRole && isActive;
     });
   }, [realDoctors, staffList, selectedBranchId, bookingForm.branch, bookingForm.specialtyId, bookingForm.specialty]);
 

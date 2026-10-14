@@ -52,8 +52,14 @@ export const ClinicQueueTable: React.FC<ClinicQueueTableProps> = ({
     return () => clearInterval(interval);
   }, [autoRefresh, fetchQueue]);
 
-  const scheduledCount = queueItems.filter((q) => q.Appointment_Type.toLowerCase() !== 'walk_in').length;
-  const walkInCount = queueItems.filter((q) => q.Appointment_Type.toLowerCase() === 'walk_in').length;
+  const scheduledCount = (queueItems || []).filter((q) => {
+    const type = String(q?.Appointment_Type || '').toLowerCase();
+    return type !== 'walk_in' && type !== 'walk-in' && !(q as any)?.isWalkIn;
+  }).length;
+  const walkInCount = (queueItems || []).filter((q) => {
+    const type = String(q?.Appointment_Type || '').toLowerCase();
+    return type === 'walk_in' || type === 'walk-in' || Boolean((q as any)?.isWalkIn);
+  }).length;
 
   return (
     <div className="ds-card bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden space-y-0">

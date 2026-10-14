@@ -25,13 +25,24 @@ export const PatientSearchField: React.FC<PatientSearchFieldProps> = ({
   const [isOpen, setIsOpen] = useState(false);
 
   const filteredPatients = useMemo(() => {
-    if (!searchQuery.trim()) return patients.slice(0, 5);
-    const q = searchQuery.toLowerCase();
-    return patients.filter((p) =>
-      p.Full_Name.toLowerCase().includes(q) ||
-      (p.NIC && p.NIC.toLowerCase().includes(q)) ||
-      (p.Contact_Number && p.Contact_Number.includes(q))
-    ).slice(0, 6);
+    if (!searchQuery.trim()) return (patients || []).slice(0, 5);
+    const q = searchQuery.toLowerCase().trim();
+    return (patients || []).filter((p) => {
+      const patId = String(p.Patient_ID || (p as any).id || (p as any).patient_id || '');
+      const patCode = `pat-${patId}`;
+      const patCodePad = patId ? `pat-${patId.padStart(4, '0')}` : '';
+      const name = String(p.Full_Name || (p as any).name || `${(p as any).First_Name || ''} ${(p as any).Last_Name || ''}`).toLowerCase();
+      const nic = String(p.NIC || (p as any).nic || '').toLowerCase();
+      const phone = String(p.Contact_Number || (p as any).phone || (p as any).contact || '');
+
+      return name.includes(q) ||
+        nic.includes(q) ||
+        phone.includes(q) ||
+        patId === q ||
+        patId.includes(q) ||
+        patCode.includes(q) ||
+        patCodePad.includes(q);
+    }).slice(0, 6);
   }, [patients, searchQuery]);
 
   if (selectedPatient) {
@@ -79,7 +90,7 @@ export const PatientSearchField: React.FC<PatientSearchFieldProps> = ({
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder="Search by Patient Name, NIC, or Phone..."
+          placeholder="Search by Patient Name, ID (PAT-XXXX), NIC, or Phone..."
           className={`w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white ${
             error ? 'border-red-400' : 'border-gray-300'
           }`}

@@ -110,14 +110,29 @@ export default function ManagerPanel({ subView, db, handlers }) {
   // Read-only staff list (API first, fallback to db.staffList)
   const localStaff = useMemo(() => {
     if (apiStaff.length > 0) return apiStaff;
-    return staffList.filter(s => s.Branch_ID === managerBranchId);
-  }, [apiStaff, staffList, managerBranchId]);
+    return staffList.filter(s =>
+      (s.Branch_ID != null && Number(s.Branch_ID) === Number(managerBranchId)) ||
+      (s.branch && managerBranch && (
+        s.branch.toLowerCase().includes(managerBranch.toLowerCase()) ||
+        managerBranch.toLowerCase().includes(s.branch.toLowerCase())
+      ))
+    );
+  }, [apiStaff, staffList, managerBranchId, managerBranch]);
 
   // Real-time doctor availability states (API first, fallback to localStaff)
   const doctorsInBranch = useMemo(() => {
     if (apiDoctors.length > 0) return apiDoctors;
-    return staffList.filter(s => s.Branch_ID === managerBranchId && (s.role.includes('Doc') || s.role === 'Cardiologist' || s.role === 'Dermatologist' || s.role === 'General Practitioner'));
-  }, [apiDoctors, staffList, managerBranchId]);
+    return staffList.filter(s => {
+      const matchBranch = (s.Branch_ID != null && Number(s.Branch_ID) === Number(managerBranchId)) ||
+        (s.branch && managerBranch && (
+          s.branch.toLowerCase().includes(managerBranch.toLowerCase()) ||
+          managerBranch.toLowerCase().includes(s.branch.toLowerCase())
+        ));
+      if (!matchBranch) return false;
+      const roleStr = String(s.role || s.System_Role || s.systemRole || '');
+      return s.isDoctor || Boolean(s.Doctor_ID) || /doc|cardio|derm|practitioner|physician|surgeon|consultant/i.test(roleStr) || (s.name && s.name.toLowerCase().includes('dr.'));
+    });
+  }, [apiDoctors, staffList, managerBranchId, managerBranch]);
 
   const handleToggleDocStatus = (docId, newStatus) => {
     // Note: Backend does not expose a doctor live availability state endpoint; managed in frontend state
@@ -290,7 +305,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
         walkinsCount: walkins,
         revenueCollected: collected,
         totalDoctors: doctorsInBranch.length,
-        activeStaff: localStaff.filter(s => s.status === 'Active').length,
+        activeStaff: localStaff.filter(s => (s.status || s.Employment_Status || '').toLowerCase() === 'active').length,
         roomCount: 12
       };
     }
@@ -317,7 +332,7 @@ export default function ManagerPanel({ subView, db, handlers }) {
       walkinsCount: walkins,
       revenueCollected: collected,
       totalDoctors: doctorsInBranch.length,
-      activeStaff: localStaff.filter(s => s.status === 'Active').length,
+      activeStaff: localStaff.filter(s => (s.status || s.Employment_Status || '').toLowerCase() === 'active').length,
       roomCount: 12
     };
   }, [apiStatusCounts, apiDailySummary, appointmentList, invoiceList, managerBranch, doctorsInBranch, localStaff, todayStr]);

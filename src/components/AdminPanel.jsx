@@ -69,9 +69,16 @@ export default function AdminPanel({ subView, db, handlers }) {
     if (itemBranchId != null && Number(itemBranchId) === selectedBranchId) return true;
     if (itemBranchName) {
       const name = String(itemBranchName).toLowerCase();
+      const currentSelectedBranch = branches?.find(b => (b.Branch_ID || b.id) === selectedBranchId);
+      if (currentSelectedBranch) {
+        const curName = String(currentSelectedBranch.Branch_Name || currentSelectedBranch.name || '').toLowerCase();
+        if (curName && (name.includes(curName) || curName.includes(name))) return true;
+      }
       if (selectedBranchId === 1 && name.includes('colombo')) return true;
       if (selectedBranchId === 2 && name.includes('kandy')) return true;
       if (selectedBranchId === 3 && name.includes('galle')) return true;
+      if (selectedBranchId === 4 && name.includes('kurunegala')) return true;
+      if (selectedBranchId === 5 && name.includes('jaffna')) return true;
     }
     return false;
   };
@@ -408,10 +415,19 @@ export default function AdminPanel({ subView, db, handlers }) {
   }, [staffList, staffSearchQuery, staffBranchFilter, staffRoleFilter, staffStatusFilter]);
 
   const filteredAuditLogs = useMemo(() => {
-    return auditLogs.filter(log => {
-      const matchSearch = log.details.toLowerCase().includes(auditSearchQuery.toLowerCase()) || log.userId.toLowerCase().includes(auditSearchQuery.toLowerCase());
-      const matchAction = auditActionFilter === 'All' || log.action === auditActionFilter;
-      const matchDate = !auditDateFilter || log.timestamp.startsWith(auditDateFilter);
+    const q = (auditSearchQuery || '').toLowerCase().trim();
+    return (auditLogs || []).filter(log => {
+      const details = String(log.details || log.Details || '').toLowerCase();
+      const userId = String(log.userId || log.User_ID || log.user_id || '').toLowerCase();
+      const userName = String(log.userName || log.username || log.User_Name || '').toLowerCase();
+      const branch = String(log.branch || log.Branch_Name || '').toLowerCase();
+      const action = String(log.action || log.Action || '').toUpperCase();
+      const timestamp = String(log.timestamp || log.Timestamp || log.created_at || '');
+
+      const matchSearch = !q || details.includes(q) || userId.includes(q) || userName.includes(q) || branch.includes(q);
+      const matchAction = auditActionFilter === 'All' || action === auditActionFilter.toUpperCase() || String(log.action || '') === auditActionFilter;
+      const matchDate = !auditDateFilter || timestamp.startsWith(auditDateFilter) || timestamp.slice(0, 10) === auditDateFilter;
+
       return matchSearch && matchAction && matchDate;
     });
   }, [auditLogs, auditSearchQuery, auditActionFilter, auditDateFilter]);
@@ -1473,6 +1489,28 @@ export default function AdminPanel({ subView, db, handlers }) {
                       </React.Fragment>
                     );
                   })}
+                  {filteredAuditLogs.length === 0 && (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-10 text-center text-sm text-slate-400">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <span>No audit log entries match the selected filters.</span>
+                          {(auditSearchQuery || auditActionFilter !== 'All' || auditDateFilter) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAuditSearchQuery('');
+                                setAuditActionFilter('All');
+                                setAuditDateFilter('');
+                              }}
+                              className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                            >
+                              Reset filters
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
