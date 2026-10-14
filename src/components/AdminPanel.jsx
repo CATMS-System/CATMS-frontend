@@ -307,13 +307,102 @@ export default function AdminPanel({ subView, db, handlers }) {
 
   // Filtered lists
   const filteredStaff = useMemo(() => {
-    return staffList.filter(s => {
-      const matchSearch = s.name.toLowerCase().includes(staffSearchQuery.toLowerCase()) || s.id.toLowerCase().includes(staffSearchQuery.toLowerCase());
-      const matchBranch = staffBranchFilter === 'All' || s.branch === staffBranchFilter;
-      const matchRole = staffRoleFilter === 'All' || (staffRoleFilter === 'DOC'
-        ? (s.isDoctor || s.systemRole === 'Doctor' || (s.role && (s.role.toUpperCase().includes('DOC') || s.role.toUpperCase().includes('CARDIOLOG') || s.role.toUpperCase().includes('DERMATOLOG') || s.role.toUpperCase().includes('PRACTITIONER'))))
-        : s.role.toUpperCase().replace(' ', '_').includes(staffRoleFilter));
-      const matchStatus = staffStatusFilter === 'All' || s.status === staffStatusFilter;
+    return (staffList || []).filter(s => {
+      // 1. Search filter across name, id, role, systemRole, email, contact, license
+      const q = (staffSearchQuery || '').toLowerCase().trim();
+      let matchSearch = true;
+      if (q) {
+        const sName = (s.name || '').toLowerCase();
+        const sId = (s.id || '').toLowerCase();
+        const sStaffId = String(s.Staff_ID || s.staffId || '').toLowerCase();
+        const sRole = (s.role || '').toLowerCase();
+        const sSysRole = (s.systemRole || s.System_Role || '').toLowerCase();
+        const sEmail = (s.details?.email || s.Email || '').toLowerCase();
+        const sPhone = (s.details?.contact || s.Contact_Number || '').toLowerCase();
+        const sLicense = (s.license || s.License_Number || '').toLowerCase();
+        matchSearch = sName.includes(q) ||
+          sId.includes(q) ||
+          sStaffId === q ||
+          sRole.includes(q) ||
+          sSysRole.includes(q) ||
+          sEmail.includes(q) ||
+          sPhone.includes(q) ||
+          sLicense.includes(q);
+      }
+
+      // 2. Branch filter matching exact name, partial prefix, or branch ID
+      let matchBranch = true;
+      if (staffBranchFilter && staffBranchFilter !== 'All') {
+        const filterVal = String(staffBranchFilter).toLowerCase().trim();
+        const staffBranch = String(s.branch || '').toLowerCase().trim();
+        const staffBranchId = s.Branch_ID != null ? String(s.Branch_ID) : '';
+
+        matchBranch = staffBranch === filterVal ||
+          staffBranch.includes(filterVal) ||
+          filterVal.includes(staffBranch) ||
+          (staffBranchId && staffBranchId === filterVal) ||
+          (filterVal.includes('colombo') && staffBranch.includes('colombo')) ||
+          (filterVal.includes('kandy') && staffBranch.includes('kandy')) ||
+          (filterVal.includes('galle') && staffBranch.includes('galle')) ||
+          (filterVal.includes('kurunegala') && staffBranch.includes('kurunegala')) ||
+          (filterVal.includes('jaffna') && staffBranch.includes('jaffna'));
+      }
+
+      // 3. Role filter matching Doctor, Branch Manager, Receptionist, Nurse, Billing, Admin
+      let matchRole = true;
+      if (staffRoleFilter && staffRoleFilter !== 'All') {
+        const rFilter = String(staffRoleFilter).toUpperCase().trim();
+        const sRole = String(s.role || '').toUpperCase();
+        const sSysRole = String(s.systemRole || s.System_Role || '').toUpperCase();
+
+        if (rFilter === 'DOC' || rFilter === 'DOCTOR') {
+          matchRole = Boolean(s.isDoctor) ||
+            sSysRole === 'DOCTOR' ||
+            s.Doctor_ID != null ||
+            sRole.includes('DOC') ||
+            sRole.includes('CARDIOLOG') ||
+            sRole.includes('DERMATOLOG') ||
+            sRole.includes('PRACTITIONER') ||
+            sRole.includes('PHYSICIAN') ||
+            sRole.includes('SURGEON') ||
+            sRole.includes('PEDIATRIC') ||
+            sRole.includes('SPECIALIST');
+        } else if (rFilter === 'BRANCH_MANAGER' || rFilter === 'MANAGER') {
+          matchRole = sSysRole.includes('MANAGER') || sRole.includes('MANAGER');
+        } else if (rFilter === 'RECEPTIONIST') {
+          matchRole = sSysRole.includes('RECEPTION') || sRole.includes('RECEPTION');
+        } else if (rFilter === 'NURSE') {
+          matchRole = sSysRole.includes('NURSE') || sRole.includes('NURSE');
+        } else if (rFilter === 'BILLING' || rFilter === 'BILLING_STAFF') {
+          matchRole = sSysRole.includes('BILLING') ||
+            sRole.includes('BILLING') ||
+            sRole.includes('CASHIER') ||
+            sRole.includes('CLAIMS');
+        } else if (rFilter === 'ADMIN') {
+          matchRole = sSysRole.includes('ADMIN') || sRole.includes('ADMIN');
+        } else {
+          matchRole = sSysRole.includes(rFilter) || sRole.includes(rFilter);
+        }
+      }
+
+      // 4. Status filter matching Active vs Inactive (On_Leave, Terminated, Inactive, etc.)
+      let matchStatus = true;
+      if (staffStatusFilter && staffStatusFilter !== 'All') {
+        const rawStatus = String(s.status || s.Employment_Status || '').trim().toLowerCase();
+        const isActive = rawStatus === 'active';
+        if (staffStatusFilter === 'Active') {
+          matchStatus = isActive;
+        } else if (staffStatusFilter === 'Inactive') {
+          matchStatus = !isActive;
+        } else if (staffStatusFilter === 'On_Leave') {
+          matchStatus = rawStatus.replace(/[\s_-]+/g, '') === 'onleave';
+        } else if (staffStatusFilter === 'Terminated') {
+          matchStatus = rawStatus === 'terminated';
+        } else {
+          matchStatus = rawStatus === staffStatusFilter.toLowerCase();
+        }
+      }
+
       return matchSearch && matchBranch && matchRole && matchStatus;
     });
   }, [staffList, staffSearchQuery, staffBranchFilter, staffRoleFilter, staffStatusFilter]);
@@ -1050,9 +1139,21 @@ export default function AdminPanel({ subView, db, handlers }) {
               onChange={e => setStaffBranchFilter(e.target.value)}
             >
               <option value="All">All Branches</option>
-              <option value="Colombo Main">Colombo Main</option>
-              <option value="Kandy">Kandy</option>
-              <option value="Galle">Galle</option>
+              {branches && branches.length > 0 ? (
+                branches.map(b => {
+                  const bName = b.Branch_Name || b.name;
+                  const bId = b.Branch_ID || b.id;
+                  return (
+                    <option key={bId || bName} value={bName}>{bName}</option>
+                  );
+                })
+              ) : (
+                <>
+                  <option value="Colombo Main Clinic">Colombo Main Clinic</option>
+                  <option value="Kandy Central Clinic">Kandy Central Clinic</option>
+                  <option value="Galle Coastal Clinic">Galle Coastal Clinic</option>
+                </>
+              )}
             </select>
             <select
               className="border border-slate-200 rounded-xl px-3.5 py-2 text-sm bg-white w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-blue-500/25"
@@ -1060,11 +1161,12 @@ export default function AdminPanel({ subView, db, handlers }) {
               onChange={e => setStaffRoleFilter(e.target.value)}
             >
               <option value="All">All Roles</option>
-              <option value="ADMIN">Admin</option>
+              <option value="DOC">Doctor</option>
               <option value="BRANCH_MANAGER">Branch Manager</option>
               <option value="RECEPTIONIST">Receptionist</option>
+              <option value="NURSE">Nurse</option>
               <option value="BILLING">Billing Staff</option>
-              <option value="DOC">Doctor</option>
+              <option value="ADMIN">System Admin</option>
             </select>
             <select
               className="border border-slate-200 rounded-xl px-3.5 py-2 text-sm bg-white w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-blue-500/25"
@@ -1073,7 +1175,9 @@ export default function AdminPanel({ subView, db, handlers }) {
             >
               <option value="All">All Statuses</option>
               <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
+              <option value="Inactive">Inactive (On Leave / Terminated)</option>
+              <option value="On_Leave">On Leave</option>
+              <option value="Terminated">Terminated</option>
             </select>
           </div>
 
@@ -1096,63 +1200,85 @@ export default function AdminPanel({ subView, db, handlers }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
-                  {filteredStaff.map(staff => (
-                    <tr key={staff.id} className="hover:bg-blue-50/30 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900">{staff.name}</div>
-                        <span className="text-xs text-slate-400 font-mono">{staff.id}</span>
-                      </td>
-                      <td className="px-6 py-4 font-medium text-slate-700">{staff.role}</td>
-                      <td className="px-6 py-4 text-slate-600">{staff.branch}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                          staff.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
-                        }`}>
-                          {staff.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right space-x-3">
-                        <button
-                          onClick={() => {
-                            setSelectedStaff(staff);
-                            setShowTransferBranchModal(true);
-                          }}
-                          className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center space-x-1 cursor-pointer"
-                        >
-                          <ArrowLeftRight className="h-3 w-3" />
-                          <span>Transfer Branch</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedStaff(staff);
-                            setShowPasswordResetModal(true);
-                          }}
-                          className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center space-x-1 cursor-pointer"
-                        >
-                          <Key className="h-3 w-3" />
-                          <span>Reset PW</span>
-                        </button>
-                        <button
-                          onClick={() => handleToggleStaffStatus(staff)}
-                          className={`text-xs font-bold transition-colors inline-flex items-center space-x-1 cursor-pointer ${
-                            staff.status === 'Active' ? 'text-red-600 hover:text-red-800' : 'text-emerald-600 hover:text-emerald-800'
-                          }`}
-                        >
-                          {staff.status === 'Active' ? (
-                            <>
-                              <UserX className="h-3 w-3" />
-                              <span>Deactivate</span>
-                            </>
-                          ) : (
-                            <>
-                              <UserCheck className="h-3 w-3" />
-                              <span>Activate</span>
-                            </>
-                          )}
-                        </button>
+                  {filteredStaff.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <Users className="h-8 w-8 text-slate-300" />
+                          <span className="text-sm font-medium">No staff members found matching the selected filters.</span>
+                          <button
+                            onClick={() => {
+                              setStaffSearchQuery('');
+                              setStaffBranchFilter('All');
+                              setStaffRoleFilter('All');
+                              setStaffStatusFilter('All');
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline mt-1"
+                          >
+                            Reset Filters
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredStaff.map(staff => (
+                      <tr key={staff.id} className="hover:bg-blue-50/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-900">{staff.name}</div>
+                          <span className="text-xs text-slate-400 font-mono">{staff.id}</span>
+                        </td>
+                        <td className="px-6 py-4 font-medium text-slate-700">{staff.role}</td>
+                        <td className="px-6 py-4 text-slate-600">{staff.branch}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                            staff.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                          }`}>
+                            {staff.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right space-x-3">
+                          <button
+                            onClick={() => {
+                              setSelectedStaff(staff);
+                              setShowTransferBranchModal(true);
+                            }}
+                            className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center space-x-1 cursor-pointer"
+                          >
+                            <ArrowLeftRight className="h-3 w-3" />
+                            <span>Transfer Branch</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedStaff(staff);
+                              setShowPasswordResetModal(true);
+                            }}
+                            className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center space-x-1 cursor-pointer"
+                          >
+                            <Key className="h-3 w-3" />
+                            <span>Reset PW</span>
+                          </button>
+                          <button
+                            onClick={() => handleToggleStaffStatus(staff)}
+                            className={`text-xs font-bold transition-colors inline-flex items-center space-x-1 cursor-pointer ${
+                              staff.status === 'Active' ? 'text-red-600 hover:text-red-800' : 'text-emerald-600 hover:text-emerald-800'
+                            }`}
+                          >
+                            {staff.status === 'Active' ? (
+                              <>
+                                <UserX className="h-3 w-3" />
+                                <span>Deactivate</span>
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="h-3 w-3" />
+                                <span>Activate</span>
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

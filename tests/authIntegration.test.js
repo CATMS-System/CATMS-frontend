@@ -362,6 +362,26 @@ test('Admin staff directory renders Add Staff Member button and flexible branch 
   assert.ok(drawerHtml.includes('value="Kandy"'));
 });
 
+test('Admin staff directory provides dynamic branch, all role, and inactive/on-leave filters', async t => {
+  browser(t, {
+    name: 'System Admin',
+    email: 'admin@careflow.com',
+    roleCode: 'ROLE_ADMIN',
+    branch: 'Colombo Main'
+  }, '/admin/staff');
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.ok(html.includes('Staff Directory'));
+  assert.ok(html.includes('All Branches'));
+  assert.ok(html.includes('All Roles'));
+  assert.ok(html.includes('All Statuses'));
+  assert.ok(html.includes('Inactive (On Leave / Terminated)'));
+  assert.ok(html.includes('On Leave'));
+  assert.ok(html.includes('Terminated'));
+  assert.ok(html.includes('Branch Manager'));
+  assert.ok(html.includes('Nurse'));
+  assert.ok(html.includes('Billing Staff'));
+});
+
 test('Admin Executive Dashboard renders Revenue Collected and Outstanding Balance stat cards', async t => {
   browser(t, {
     name: 'System Admin',
