@@ -150,6 +150,84 @@ export default function PatientPanel({ subView, db, handlers }) {
     }, 0);
   }, [personalInvoices]);
 
+  const visitCardData = useMemo(() => {
+    if (!personalAppointments || personalAppointments.length === 0) {
+      return { type: 'none' };
+    }
+
+    const now = new Date();
+    const currentDateStr = now.toISOString().split('T')[0];
+    const currentHours = String(now.getHours()).padStart(2, '0');
+    const currentMins = String(now.getMinutes()).padStart(2, '0');
+    const currentTimeStr = `${currentHours}:${currentMins}`;
+
+    const upcoming = [];
+    const past = [];
+
+    personalAppointments.forEach(appt => {
+      const apptDate = String(appt.date || '');
+      const apptTime = String(appt.time || '00:00').slice(0, 5);
+      const s = String(appt.status || '').toLowerCase();
+      const isPastDate = apptDate < currentDateStr || (apptDate === currentDateStr && apptTime < currentTimeStr);
+      const isTerminal = ['completed', 'cancelled', 'no_show'].includes(s);
+
+      if (!isPastDate && !isTerminal) {
+        upcoming.push({ ...appt, apptDate, apptTime, isToday: apptDate === currentDateStr });
+      } else {
+        past.push({
+          ...appt,
+          apptDate,
+          apptTime,
+          isPastDate,
+          isCompleted: s === 'completed',
+          isCancelled: s === 'cancelled'
+        });
+      }
+    });
+
+    if (upcoming.length > 0) {
+      upcoming.sort((a, b) => a.apptDate.localeCompare(b.apptDate) || a.apptTime.localeCompare(b.apptTime));
+      const next = upcoming[0];
+      return {
+        type: 'upcoming',
+        title: 'Next Scheduled Visit',
+        badge: next.isToday ? 'TODAY' : 'UPCOMING',
+        badgeClass: next.isToday
+          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          : 'bg-blue-50 text-blue-700 border border-blue-200',
+        appointment: next
+      };
+    }
+
+    if (past.length > 0) {
+      past.sort((a, b) => b.apptDate.localeCompare(a.apptDate) || b.apptTime.localeCompare(a.apptTime));
+      const latest = past[0];
+      let badge = 'COMPLETED';
+      let badgeClass = 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+      let title = 'Last Completed Visit';
+
+      if (latest.isCancelled) {
+        badge = 'CANCELLED';
+        badgeClass = 'bg-rose-50 text-rose-700 border border-rose-200';
+        title = 'Previous Visit';
+      } else if (!latest.isCompleted) {
+        badge = 'EXPIRED';
+        badgeClass = 'bg-amber-50 text-amber-700 border border-amber-200';
+        title = 'Past Appointment (Expired)';
+      }
+
+      return {
+        type: 'past',
+        title,
+        badge,
+        badgeClass,
+        appointment: latest
+      };
+    }
+
+    return { type: 'none' };
+  }, [personalAppointments]);
+
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const tomorrowStr = useMemo(() => {
     const d = new Date();
@@ -511,31 +589,74 @@ export default function PatientPanel({ subView, db, handlers }) {
           </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Upcoming Appointment Widget */}
+            {/* Upcoming or Previous Appointment Widget */}
             <motion.div custom={0} variants={MOTION_VARIANTS.fadeUp} initial="hidden" animate="visible" className="ds-card ds-card-hover p-6 space-y-4">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                <h3 className="font-bold text-slate-900 text-sm">Next Scheduled Visit</h3>
-                <span className="bg-blue-50 text-blue-700 rounded-full px-2 py-0.5 text-[10px] font-bold font-mono uppercase">
-                  {personalAppointments.length > 0 ? 'Upcoming' : 'None'}
+                <h3 className="font-bold text-slate-900 text-sm">
+                  {visitCardData.type === 'upcoming' ? 'Next Scheduled Visit' : (visitCardData.type === 'past' ? visitCardData.title : 'Next Scheduled Visit')}
+                </h3>
+                <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold font-mono uppercase ${visitCardData.badgeClass || 'bg-slate-100 text-slate-500'}`}>
+                  {visitCardData.badge || 'None'}
                 </span>
               </div>
 
-              {personalAppointments.length > 0 ? (
+              {visitCardData.type === 'upcoming' ? (
                 <div className="space-y-3">
                   <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2 text-xs">
                     <div className="flex items-center space-x-2 text-blue-900 font-bold">
                       <Calendar className="h-4 w-4 text-blue-600" />
-                      <span>{personalAppointments[0].date} @ {personalAppointments[0].time}</span>
+                      <span>{visitCardData.appointment.date} @ {visitCardData.appointment.time}</span>
                     </div>
-                    <div className="text-slate-600 font-medium">Physician: {personalAppointments[0].doctorName}</div>
-                    <div className="text-slate-500 font-mono text-[10px]">Location: {personalAppointments[0].branch}</div>
-                    <div className="text-slate-500 italic mt-1 font-sans">Reason: "{personalAppointments[0].reason}"</div>
+                    <div className="text-slate-600 font-medium">Physician: {visitCardData.appointment.doctorName}</div>
+                    <div className="text-slate-500 font-mono text-[10px]">Location: {visitCardData.appointment.branch}</div>
+                    <div className="text-slate-500 italic mt-1 font-sans">Reason: "{visitCardData.appointment.reason}"</div>
+                  </div>
+                </div>
+              ) : visitCardData.type === 'past' ? (
+                <div className="space-y-3">
+                  <div className={`p-4 rounded-xl space-y-2 text-xs border ${
+                    visitCardData.badge === 'EXPIRED'
+                      ? 'bg-amber-50/60 border-amber-200'
+                      : visitCardData.badge === 'CANCELLED'
+                      ? 'bg-rose-50/60 border-rose-200'
+                      : 'bg-slate-50/80 border-slate-200'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-slate-800 font-bold">
+                        <Calendar className="h-4 w-4 text-slate-500" />
+                        <span>{visitCardData.appointment.date} @ {visitCardData.appointment.time}</span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                        {visitCardData.badge === 'EXPIRED' ? 'Past / Unfulfilled' : visitCardData.badge === 'COMPLETED' ? 'Completed Visit' : 'Cancelled'}
+                      </span>
+                    </div>
+                    <div className="text-slate-600 font-medium">Physician: {visitCardData.appointment.doctorName}</div>
+                    <div className="text-slate-500 font-mono text-[10px]">Location: {visitCardData.appointment.branch}</div>
+                    <div className="text-slate-500 italic mt-1 font-sans">Reason: "{visitCardData.appointment.reason}"</div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-slate-500">No active upcoming bookings</span>
+                    <button
+                      onClick={() => navigateTo('/portal/book')}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                    >
+                      <Plus className="h-3 w-3" />
+                      <span>Book Next Visit</span>
+                    </button>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-6 text-slate-400 text-xs">
-                  <Calendar className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                  No upcoming clinic appointments scheduled.
+                <div className="text-center py-6 text-slate-400 text-xs space-y-3">
+                  <Calendar className="h-8 w-8 mx-auto text-slate-300" />
+                  <div>No upcoming clinic appointments scheduled.</div>
+                  <button
+                    onClick={() => navigateTo('/portal/book')}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Book Your First Visit</span>
+                  </button>
                 </div>
               )}
             </motion.div>
